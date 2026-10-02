@@ -501,8 +501,8 @@ function priceTable(t,v,at){if(!v.length)return "";
 function vPicks(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
   sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
-  var up=Object.keys(sd).sort(),past=Object.keys(pd).sort().reverse().filter(function(d){return !sd[d]}),days=up.concat(past);
-  if(days.indexOf(S.day)<0)S.day=days[0];
+  var up=Object.keys(sd).sort(),past=Object.keys(pd).sort().reverse().filter(function(d){return !sd[d]}),days=up.slice().reverse().concat(past); // newest first throughout, so Earlier/Later step the right way
+  if(days.indexOf(S.day)<0)S.day=up.length?up[0]:days[0]; // open on the soonest scheduled day
   var day=S.day,at=days.indexOf(day);
   // games already played (or under way) that day, plus any still to tip
   var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g}});
