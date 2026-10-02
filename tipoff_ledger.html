@@ -18,6 +18,26 @@ body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body);-webkit
 .wrap{max-width:1760px;margin:0 auto;padding-inline:24px;padding-block:28px 64px;display:flex;flex-direction:column;gap:20px}
 header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
 .topr{display:flex;align-items:center;gap:22px}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,560px),1fr));gap:16px}
+.lcard{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.lcard.lock{border-color:var(--made);background:linear-gradient(180deg,var(--made-soft),var(--bg) 42%);box-shadow:0 0 0 1px var(--made),0 0 38px -12px var(--made)}
+.lhead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.lhead .tm{font:600 22px/1 var(--display);letter-spacing:.04em;color:var(--accent);text-transform:uppercase}
+.lteams{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.lteam{display:flex;flex-direction:column;gap:8px;min-width:0}
+.lteam h3{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;color:var(--soft)}
+.lteam ol{list-style:none;margin:0;padding:0}
+.lteam li{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.lteam li:last-child{border-bottom:0}
+.lteam li .o{margin-left:auto}
+.lrep{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--soft)}
+.lrep div{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.lrep small{flex-basis:100%;color:var(--muted);font-size:12px;line-height:1.45}
+.ldot{width:8px;height:8px;border-radius:50%;background:var(--made);box-shadow:0 0 10px 2px var(--made);display:inline-block;margin-right:6px;vertical-align:1px;animation:lpulse 1.8s ease-in-out infinite}
+@keyframes lpulse{50%{opacity:.45}}
+@media(prefers-reduced-motion:reduce){.ldot{animation:none}}
+@media(max-width:560px){.lteams{grid-template-columns:1fr}}
+
 @media(min-width:601px){header.top{flex-wrap:nowrap;align-items:center}.topr{flex:none;margin-left:auto}.topr .refresh{max-width:440px}}
 .logo{width:72px;height:72px;border-radius:50%;flex:none;box-shadow:0 0 0 1px rgba(240,145,74,.35),0 0 26px 6px rgba(240,145,74,.55),0 0 70px 18px rgba(240,145,74,.22)}
 @media(max-width:600px){.logo{width:52px;height:52px}.topr{gap:14px;width:100%;justify-content:space-between}}
@@ -187,6 +207,7 @@ h2.sep{margin-top:12px;color:var(--muted)}
   <div class="bar">
     <div class="tabs" role="tablist" id="tabs">
       <button role="tab" data-tab="picks" id="tab-picks">Picks</button>
+      <button role="tab" data-tab="lineups" id="tab-lineups">Lineups</button>
       <button role="tab" data-tab="matchup" id="tab-matchup">Matchup</button>
       <button role="tab" data-tab="tips" id="tab-tips">Tip-offs</button>
       <button role="tab" data-tab="shots" id="tab-shots">First shots</button>
@@ -572,6 +593,50 @@ function vPicks(){
   S._days=days;
   view.innerHTML='<div class="picks">'+hd+round+cards+other+others+'</div>';
 }
+/* ---- daily lineups: posted starters when the NBA has them, otherwise the likeliest five from recent games ---- */
+function vLineups(){
+  var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
+  sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
+  var up=Object.keys(sd).sort(),past=Object.keys(pd).sort().reverse().filter(function(d){return !sd[d]}),days=up.slice().reverse().concat(past);
+  if(days.indexOf(S.day)<0)S.day=up.length?up[0]:days[0];
+  var day=S.day,at=days.indexOf(day);S._days=days;
+  var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g}});
+  var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
+  ms.sort(function(x,y){return String(x.ts||"").localeCompare(String(y.ts||""))});
+  var H=all.filter(function(g){return g.d<day});
+  function expected(t,c){ // likeliest five: most starts in the team's last five games, ties to the more recent, skipping anyone listed out
+    var gs=H.filter(function(g){return g.h===t||g.a===t}).slice(-5),n={},last={};
+    gs.forEach(function(g,i){(g.st[t]||[]).forEach(function(p){n[p]=(n[p]||0)+1;last[p]=i})});
+    var l=Object.keys(n).map(Number).filter(function(p){var i=c&&injOf(c,t,p);return !(i&&/^out/i.test(i.st))})
+      .sort(function(a,b){return n[b]-n[a]||last[b]-last[a]}).slice(0,5);
+    return{l:l,n:n,k:gs.length}}
+  function itag(i){return i?'<span class="tag '+(/^out/i.test(i.st)?"l":"q")+'" title="'+esc(i.c||"")+'">'+esc(i.st.toUpperCase())+(i.ty?" · "+esc(i.ty.toUpperCase()):"")+'</span>':""}
+  function team(m,t,c){
+    var u=!m.g&&c&&c.lu&&c.lu[t],posted=!!(u&&u.st.length>=5),fin=!!m.g,ids,ex=null,names={};
+    if(fin)ids=(m.g.st[t]||[]).slice();
+    else if(posted){ids=u.st.map(function(x){names[x[0]]=x[1];return x[0]})}
+    else{ex=expected(t,c);ids=ex.l}
+    var j;if(fin){var tp=m.g.tip;j=tp?(tp.wt===t?tp.w:(tp.lt===t?tp.l:null)):null}
+    else{j=IX.proj(t);if(c)j=pickJumper(c,t,j,day);if(ids.indexOf(j)<0&&!posted){var o=teamJumpersBefore(t,day).filter(function(p){return ids.indexOf(p)>=0});j=o.length?o[0]:j}}
+    var rows=ids.map(function(p){var i=c&&injOf(c,t,p);
+      return '<li><span>'+(D.players[p]?nm(p):esc(names[p]||"#"+p))+'</span>'+(p===j?'<span class="tag w">'+(fin?"TOOK THE TIP":"JUMPER")+'</span>':'')+itag(i)+(ex?'<span class="o">started '+(ex.n[p]||0)+' of last '+ex.k+'</span>':'')+'</li>'}).join("");
+    var inj=(c&&c.inj[t]||[]),rep=inj.map(function(x){return '<div><span>'+esc(x.n)+'</span>'+itag(x)+(x.d?'<span class="o">'+fmtD(x.d)+'</span>':'')+(x.c?'<small>'+esc(x.c)+'</small>':'')+'</div>'}).join("");
+    var off=u&&u.out&&u.out.length?'<div><span class="o">Inactive tonight</span> '+u.out.map(function(x){return esc(x[1])+(x[2]?' <span class="o">('+esc(x[2])+')</span>':'')}).join(", ")+'</div>':"";
+    var st=fin?'<span class="tag">STARTED</span>':posted?'<span class="tag w"><span class="ldot"></span>LOCKED</span>':'<span class="tag q">EXPECTED</span>';
+    return{lock:posted||fin,posted:posted,html:'<div class="lteam"><h3>'+t+' '+st+'</h3>'+(rows?'<ol>'+rows+'</ol>':'<p class="note">No earlier games for '+t+' in this data.</p>')+
+      (rep||off?'<h3>'+(fin?"Flagged before tip":"Injury report")+'</h3><div class="lrep">'+off+rep+'</div>':(c&&!fin&&D.inj?'<p class="note">Nobody listed.</p>':''))+'</div>'}}
+  var nLock=0,nUp=0;
+  var cards=ms.map(function(m){var c=ctxOf(m),a=team(m,m.a,c),b=team(m,m.h,c),lock=!m.g&&a.posted&&b.posted;
+    if(!m.g){nUp++;if(lock)nLock++}
+    return '<div class="lcard'+(lock?" lock":"")+'"><div class="lhead"><span class="tm">'+m.a+' @ '+m.h+'</span><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
+      (m.g?'<span class="tag">'+(m.g.lv?"LIVE":"FINAL")+' · ACTUAL STARTERS</span>':lock?'<span class="tag w"><span class="ldot"></span>LINEUPS LOCKED</span>':'<span class="tag q">'+(a.posted||b.posted?"ONE SIDE POSTED":"NOT POSTED YET")+'</span>')+'</span></div>'+
+      '<div class="lteams">'+a.html+b.html+'</div></div>'}).join("");
+  var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
+  Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
+  view.innerHTML='<section class="panel"><div class="phead"><h2>Daily lineups</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
+    (nUp?'<span class="tag '+(nLock===nUp?"w":nLock?"q":"")+'">'+nLock+' OF '+nUp+' LOCKED</span>':'')+'</div></div>'+
+    '<p class="note">'+(ms.length?'':'No games on this day. ')+'A game lights up once the NBA has posted both starting fives, usually about half an hour before tip. Until then each side shows its expected five: the players with the most starts in the team\'s last five games, leaving out anyone listed out. Injury designations and notes come from the league injury report'+(D.inj?'':' (not available in this copy)')+'. For games already played, the five shown are the players who actually started.</p>'+
+    (cards?'<div class="lgrid">'+cards+'</div>':'')+'</section>'}
 function vMatchup(){
   var a=S.a,b=S.b;if(a===b)b=teams().filter(function(t){return t!==a})[0];
   if(!S.ja||!teamTipAll(a).some(function(j){return j.p===S.ja}))S.ja=likelyJumper(a);
@@ -727,7 +792,7 @@ function render(){
   [].forEach.call(document.querySelectorAll("#seg-ft button"),function(b){b.setAttribute("aria-pressed",+b.dataset.v===S.ft)});
   if(!G.length){view.innerHTML='<p class="empty">No games match these filters.</p>';return}
   var keep=document.activeElement&&document.activeElement.id,pos=keep==="q"?document.activeElement.selectionStart:null;
-  ({picks:vPicks,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,games:vGames})[S.tab]();
+  ({picks:vPicks,lineups:vLineups,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,games:vGames})[S.tab]();
   if(keep&&$(keep)){$(keep).focus();if(pos!=null)$(keep).setSelectionRange(pos,pos)}
 }
 
@@ -772,7 +837,7 @@ function start(d){
     if(S.ssn!=="all"&&ss.map(String).indexOf(S.ssn)<0)S.ssn="all";
     if(!S.booted)S.ssn=nCur>=150?cur:"all"}else S.ssn="all";
   if(!S.booted&&(d.sched||[]).some(function(x){return x.d>=todayET()}))S.tab="picks";
-  if(!S.booted&&["picks","matchup","tips","shots","leaders","tracker","games"].indexOf(h)>=0)S.tab=h;S.booted=1;
+  if(!S.booted&&["picks","lineups","matchup","tips","shots","leaders","tracker","games"].indexOf(h)>=0)S.tab=h;S.booted=1;
   var top=jumperTable().sort(function(a,b){return b.tips-a.tips})[0];S.jumper=top?top.p:null;
   $("subline").textContent=d.season+" season · opening tips, jumper head-to-heads and first attempts, from NBA play-by-play.";
   $("fresh").innerHTML=d.games.length+" games through "+fmtD(d.through)+", "+d.through.slice(0,4)+"<br>data built "+esc(d.built.replace("T"," ").replace("Z"," UTC"));
