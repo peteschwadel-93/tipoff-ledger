@@ -503,8 +503,8 @@ function topShooters(t,day,m){
     .sort(function(a,b){return (b.st>0)-(a.st>0)||b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)}).slice(0,10);
   function mark(x){if(pk[x.p])return ' <span class="tag w">PICK</span>';if(cand[x.p])return "";
     var i=c&&injOf(c,t,x.p);return ' <span class="tag'+(i&&/^out/i.test(i.st)?' l">OUT':'">NOT STARTING')+'</span>'}
-  return '<div class="tw"><table style="width:auto"><thead><tr><th>Shooter</th><th>Pos</th><th class="n">Per start</th><th class="n">Attempts</th><th class="n">Starts</th><th class="n">Last 3 games</th>'+cs.map(function(k){return '<th class="n">'+k+'</th>'}).join("")+'</tr></thead><tbody>'+
-    ten.map(function(x){return '<tr'+(pk[x.p]||cand[x.p]?'':' style="opacity:.6"')+'><td>'+esc(x.name)+mark(x)+'</td><td>'+(posOf(x.p)||'<span class="o">–</span>')+'</td><td class="n">'+(x.st?(x.c/x.st).toFixed(2):"–")+'</td><td class="n">'+x.c+'</td><td class="n">'+x.st+'</td><td class="n">'+x.n+" of "+(l3.length*3)+'</td>'+cs.map(function(k){return '<td class="n">'+(x.mix[k]||'<span class="o">·</span>')+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table></div>'}
+  return '<div class="tw"><table style="width:auto"><thead><tr><th>Pos</th><th>Shooter</th><th class="n">Per start</th><th class="n">Attempts</th><th class="n">Starts</th><th class="n">Last 3 games</th>'+cs.map(function(k){return '<th class="n">'+k+'</th>'}).join("")+'</tr></thead><tbody>'+
+    ten.map(function(x){return '<tr'+(pk[x.p]||cand[x.p]?'':' style="opacity:.6"')+'><td>'+(posOf(x.p)||'<span class="o">–</span>')+'</td><td>'+esc(x.name)+mark(x)+'</td><td class="n">'+(x.st?(x.c/x.st).toFixed(2):"–")+'</td><td class="n">'+x.c+'</td><td class="n">'+x.st+'</td><td class="n">'+x.n+" of "+(l3.length*3)+'</td>'+cs.map(function(k){return '<td class="n">'+(x.mix[k]||'<span class="o">·</span>')+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table></div>'}
 /* ---- first-basket prices and a rough value score ----
    Model: chance the team scores first = 50% + a third of its tip edge (fitted on both seasons), times the
    player's share of the team's early attempts among its five likeliest starters, pulled slightly toward an
