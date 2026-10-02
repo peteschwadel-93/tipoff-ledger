@@ -415,6 +415,11 @@ function teamJumpersBefore(t,day){ // most likely jumpers first: by how many of 
   var l=[];D.games.forEach(function(g){var tp=g.tip;if(g.d>=day||!tp)return;var p=tp.wt===t?tp.w:(tp.lt===t?tp.l:null);if(p)l.push(p)});
   l=l.slice(-30);var c={},last={};l.forEach(function(p,i){c[p]=(c[p]||0)+1;last[p]=i});
   return Object.keys(c).map(Number).sort(function(a,b){return c[b]-c[a]||last[b]-last[a]})}
+function jumpShare(t,j,day){ // how many of the team's last 10 opening tips this player took
+  var l=[];D.games.forEach(function(g){var tp=g.tip;if(g.d>=day||!tp)return;var p=tp.wt===t?tp.w:(tp.lt===t?tp.l:null);if(p)l.push(p)});
+  l=l.slice(-10);var n=0;l.forEach(function(p){if(p===j)n++});return{n:n,of:l.length,split:l.length>=5&&n/l.length<.8}}
+function shareTag(t,j,day){if(!j)return "";var s=jumpShare(t,j,day);if(!s.of)return "";
+  return '<span class="tag '+(s.split?"q":"")+'" title="In past seasons a starter who took 8 or more of the last 10 jumped again about 97% of the time; under 8, closer to 89%.">'+(s.split?"SPLIT ROLE · ":"")+s.n+" OF LAST "+s.of+' TIPS</span>'}
 function recBefore(p,day){var r=[];D.games.forEach(function(g){var t=g.tip;if(g.d>=day||!t)return;if(t.w===p)r.push(1);else if(t.l===p)r.push(0)});
   function s(l){var w=0;l.forEach(function(x){w+=x});return{w:w,n:l.length}}return{full:s(r),l15:s(r.slice(-15))}}
 function pickJumper(c,t,j,day){ // returns the jumper to rate, or null when nobody suitable is known
@@ -498,7 +503,7 @@ function vPicks(){
   function firsts(t){var gs=H.filter(function(g){return g.h===t||g.a===t}).slice(-3).reverse();if(!gs.length)return "";
     return '<h3>'+t+' first shot and first score, last 3 games</h3><div class="tw"><table><thead><tr><th>Game</th><th>Tip</th><th>'+t+' first shot</th><th>'+t+' first score</th><th>Game\'s first score</th></tr></thead><tbody>'+
       gs.map(function(g){var fs=firstScore(g),won=g.tip&&g.tip.pos===t;return '<tr><td>'+fmtD(g.d)+" "+(g.h===t?"vs ":"at ")+opp(g,t)+'</td><td><span class="tag '+(won?"w":"l")+'">'+(won?"WON":"LOST")+'</span></td><td class="cell">'+attText(att(g,t)[0])+'</td><td class="cell">'+(teamFirstScore(g,t)?attText(teamFirstScore(g,t)):'<span class="o">none in first 5 shots</span>')+'</td><td>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+'</td></tr>'}).join("")+'</tbody></table></div>'}
-  function side(t,j,f,r,cls,m,orig){var tg=swapTag(orig,j)+(m&&j?avail(m,t,j):"");return '<div class="side '+cls+'"><h3>'+t+' jumper</h3><div class="who">'+nm(j)+'</div>'+(tg?'<div class="rf">'+tg+'</div>':'')+'<div class="big">'+pct(f.w,f.n)+'</div><div class="kv"><span>Record <b>'+rec(f)+'</b></span><span>Last '+(r.n||15)+' <b>'+rec(r)+'</b></span></div></div>'}
+  function side(t,j,f,r,cls,m,orig){var tg=swapTag(orig,j)+(m&&j?avail(m,t,j):"")+shareTag(t,j,day);return '<div class="side '+cls+'"><h3>'+t+' jumper</h3><div class="who">'+nm(j)+'</div>'+(tg?'<div class="rf">'+tg+'</div>':'')+'<div class="big">'+pct(f.w,f.n)+'</div><div class="kv"><span>Record <b>'+rec(f)+'</b></span><span>Last '+(r.n||15)+' <b>'+rec(r)+'</b></span></div></div>'}
   var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
   Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   var hd='<section class="panel"><div class="phead"><h2>Picks</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
@@ -525,7 +530,7 @@ function vPicks(){
       var jOut=isOut(m,r.fav,j);
       return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+m.a+' @ '+m.h+'</span><span class="edge">'+r.fav+' '+r.abs+'%</span></div>'+
         (m.t?'<div><span class="tag">'+esc(m.t)+'</span>'+(m.pre?' <span class="tag">PRESEASON</span>':'')+' <span class="tag">RESULTS PENDING</span>'+(jOut?' <span class="tag l">CHECK · JUMPER UNAVAILABLE</span>':'')+'</div>':((g&&g.lv)||jOut?'<div>'+(g&&g.lv?'<span class="tag w">LIVE · SO FAR</span> ':'')+(jOut?'<span class="tag l">JUMPER WAS FLAGGED UNAVAILABLE</span>':'')+'</div>':''))+
-        '<div class="rblock"><h3>Tip pick</h3><div class="rl"><div class="rname">'+nm(j)+'</div>'+chev(r.lv,false,"sm"+(jOut?" off":""))+'</div>'+(swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)?'<div class="rf" style="padding-left:0">'+swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+'</div>':'')+'</div>'+
+        '<div class="rblock"><h3>Tip pick</h3><div class="rl"><div class="rname">'+nm(j)+'</div>'+chev(r.lv,false,"sm"+(jOut?" off":""))+'</div>'+(swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+shareTag(r.fav,j,day)?'<div class="rf" style="padding-left:0">'+swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+shareTag(r.fav,j,day)+'</div>':'')+'</div>'+
         '<div class="rblock"><h3>'+r.fav+' shooters</h3><ol>'+[0,1,2].map(function(k){var s=r.top[k];if(!s)return "";
           var l=g?att(g,r.fav):[],ts=g&&teamFirstScore(g,r.fav),fo=Infinity; // fo: where the game's first score falls in the order of attempts
           if(g)[g.h,g.a].forEach(function(t){att(g,t).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
