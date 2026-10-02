@@ -395,6 +395,7 @@ function grade(o){ // rating and favourite from the two jumpers' full records (o
 function normName(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z ]/g,"").replace(/\s+(jr|sr|ii|iii|iv)$/,"").replace(/\s+/g," ").trim()}
 function ctxOf(m){ // what is known about availability: live feeds for games to come, the saved pre-tip note for played ones
   if(!m.g)return D.inj||m.lu?{inj:D.inj||{},lu:m.lu||null,past:false}:null;
+  if(m.simLu){var lu={};[m.h,m.a].forEach(function(t){lu[t]={st:(m.g.st[t]||[]).map(function(p){return[p,D.players[p]||""]}),out:[]}});return{inj:{},lu:lu,past:true}} // tracker reference: that night's actual starters stand in for a posted lineup
   var f=(D.flags||{})[m.g.d+"|"+m.a+"|"+m.h];if(!f)return null;var inj={};
   Object.keys(f.inj||{}).forEach(function(t){inj[t]=f.inj[t].map(function(x){return{n:x[0],st:x[1],ty:x[2],c:""}})});
   return{inj:inj,lu:f.lu||null,past:true}}
@@ -656,13 +657,13 @@ function vLeaders(){
    Each finished regular-season game is re-read as it stood before tip: jumpers and rating from the games before
    that day, adjusted by the injury designations and lineup saved before tip, and the favoured side's three
    shooters. Nothing is entered by hand; if the pick rules change later, the whole table is recalculated. */
-function trackGames(season){
-  var key=season+"|"+S.ft;D._trk=D._trk||{};if(D._trk[key])return D._trk[key];
+function trackGames(season,sim){
+  var key=season+"|"+S.ft+"|"+(sim?1:0);D._trk=D._trk||{};if(D._trk[key])return D._trk[key];
   var IX=pickIndex(),out=[];
   D.games.forEach(function(g){if(g.s!==season||g.po||!g.tip||g.lv)return;
-    var e=IX.g[g.id],m={h:g.h,a:g.a,g:g},o={m:g,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh};
+    var e=IX.g[g.id],m={h:g.h,a:g.a,g:g,simLu:!!sim},o={m:g,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh};
     adjust(o,m,g.d);grade(o);if(!o.ok)return;
-    var t=o.fav,j=t===g.h?o.jh:o.ja,f=(D.flags||{})[g.d+"|"+g.a+"|"+g.h],conf=!!(f&&f.lu&&f.lu[t]&&f.lu[t].st&&f.lu[t].st.length);
+    var t=o.fav,j=t===g.h?o.jh:o.ja,f=(D.flags||{})[g.d+"|"+g.a+"|"+g.h],conf=!!sim||!!(f&&f.lu&&f.lu[t]&&f.lu[t].st&&f.lu[t].st.length);
     topShooters(t,g.d,m);var top=(topShooters.rows||[]).map(function(x){return x.p}),l=att(g,t),fo=Infinity,fs=firstScore(g);
     [g.h,g.a].forEach(function(tt){att(g,tt).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
     var fbaN=top.filter(function(p){return l.some(function(x){return x[0]===p&&x[6]<=fo})}).length,act=g.tip.wt===t?g.tip.w:(g.tip.lt===t?g.tip.l:null);
@@ -678,7 +679,7 @@ function trackTable(rows){
   return h+'</tbody></table></div>'}
 function vTracker(){
   var today=todayET(),sy=+today.slice(0,4)-(+today.slice(5,7)>=9?0:1),lab=function(y){return y+"-"+String(y+1).slice(2)};
-  var cur=trackGames(sy),shown=S.trkConf?cur.filter(function(x){return x.conf}):cur,prev=trackGames(sy-1);
+  var cur=trackGames(sy),shown=S.trkConf?cur.filter(function(x){return x.conf}):cur,prev=trackGames(sy-1,true);
   var log=shown.slice().reverse(),more=log.length>S.trkN;
   view.innerHTML='<section class="panel"><div class="phead"><h2>Tracker · '+lab(sy)+' regular season</h2><span class="seg" id="seg-trk"><button data-v="1" aria-pressed="'+(S.trkConf===1)+'">Lineup confirmed</button><button data-v="0" aria-pressed="'+(S.trkConf===0)+'">All games</button></span></div>'+
     '<p class="note">Every finished regular-season game, read as it stood before tip: the favoured side by the rating and its three shooters. "Lineup confirmed" counts only games where the favoured team\'s starting lineup was saved before tip. Results follow the Free throws switch. If the pick rules change, the whole table is recalculated with the new rules.</p>'+
@@ -687,7 +688,7 @@ function vTracker(){
       log.slice(0,S.trkN).map(function(x){var g=x.g,fs=firstScore(g);function yn(v){return '<span class="tag'+(v?" w":"")+'">'+(v?"YES":"NO")+'</span>'}
         return '<tr><td>'+fmtD(g.d)+'</td><td><span class="tm">'+g.a+" @ "+g.h+'</span></td><td><span class="tm">'+x.t+'</span> '+x.pct+'% '+chev(x.lv,false,"sm")+'</td><td>'+nm(x.j)+(x.jr===false?' <span class="tag l">DID NOT JUMP</span>':'')+'</td><td><span class="tag '+(x.tip?"w":"l")+'">'+(x.tip?"WON":"LOST")+'</span></td><td>'+yn(x.any)+' <span class="o">'+x.fbaN+" of "+x.n+'</span></td><td>'+yn(x.fb)+' <span class="o">'+(fs?nm(fs[0])+" ("+fs[1]+")":"")+'</span></td><td>'+x.top.map(nm).join(", ")+'</td></tr>'}).join("")+
       '</tbody></table></div>'+(more?'<button class="more" id="trkMore">Show 30 more ('+(log.length-S.trkN)+' left)</button>':'')+'</section>':'')+
-    (prev.length?'<section class="panel" style="margin-top:20px"><div class="phead"><h2>For reference · '+lab(sy-1)+' by the same rules</h2><span class="tag">back-test, not live picks</span></div><p class="note">Last season run through today\'s rules. No lineups or injury notes were saved then, so jumpers are guesses from each team\'s recent tips and shooters come from recent starters. Expect live results with confirmed lineups to run above these.</p>'+trackTable(prev)+'</section>':'');
+    (prev.length?'<section class="panel" style="margin-top:20px"><div class="phead"><h2>For reference · '+lab(sy-1)+' with lineups known</h2><span class="tag">back-test, not live picks</span></div><p class="note">Last season run through today\'s rules as if every lineup had been posted before tip: the jumper and the three shooters are chosen from each night\'s actual starters. This is the fair comparison for the Lineup confirmed view above. It has no injury notes, and it cannot tell which starter the coach sent to the circle.</p>'+trackTable(prev)+'</section>':'');
 }
 function vGames(){
   var gs=G.filter(function(g){return !S.logTeam||g.h===S.logTeam||g.a===S.logTeam}).slice().reverse(),shown=gs.slice(0,S.logN);
