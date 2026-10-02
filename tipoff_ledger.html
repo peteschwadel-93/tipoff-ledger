@@ -74,8 +74,16 @@ tbody tr.on td{background:var(--accent-soft)}
 .side.r{text-align:right;align-items:flex-end}
 .big{font:700 48px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--accent)}
 .who{font:600 22px/1.1 var(--display);text-transform:uppercase;letter-spacing:.04em;overflow-wrap:anywhere}
-.mid{width:128px;height:128px;border:1px solid var(--line);background:var(--surface);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}
-.mid b{font:700 34px/1 var(--display);font-variant-numeric:tabular-nums}
+.mid{width:136px;height:136px;border:1px solid var(--line);background:var(--surface);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}
+.midw{display:flex;flex-direction:column;align-items:center;gap:8px}
+.hh{font-size:12px;color:var(--muted);letter-spacing:.04em}.hh b{color:var(--ink);font-weight:500}
+.chev{width:66px;height:28px;display:block;flex:none}
+.chev.sm{width:44px;height:19px}
+.chev polyline{fill:none;stroke:var(--sunk);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.chev polyline.on{stroke:var(--made);filter:drop-shadow(0 0 4px var(--made))}
+.chev.off polyline.on,.mid.off .chev polyline.on{stroke:var(--muted);filter:none}
+.rl .rname{min-width:0}
+.mid b{font:700 30px/1 var(--display);font-variant-numeric:tabular-nums}
 .mid span{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
 .kv{display:flex;flex-wrap:wrap;gap:6px 24px;font-size:13.5px;color:var(--muted);align-items:baseline}
 .kv b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
@@ -143,7 +151,7 @@ section[id^="pick-"]{scroll-margin-top:16px}
 @media (max-width:760px){
   .wrap{padding-inline:16px}.panel{padding:16px}
   h1{font-size:36px}.grid2{grid-template-columns:minmax(0,1fr)}.filters{margin-left:0}.fresh{text-align:left}.refresh{align-items:flex-start}
-  .circle{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:16px}.mid{grid-column:1/-1;grid-row:1;justify-self:center;width:108px;height:108px}
+  .circle{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:16px}.midw{grid-column:1/-1;grid-row:1;justify-self:center}.mid{width:124px;height:124px}
   .big{font-size:38px} th,td{padding:10px 12px}
 }
 @media (prefers-reduced-motion:no-preference){.tabs button,.seg button,.more,.refresh button{transition:background .15s,color .15s,border-color .15s}}
@@ -199,7 +207,7 @@ section[id^="pick-"]{scroll-margin-top:16px}
 <script>
 (function(){
 "use strict";
-var D=null, G=[], S={ldDays:30,ldScope:3,ldTeam:"",tab:"matchup",po:"all",ssn:"all",day:null,margin:20,n:0,ft:1,a:null,b:null,ja:null,jb:null,jumper:null,q:"",minTips:10,shotTeam:null,logTeam:"",logN:40,sort:{}};
+var D=null, G=[], S={minLv:2,ldDays:30,ldScope:3,ldTeam:"",tab:"matchup",po:"all",ssn:"all",day:null,margin:20,n:0,ft:1,a:null,b:null,ja:null,jb:null,jumper:null,q:"",minTips:10,shotTeam:null,logTeam:"",logN:40,sort:{}};
 var $=function(id){return document.getElementById(id)};
 var view=$("view");
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -347,15 +355,32 @@ function pickIndex(){ // what was known before each game day: projected jumpers 
   var teamJ={},pl={},idx={},gs=D.games,i=0;
   function proj(t){var l=(teamJ[t]||[]).slice(-10),c={},best=null;l.forEach(function(p){c[p]=(c[p]||0)+1;if(!best||c[p]>=c[best])best=p});return best}
   function l15(p){var l=(pl[p]||[]).slice(-15),w=0;l.forEach(function(x){w+=x});return{w:w,n:l.length}}
+  function full(p){var l=pl[p]||[],w=0;l.forEach(function(x){w+=x});return{w:w,n:l.length}}
   while(i<gs.length){var j=i;while(j<gs.length&&gs[j].d===gs[i].d)j++;
-    for(var k=i;k<j;k++){var g=gs[k],ja=proj(g.a),jh=proj(g.h);idx[g.id]={ja:ja,jh:jh,ra:ja?l15(ja):{w:0,n:0},rh:jh?l15(jh):{w:0,n:0}}}
+    for(var k=i;k<j;k++){var g=gs[k],ja=proj(g.a),jh=proj(g.h);idx[g.id]={ja:ja,jh:jh,ra:ja?l15(ja):{w:0,n:0},rh:jh?l15(jh):{w:0,n:0},fa:ja?full(ja):{w:0,n:0},fh:jh?full(jh):{w:0,n:0}}}
     for(k=i;k<j;k++){var t=gs[k].tip;if(!t||!t.w||!t.l)continue;(teamJ[t.wt]=teamJ[t.wt]||[]).push(t.w);(teamJ[t.lt]=teamJ[t.lt]||[]).push(t.l);(pl[t.w]=pl[t.w]||[]).push(1);(pl[t.l]=pl[t.l]||[]).push(0)}
     i=j}
-  return D._idx={g:idx,proj:proj,l15:l15};
+  return D._idx={g:idx,proj:proj,l15:l15,full:full};
 }
-function grade(o){ // margin and favourite from two last-15 records
-  o.ok=o.ra.n>=5&&o.rh.n>=5;o.diff=o.ok?Math.round(100*(o.rh.w/o.rh.n-o.ra.w/o.ra.n)):null;
-  o.abs=o.diff==null?-1:Math.abs(o.diff);o.fav=o.diff==null?null:(o.diff>=0?o.m.h:o.m.a);return o}
+/* ---- tip advantage rating ----
+   Backtested on 2024-25 and 2025-26: a jumper's whole record to date predicted tip winners better than
+   his last 15, recency-weighted records or head-to-head. Each record is pulled toward 50% by eight
+   phantom tips, and the gap between the two becomes a win chance through a logistic curve fitted to
+   those seasons (K). Levels: one chevron 55%+, two 62%+, three 70%+. */
+var ADV_K=4.17;
+function rating(left,right){ // left/right: {w,n} full records; null when either jumper has under five tips
+  if(!left||!right||left.n<5||right.n<5)return null;
+  var pr=1/(1+Math.exp(-ADV_K*((right.w+4)/(right.n+8)-(left.w+4)/(left.n+8)))),p=Math.max(pr,1-pr);
+  var pc=Math.round(p*100);return{p:p,pct:pc,right:pr>=.5,lv:pc>=70?3:pc>=62?2:pc>=55?1:0}} // levels use the rounded figure shown on screen
+function chev(lv,left,cls){ // three chevrons pointing at the favoured side, lit up to the level
+  var s='<svg class="chev '+(cls||"")+'" viewBox="0 0 66 28" aria-hidden="true"'+(left?' style="transform:scaleX(-1)"':'')+'>';
+  for(var i=0;i<3;i++)s+='<polyline points="'+(8+i*20)+',4 '+(20+i*20)+',14 '+(8+i*20)+',24"'+(i<lv?' class="on"':'')+'/>';return s+'</svg>'}
+function advBlock(rt,leftT,rightT,hh,off){ // centre of a matchup: chevrons, win chance, favoured side, head-to-head beneath
+  var c=rt?'<div class="mid'+(off?" off":"")+'">'+chev(rt.lv,!rt.right)+'<b>'+rt.pct+'%</b><span>'+(rt.lv?(rt.right?rightT:leftT)+" advantage":"Even")+'</span></div>'
+          :'<div class="mid"><span>No rating</span><span>too few tips</span></div>';
+  return '<div class="midw">'+c+'<span class="hh">Head to head <b>'+hh[0]+"–"+hh[1]+'</b></span></div>'}
+function grade(o){ // rating and favourite from the two jumpers' full records (o.fa away, o.fh home)
+  var r=rating(o.fa,o.fh);o.rt=r;o.ok=!!r;o.lv=r?r.lv:-1;o.abs=r?r.pct:-1;o.fav=r?(r.right?o.m.h:o.m.a):null;return o}
 /* ---- availability: ESPN injury designations and, once posted, NBA starting lineups ---- */
 function normName(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z ]/g,"").replace(/\s+(jr|sr|ii|iii|iv)$/,"").replace(/\s+/g," ").trim()}
 function ctxOf(m){ // what is known about availability: live feeds for games to come, the saved pre-tip note for played ones
@@ -377,6 +402,28 @@ function injReport(m){ // every listed designation for both teams, plus posted s
     if(u&&u.st.length&&!c.past)o+='<div class="kv"><span><b>'+t+' starters</b></span><span>'+u.st.map(function(x){return esc(x[1])}).join(", ")+'</span></div>';
     if(l.length)o+='<div class="inj"><span class="tm">'+t+'</span>'+l.map(function(x){return '<span title="'+esc(x.c)+'">'+esc(x.n)+' <span class="tag '+(/^out/i.test(x.st)?"l":"q")+'">'+esc(x.st.toUpperCase())+(x.ty?" · "+esc(x.ty.toUpperCase()):"")+'</span></span>'}).join("")+'</div>'});
   return o?'<h3>'+(c.past?"Availability as flagged before tip":"Availability")+'</h3>'+o:""}
+/* ---- which jumper to rate: the usual one, unless availability says otherwise ---- */
+function teamJumpersBefore(t,day){ // most likely jumpers first: by how many of the team's last 30 tips they took, ties to the more recent
+  var l=[];D.games.forEach(function(g){var tp=g.tip;if(g.d>=day||!tp)return;var p=tp.wt===t?tp.w:(tp.lt===t?tp.l:null);if(p)l.push(p)});
+  l=l.slice(-30);var c={},last={};l.forEach(function(p,i){c[p]=(c[p]||0)+1;last[p]=i});
+  return Object.keys(c).map(Number).sort(function(a,b){return c[b]-c[a]||last[b]-last[a]})}
+function recBefore(p,day){var r=[];D.games.forEach(function(g){var t=g.tip;if(g.d>=day||!t)return;if(t.w===p)r.push(1);else if(t.l===p)r.push(0)});
+  function s(l){var w=0;l.forEach(function(x){w+=x});return{w:w,n:l.length}}return{full:s(r),l15:s(r.slice(-15))}}
+function pickJumper(c,t,j,day){ // returns the jumper to rate, or null when nobody suitable is known
+  var u=c.lu&&c.lu[t],order=teamJumpersBefore(t,day),i;
+  if(u&&u.st.length){var st={};u.st.forEach(function(x){st[x[0]]=1});
+    if(j&&st[j])return j;
+    for(i=0;i<order.length;i++)if(st[order[i]])return order[i];              // a starter who has jumped for this team
+    var best=null,bn=0;u.st.forEach(function(x){var n=recBefore(x[0],day).full.n;if(n>bn){bn=n;best=x[0]}});return best} // else the starter with most tips anywhere
+  var inj=j&&injOf(c,t,j);
+  if(inj&&/^out/i.test(inj.st)){for(i=0;i<order.length;i++){var q=injOf(c,t,order[i]);if(order[i]!==j&&!(q&&/^out/i.test(q.st)))return order[i]}return null}
+  return j}
+function adjust(o,m,day){ // swap in a replacement jumper where needed, keeping a note of who was replaced (o.na / o.nh)
+  var c=ctxOf(m);if(!c)return o;
+  [["ja","ra","fa",m.a,"na"],["jh","rh","fh",m.h,"nh"]].forEach(function(k){var j=o[k[0]],nj=pickJumper(c,k[3],j,day);if(nj===j)return;
+    var r=nj?recBefore(nj,day):{l15:{w:0,n:0},full:{w:0,n:0}};o[k[4]]=j;o[k[0]]=nj;o[k[1]]=r.l15;o[k[2]]=r.full});
+  return o}
+function swapTag(orig,now){return orig===undefined?"":'<span class="tag q">'+(now?"IN FOR "+nm(orig).toUpperCase():"NO KNOWN JUMPER · "+nm(orig).toUpperCase()+" OUT")+'</span>'}
 function vPicks(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
   sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
@@ -389,13 +436,14 @@ function vPicks(){
   var H=all.filter(function(g){return g.d<day}); // only what was known before tip-off
   function met(a,b){var x=0,y=0;H.forEach(function(g){var t=g.tip;if(!t)return;if(t.w===a&&t.l===b)x++;else if(t.w===b&&t.l===a)y++});return[x,y]}
   var rows=ms.map(function(m){var o;
-    if(m.g){var e=IX.g[m.g.id];o={m:m,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh}}
-    else{var ja=IX.proj(m.a),jh=IX.proj(m.h);o={m:m,ja:ja,jh:jh,ra:ja?IX.l15(ja):{w:0,n:0},rh:jh?IX.l15(jh):{w:0,n:0}}}
-    grade(o);o.hh=o.ja&&o.jh?met(o.ja,o.jh):[0,0];return o}).sort(function(x,y){return y.abs-x.abs});
-  var picks=rows.filter(function(r){return r.abs>=S.margin}),rest=rows.filter(function(r){return r.abs<S.margin});
+    if(m.g){var e=IX.g[m.g.id];o={m:m,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh}}
+    else{var ja=IX.proj(m.a),jh=IX.proj(m.h),z={w:0,n:0};o={m:m,ja:ja,jh:jh,ra:ja?IX.l15(ja):z,rh:jh?IX.l15(jh):z,fa:ja?IX.full(ja):z,fh:jh?IX.full(jh):z}}
+    adjust(o,m,day);grade(o);o.hh=o.ja&&o.jh?met(o.ja,o.jh):[0,0];return o}).sort(function(x,y){return y.abs-x.abs});
+  var picks=rows.filter(function(r){return r.lv>=S.minLv}),rest=rows.filter(function(r){return r.lv<S.minLv});
   // track record of this margin over every past game in the data
   var tr={n:0,tip:0,shot:0,score:0};
-  all.forEach(function(g){var e=IX.g[g.id],o=grade({m:g,ra:e.ra,rh:e.rh});if(o.abs<S.margin||!g.tip)return;
+  all.forEach(function(g){var e=IX.g[g.id],o={m:g,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh};
+    if(D.flags&&D.flags[g.d+"|"+g.a+"|"+g.h])adjust(o,{h:g.h,a:g.a,g:g},g.d);grade(o);if(o.lv<S.minLv||!g.tip)return;
     var fa=firstAtt(g),fs=firstScore(g);tr.n++;if(g.tip.pos===o.fav)tr.tip++;if(fa&&fa.t===o.fav)tr.shot++;if(fs&&fs[1]===o.fav)tr.score++});
   function rec(r){return r.n?r.w+"–"+(r.n-r.w):"no tips"}
   function what(m){if(!m.g)return "";var g=m.g,t=g.tip,fa=firstAtt(g),fs=firstScore(g);
@@ -404,26 +452,26 @@ function vPicks(){
   function firsts(t){var gs=H.filter(function(g){return g.h===t||g.a===t}).slice(-3).reverse();if(!gs.length)return "";
     return '<h3>'+t+' first shot and first score, last 3 games</h3><div class="tw"><table><thead><tr><th>Game</th><th>Tip</th><th>'+t+' first shot</th><th>'+t+' first score</th><th>Game\'s first score</th></tr></thead><tbody>'+
       gs.map(function(g){var fs=firstScore(g),won=g.tip&&g.tip.pos===t;return '<tr><td>'+fmtD(g.d)+" "+(g.h===t?"vs ":"at ")+opp(g,t)+'</td><td><span class="tag '+(won?"w":"l")+'">'+(won?"WON":"LOST")+'</span></td><td class="cell">'+attText(att(g,t)[0])+'</td><td class="cell">'+(teamFirstScore(g,t)?attText(teamFirstScore(g,t)):'<span class="o">none in first 5 shots</span>')+'</td><td>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+'</td></tr>'}).join("")+'</tbody></table></div>'}
-  function side(t,j,r,cls,m){return '<div class="side '+cls+'"><h3>'+t+' jumper</h3><div class="who">'+nm(j)+'</div>'+(m&&avail(m,t,j)?'<div class="rf">'+avail(m,t,j)+'</div>':'')+'<div class="big">'+pct(r.w,r.n)+'</div><div class="kv"><span>Last '+(r.n||15)+' tips <b>'+rec(r)+'</b></span></div></div>'}
+  function side(t,j,f,r,cls,m,orig){var tg=swapTag(orig,j)+(m&&j?avail(m,t,j):"");return '<div class="side '+cls+'"><h3>'+t+' jumper</h3><div class="who">'+nm(j)+'</div>'+(tg?'<div class="rf">'+tg+'</div>':'')+'<div class="big">'+pct(f.w,f.n)+'</div><div class="kv"><span>Record <b>'+rec(f)+'</b></span><span>Last '+(r.n||15)+' <b>'+rec(r)+'</b></span></div></div>'}
   var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
   Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   var hd='<section class="panel"><div class="phead"><h2>Picks</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
-    '<label class="f">Wide margin <select id="selMargin">'+[10,15,20,25,30,40].map(function(n){return '<option value="'+n+'"'+(n===S.margin?' selected':'')+'>'+n+'+ pts</option>'}).join("")+'</select></label></div></div>'+
-    '<p class="note">'+(ms.length?picks.length+" of "+ms.length+" matchups clear the margin. ":"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips; the margin is the gap in tip win rate over each jumper\'s last 15 tips, in percentage points.'+
-    (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. Picks are not re-ranked when a player is out. Whatever was flagged before tip stays on the card after the game.":"")+
+    '<label class="f">Minimum rating <select id="selLv">'+[[1,"One chevron · 55%+"],[2,"Two chevrons · 62%+"],[3,"Three chevrons · 70%+"]].map(function(n){return '<option value="'+n[0]+'"'+(n[0]===S.minLv?' selected':'')+'>'+n[1]+'</option>'}).join("")+'</select></label></div></div>'+
+    '<p class="note">'+(ms.length?picks.length+" of "+ms.length+" matchups reach the rating. ":"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips. The rating is the favoured jumper\'s estimated chance of winning the tip, from both jumpers\' full records in this data: one chevron at 55%, two at 62%, three at 70%.'+
+    (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are flagged but not re-ranked. Whatever was flagged before tip stays on the card after the game.":"")+
     (up.length?"":" This data has no upcoming schedule, so past game days are shown as they looked before tip-off. Run python3 build_data.py --install once and today\'s games load on their own.")+'</p>'+
-    '<div class="kv"><span><b>Track record at '+S.margin+'+ pts</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
+    '<div class="kv"><span><b>Track record at '+["","one chevron","two chevrons","three chevrons"][S.minLv]+' or more</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
   var cards=picks.map(function(r,i){var m=r.m,tbl=last3(r.fav,H,3);r.top=(last3.rows||[]).slice();r.of=last3.of;
-    return '<section class="panel" id="pick-'+i+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+'<span class="edge">'+r.fav+' +'+r.abs+' pts</span></span></div>'+
-      '<div class="circle">'+side(m.a,r.ja,r.ra,"",m)+'<div class="mid"><span>Head to head</span><b>'+r.hh[0]+"–"+r.hh[1]+'</b><span>'+(r.hh[0]+r.hh[1]?"meetings":"never met")+'</span></div>'+side(m.h,r.jh,r.rh,"r",m)+'</div>'+
+    return '<section class="panel" id="pick-'+i+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+'<span class="edge">'+r.fav+' '+r.abs+'%</span></span></div>'+
+      '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
       what(m)+injReport(m)+firsts(r.fav)+'<h3>'+r.fav+' top 3 shooters, last 3 games · first three attempts</h3>'+tbl+'</section>'}).join("");
   var round=picks.length?'<section class="panel"><div class="phead"><h2>Round-up</h2><span class="tag">'+picks.length+(picks.length===1?" pick":" picks")+' · select a card to jump to its data</span></div><div class="rcards">'+
     picks.map(function(r,i){var m=r.m,g=m.g,j=r.fav===m.h?r.jh:r.ja,fa=g&&firstAtt(g),fs=g&&firstScore(g),won=g&&g.tip&&g.tip.pos===r.fav;
       var inTop=function(p){return r.top.slice(0,3).some(function(s){return s.p===p})},hitShot=!!(fa&&inTop(fa.s[0])),hitScore=!!(fs&&inTop(fs[0]));
       var jOut=isOut(m,r.fav,j);
-      return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+m.a+' @ '+m.h+'</span><span class="edge">'+r.fav+' +'+r.abs+'</span></div>'+
+      return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+m.a+' @ '+m.h+'</span><span class="edge">'+r.fav+' '+r.abs+'%</span></div>'+
         (m.t?'<div><span class="tag">'+esc(m.t)+'</span>'+(m.pre?' <span class="tag">PRESEASON</span>':'')+' <span class="tag">RESULTS PENDING</span>'+(jOut?' <span class="tag l">CHECK · JUMPER UNAVAILABLE</span>':'')+'</div>':((g&&g.lv)||jOut?'<div>'+(g&&g.lv?'<span class="tag w">LIVE · SO FAR</span> ':'')+(jOut?'<span class="tag l">JUMPER WAS FLAGGED UNAVAILABLE</span>':'')+'</div>':''))+
-        '<div class="rblock"><h3>Tip pick</h3><div class="rname">'+nm(j)+'</div>'+(avail(m,r.fav,j)?'<div class="rf" style="padding-left:0">'+avail(m,r.fav,j)+'</div>':'')+'</div>'+
+        '<div class="rblock"><h3>Tip pick</h3><div class="rl"><div class="rname">'+nm(j)+'</div>'+chev(r.lv,false,"sm"+(jOut?" off":""))+'</div>'+(swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)?'<div class="rf" style="padding-left:0">'+swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+'</div>':'')+'</div>'+
         '<div class="rblock"><h3>'+r.fav+' shooters</h3><ol>'+[0,1,2].map(function(k){var s=r.top[k];if(!s)return "";
           var l=g?att(g,r.fav):[],ts=g&&teamFirstScore(g,r.fav),fo=Infinity; // fo: where the game's first score falls in the order of attempts
           if(g)[g.h,g.a].forEach(function(t){att(g,t).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
@@ -432,8 +480,8 @@ function vPicks(){
             yn("1st basket attempt",l.some(function(x){return x[0]===s.p&&x[6]<=fo}))+yn("Team's first 3",l.slice(0,3).some(function(x){return x[0]===s.p}))+
             yn("Team's 1st shot",l[0]&&l[0][0]===s.p)+yn("Team's 1st "+(S.ft?"score":"basket"),ts&&ts[0]===s.p)+'</div></li>'}).join("")+'</ol></div>'+
         (!g?"":'<div class="rblock rres"><h3>What happened</h3><div><span class="o">Tip</span>'+(g&&g.tip?'<span class="tag '+(won?"w":"l")+'">'+(won?"WON":"LOST")+'</span>':"<span>–</span>")+'</div><div'+(hitShot?' class="hit"':'')+'><span class="o">First shot</span><span>'+(fa?nm(fa.s[0])+" ("+fa.t+")":"–")+(hitShot?' <span class="tag w">HIT</span>':'')+'</span></div><div'+(hitScore?' class="hit"':'')+'><span class="o">First score</span><span>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+(hitScore?' <span class="tag w">HIT</span>':'')+'</span></div></div>')+'</div>'}).join("")+'</div></section>':"";
-  var other=rest.length?'<section class="panel"><h2>Below the margin</h2><div class="tw"><table><thead><tr><th>Game</th><th>Away jumper</th><th class="n">Last 15</th><th>Home jumper</th><th class="n">Last 15</th><th class="n">Margin</th>'+(!played.length?"":"<th>Tip won by</th><th>First shot</th><th>First score</th>")+'</tr></thead><tbody>'+
-    rest.map(function(r){var m=r.m,g=m.g,t=g&&g.tip,fa=g&&firstAtt(g),fs=g&&firstScore(g);return '<tr><td><span class="tm">'+m.a+' @ '+m.h+'</span>'+(m.t?' <span class="tag">'+esc(m.t)+'</span>':'')+'</td><td>'+nm(r.ja)+'</td><td class="n">'+rec(r.ra)+" · "+pct(r.ra.w,r.ra.n)+'</td><td>'+nm(r.jh)+'</td><td class="n">'+rec(r.rh)+" · "+pct(r.rh.w,r.rh.n)+'</td><td class="n">'+(r.diff==null?"too few tips":r.fav+" +"+r.abs)+'</td>'+
+  var other=rest.length?'<section class="panel"><h2>Below the rating</h2><div class="tw"><table><thead><tr><th>Game</th><th>Away jumper</th><th class="n">Last 15</th><th>Home jumper</th><th class="n">Last 15</th><th class="n">Record</th><th class="n">Rating</th>'+(!played.length?"":"<th>Tip won by</th><th>First shot</th><th>First score</th>")+'</tr></thead><tbody>'+
+    rest.map(function(r){var m=r.m,g=m.g,t=g&&g.tip,fa=g&&firstAtt(g),fs=g&&firstScore(g);return '<tr><td><span class="tm">'+m.a+' @ '+m.h+'</span>'+(m.t?' <span class="tag">'+esc(m.t)+'</span>':'')+'</td><td>'+nm(r.ja)+'</td><td class="n">'+rec(r.ra)+" · "+pct(r.ra.w,r.ra.n)+'</td><td>'+nm(r.jh)+'</td><td class="n">'+rec(r.rh)+" · "+pct(r.rh.w,r.rh.n)+'</td><td class="n">'+rec(r.fa)+" v "+rec(r.fh)+'</td><td class="n">'+(r.ok?(r.lv?r.fav+" ":"Even ")+r.abs+"%":"too few tips")+'</td>'+
       (!played.length?"":'<td>'+(t?(t.w?nm(t.w)+" ("+t.wt+")":t.pos):"–")+'</td><td>'+(fa?nm(fa.s[0])+" ("+fa.t+")":"–")+'</td><td>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+'</td>')+'</tr>'}).join("")+'</tbody></table></div></section>':"";
   S._days=days;
   view.innerHTML='<div class="picks">'+hd+round+cards+other+'</div>';
@@ -443,14 +491,15 @@ function vMatchup(){
   if(!S.ja||!teamTipAll(a).some(function(j){return j.p===S.ja}))S.ja=likelyJumper(a);
   if(!S.jb||!teamTipAll(b).some(function(j){return j.p===S.jb}))S.jb=likelyJumper(b);
   var ta=teamTip(a),tb=teamTip(b),sa=season(S.ja),sb=season(S.jb),hh=h2h(S.ja,S.jb);
-  var pa=sa.n?sa.w/sa.n:.5,pb=sb.n?sb.w/sb.n:.5,den=pa*(1-pb)+pb*(1-pa),est=den?pa*(1-pb)/den:.5;
+  function fullRec(p){var w=0,n=0;D.games.forEach(function(g){var t=g.tip;if(!t)return;if(t.w===p){w++;n++}else if(t.l===p)n++});return{w:w,n:n}}
+  var fa=fullRec(S.ja),fb=fullRec(S.jb),rt=rating(fa,fb);
   function side(t,tt,j,s,cls,sel){return '<div class="side '+cls+'"><h3>'+t+' jumper</h3>'+sel+
     '<div class="big">'+pct(s.w,s.n)+'</div><div class="kv"><span>Jumper <b>'+s.w+"–"+(s.n-s.w)+'</b></span><span>'+t+' tips <b>'+tt.w+"–"+(tt.n-tt.w)+'</b></span><span>Home <b>'+pct(tt.hw,tt.hn)+'</b></span><span>Away <b>'+pct(tt.aw,tt.an)+'</b></span></div></div>'}
   var h='<section class="panel"><div class="phead"><h2>Opening tip</h2><div class="pickers">'+teamSelect("selA",a)+'<span class="vs">VS</span>'+teamSelect("selB",b)+'</div></div>'+
     '<div class="circle">'+side(a,ta,S.ja,sa,"",jumperSelect("selJA",a,S.ja))+
-    '<div class="mid"><span>Head to head</span><b>'+hh.aw+"–"+hh.bw+'</b><span>'+(hh.aw+hh.bw?"meetings":"never met")+'</span></div>'+
+    advBlock(rt,a,b,[hh.aw,hh.bw])+
     side(b,tb,S.jb,sb,"r",jumperSelect("selJB",b,S.jb))+'</div>'+
-    '<p class="note">Estimate from each jumper\'s win rate: <b>'+nm(S.ja)+' '+Math.round(est*100)+'%</b>, '+nm(S.jb)+' '+(100-Math.round(est*100))+'%. Jumper and team records follow the Window (a jumper\'s last tips, a team\'s last games); head-to-head counts every meeting in the Season and Games filters.'+
+    '<p class="note">'+(rt?'<b>'+nm(rt.right?S.jb:S.ja)+' '+rt.pct+'%</b> to win the tip, from full records of '+fa.w+"–"+(fa.n-fa.w)+" and "+fb.w+"–"+(fb.n-fb.w)+' across every season in the data. ':'No rating: one of these jumpers has fewer than five tips. ')+'The rating does not change with the filters. The records shown follow the Window (a jumper\'s last tips, a team\'s last games); head-to-head counts every meeting in the Season and Games filters.'+
     (hh.log.length?' Meetings: '+hh.log.map(function(e){return fmtD(e.g.d)+" "+nm(e.w)}).join(", ")+'.':'')+'</p></section>';
   h+='<div class="picks" style="margin-top:20px">'+[a,b].map(function(t,i){var st=shotTable("ms"+i,t);
     return '<section class="panel"><div class="phead"><h2>'+t+' first attempts</h2><span class="tag">'+st.fs.tot.n+' games · first attempt made '+pct(st.fs.tot.made1,st.fs.tot.n)+'</span></div>'+
@@ -581,7 +630,7 @@ function sortBy(th){var p=th.dataset.sort.split("|"),cur=S.sort[p[0]];
   if(!cur&&th.getAttribute("aria-sort"))S.sort[p[0]].dir=th.getAttribute("aria-sort")==="descending"?1:-1;render()}
 document.addEventListener("change",function(e){var id=e.target.id,v=e.target.value;
   if(id==="selA"){S.a=v;S.ja=null}else if(id==="selB"){S.b=v;S.jb=null}else if(id==="selJA")S.ja=+v;else if(id==="selJB")S.jb=+v;
-  else if(id==="selShot")S.shotTeam=v;else if(id==="selLog"){S.logTeam=v;S.logN=40}else if(id==="minTips")S.minTips=+v;else if(id==="selDay")S.day=v;else if(id==="ldDays")S.ldDays=+v;else if(id==="ldScope")S.ldScope=+v;else if(id==="ldTeam")S.ldTeam=v;else if(id==="ldRank")S.sort.ld={k:v,dir:-1};else if(id==="selMargin")S.margin=+v;else return;
+  else if(id==="selShot")S.shotTeam=v;else if(id==="selLog"){S.logTeam=v;S.logN=40}else if(id==="minTips")S.minTips=+v;else if(id==="selDay")S.day=v;else if(id==="ldDays")S.ldDays=+v;else if(id==="ldScope")S.ldScope=+v;else if(id==="ldTeam")S.ldTeam=v;else if(id==="ldRank")S.sort.ld={k:v,dir:-1};else if(id==="selMargin")S.margin=+v;else if(id==="selLv")S.minLv=+v;else return;
   try{localStorage.setItem("tol",JSON.stringify({a:S.a,b:S.b,s:S.shotTeam}))}catch(_){}
   render()});
 document.addEventListener("input",function(e){if(e.target.id==="q"){S.q=e.target.value;render()}});
