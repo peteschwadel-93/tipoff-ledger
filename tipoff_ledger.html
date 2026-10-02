@@ -111,7 +111,8 @@ td.cell .o,td.n .o,td .o{color:var(--muted)}
 table[style] th,table[style] td{padding-right:32px}
 .tw:has(>table[style]){align-self:flex-start;max-width:100%}
 .edge{display:inline-block;font:600 12.5px/1 var(--body);letter-spacing:.04em;padding:6px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent);vertical-align:middle}
-section[id^="pick-"]{scroll-margin-top:16px}
+section[id^="pick-"],section[id^="game-"]{scroll-margin-top:16px}
+h2.sep{margin-top:12px;color:var(--muted)}
 .rcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:14px}
 .rcard{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px;cursor:pointer;min-width:0}
 .rcard:hover{border-color:var(--accent)}
@@ -464,10 +465,16 @@ function vPicks(){
     (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are flagged but not re-ranked. Whatever was flagged before tip stays on the card after the game.":"")+
     (up.length?"":" This data has no upcoming schedule, so past game days are shown as they looked before tip-off. Run python3 build_data.py --install once and today\'s games load on their own.")+'</p>'+
     '<div class="kv"><span><b>Track record at '+["","one chevron","two chevrons","three chevrons","four chevrons"][S.minLv]+' or more</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
-  var cards=picks.map(function(r,i){var m=r.m,tbl=last3(r.fav,H,3);r.top=(last3.rows||[]).slice();r.of=last3.of;
-    return '<section class="panel" id="pick-'+i+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+'<span class="edge">'+r.fav+' '+r.abs+'%</span></span></div>'+
-      '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
-      what(m)+injReport(m)+firsts(r.fav)+'<h3>'+r.fav+' top 3 shooters, last 3 games · first three attempts</h3>'+tbl+'</section>'}).join("");
+  function card(r,id){ // full detail for one game: the favoured side's shooters, or both sides when nothing is favoured
+    var m=r.m,sides=r.fav&&r.lv>0?[r.fav]:[m.a,m.h],body="";
+    sides.forEach(function(t,k){var tbl=last3(t,H,3);if(!k&&r.fav){r.top=(last3.rows||[]).slice();r.of=last3.of}
+      body+=firsts(t)+'<h3>'+t+' top 3 shooters, last 3 games · first three attempts</h3>'+tbl});
+    return '<section class="panel" id="'+id+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
+      (r.ok?'<span class="edge">'+(r.lv?r.fav+" ":"Even ")+r.abs+'%</span>':'<span class="tag">NO RATING</span>')+'</span></div>'+
+      '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,r.fav&&isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
+      what(m)+injReport(m)+body+'</section>'}
+  var cards=picks.map(function(r,i){return card(r,"pick-"+i)}).join("");
+  var others=rest.length?'<h2 class="sep">Other games · below the rating</h2>'+rest.map(function(r,i){return card(r,"game-"+i)}).join(""):"";
   var round=picks.length?'<section class="panel"><div class="phead"><h2>Round-up</h2><span class="tag">'+picks.length+(picks.length===1?" pick":" picks")+' · select a card to jump to its data</span></div><div class="rcards">'+
     picks.map(function(r,i){var m=r.m,g=m.g,j=r.fav===m.h?r.jh:r.ja,fa=g&&firstAtt(g),fs=g&&firstScore(g),won=g&&g.tip&&g.tip.pos===r.fav;
       var inTop=function(p){return r.top.slice(0,3).some(function(s){return s.p===p})},hitShot=!!(fa&&inTop(fa.s[0])),hitScore=!!(fs&&inTop(fs[0]));
@@ -483,11 +490,11 @@ function vPicks(){
             yn("1st basket attempt",l.some(function(x){return x[0]===s.p&&x[6]<=fo}))+yn("Team's first 3",l.slice(0,3).some(function(x){return x[0]===s.p}))+
             yn("Team's 1st shot",l[0]&&l[0][0]===s.p)+yn("Team's 1st "+(S.ft?"score":"basket"),ts&&ts[0]===s.p)+'</div></li>'}).join("")+'</ol></div>'+
         (!g?"":'<div class="rblock rres"><h3>What happened</h3><div><span class="o">Tip</span>'+(g&&g.tip?'<span class="tag '+(won?"w":"l")+'">'+(won?"WON":"LOST")+'</span>':"<span>–</span>")+'</div><div'+(hitShot?' class="hit"':'')+'><span class="o">First shot</span><span>'+(fa?nm(fa.s[0])+" ("+fa.t+")":"–")+(hitShot?' <span class="tag w">HIT</span>':'')+'</span></div><div'+(hitScore?' class="hit"':'')+'><span class="o">First score</span><span>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+(hitScore?' <span class="tag w">HIT</span>':'')+'</span></div></div>')+'</div>'}).join("")+'</div></section>':"";
-  var other=rest.length?'<section class="panel"><h2>Below the rating</h2><div class="tw"><table><thead><tr><th>Game</th><th>Away jumper</th><th class="n">Last 15</th><th>Home jumper</th><th class="n">Last 15</th><th class="n">Record</th><th class="n">Rating</th>'+(!played.length?"":"<th>Tip won by</th><th>First shot</th><th>First score</th>")+'</tr></thead><tbody>'+
-    rest.map(function(r){var m=r.m,g=m.g,t=g&&g.tip,fa=g&&firstAtt(g),fs=g&&firstScore(g);return '<tr><td><span class="tm">'+m.a+' @ '+m.h+'</span>'+(m.t?' <span class="tag">'+esc(m.t)+'</span>':'')+'</td><td>'+nm(r.ja)+'</td><td class="n">'+rec(r.ra)+" · "+pct(r.ra.w,r.ra.n)+'</td><td>'+nm(r.jh)+'</td><td class="n">'+rec(r.rh)+" · "+pct(r.rh.w,r.rh.n)+'</td><td class="n">'+rec(r.fa)+" v "+rec(r.fh)+'</td><td class="n">'+(r.ok?(r.lv?r.fav+" ":"Even ")+r.abs+"%":"too few tips")+'</td>'+
+  var other=rest.length?'<section class="panel"><div class="phead"><h2>Below the rating</h2><span class="tag">select a row to jump to its data</span></div><div class="tw"><table><thead><tr><th>Game</th><th>Away jumper</th><th class="n">Last 15</th><th>Home jumper</th><th class="n">Last 15</th><th class="n">Record</th><th class="n">Rating</th>'+(!played.length?"":"<th>Tip won by</th><th>First shot</th><th>First score</th>")+'</tr></thead><tbody>'+
+    rest.map(function(r,i){var m=r.m,g=m.g,t=g&&g.tip,fa=g&&firstAtt(g),fs=g&&firstScore(g);return '<tr class="pick" tabindex="0" data-goto="game-'+i+'"><td><span class="tm">'+m.a+' @ '+m.h+'</span>'+(m.t?' <span class="tag">'+esc(m.t)+'</span>':'')+'</td><td>'+nm(r.ja)+'</td><td class="n">'+rec(r.ra)+" · "+pct(r.ra.w,r.ra.n)+'</td><td>'+nm(r.jh)+'</td><td class="n">'+rec(r.rh)+" · "+pct(r.rh.w,r.rh.n)+'</td><td class="n">'+rec(r.fa)+" v "+rec(r.fh)+'</td><td class="n">'+(r.ok?(r.lv?r.fav+" ":"Even ")+r.abs+"%":"too few tips")+'</td>'+
       (!played.length?"":'<td>'+(t?(t.w?nm(t.w)+" ("+t.wt+")":t.pos):"–")+'</td><td>'+(fa?nm(fa.s[0])+" ("+fa.t+")":"–")+'</td><td>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+'</td>')+'</tr>'}).join("")+'</tbody></table></div></section>':"";
   S._days=days;
-  view.innerHTML='<div class="picks">'+hd+round+cards+other+'</div>';
+  view.innerHTML='<div class="picks">'+hd+round+cards+other+others+'</div>';
 }
 function vMatchup(){
   var a=S.a,b=S.b;if(a===b)b=teams().filter(function(t){return t!==a})[0];
