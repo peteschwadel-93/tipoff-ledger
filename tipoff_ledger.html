@@ -395,10 +395,13 @@ function grade(o){ // rating and favourite from the two jumpers' full records (o
 function normName(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z ]/g,"").replace(/\s+(jr|sr|ii|iii|iv)$/,"").replace(/\s+/g," ").trim()}
 function ctxOf(m){ // what is known about availability: live feeds for games to come, the saved pre-tip note for played ones
   if(!m.g)return D.inj||m.lu?{inj:D.inj||{},lu:m.lu||null,past:false}:null;
-  if(m.simLu){var lu={};[m.h,m.a].forEach(function(t){lu[t]={st:(m.g.st[t]||[]).map(function(p){return[p,D.players[p]||""]}),out:[]}});return{inj:{},lu:lu,past:true}} // tracker reference: that night's actual starters stand in for a posted lineup
-  var f=(D.flags||{})[m.g.d+"|"+m.a+"|"+m.h];if(!f)return null;var inj={};
-  Object.keys(f.inj||{}).forEach(function(t){inj[t]=f.inj[t].map(function(x){return{n:x[0],st:x[1],ty:x[2],c:""}})});
-  return{inj:inj,lu:f.lu||null,past:true}}
+  // played games: that night's actual starters are the lineup, so the jumper and the three shooters match who really started
+  var lu=null;if(m.g.st&&(m.g.st[m.h]||[]).length&&(m.g.st[m.a]||[]).length){lu={};[m.h,m.a].forEach(function(t){lu[t]={st:m.g.st[t].map(function(p){return[p,D.players[p]||""]}),out:[]}})}
+  var f=m.simLu?null:(D.flags||{})[m.g.d+"|"+m.a+"|"+m.h],inj={};
+  if(f){Object.keys(f.inj||{}).forEach(function(t){inj[t]=f.inj[t].map(function(x){return{n:x[0],st:x[1],ty:x[2],c:""}})});
+    if(lu&&f.lu)Object.keys(f.lu).forEach(function(t){if(lu[t])lu[t].out=f.lu[t].out||[]});if(!lu)lu=f.lu||null}
+  if(!f&&!lu)return null;
+  return{inj:inj,lu:lu,past:true,actual:!!lu}}
 function injOf(c,t,p){var l=c.inj[t]||[],n=normName(D.players[p]);if(!n)return null;for(var i=0;i<l.length;i++)if(normName(l[i].n)===n)return l[i];return null}
 function luOf(c,t,p){var u=c.lu&&c.lu[t];if(!u)return null;if(u.st.some(function(x){return x[0]===p}))return "start";if(u.out.some(function(x){return x[0]===p}))return "out";return u.st.length?"bench":null}
 function isOut(m,t,p){var c=ctxOf(m);if(!c||!p)return false;var l=luOf(c,t,p),i=injOf(c,t,p);return l==="out"||l==="bench"||(!l&&i&&/^out/i.test(i.st))}
@@ -410,9 +413,9 @@ function avail(m,t,p){ // tags for one player: current for games to come, as fla
 function injReport(m){ // every listed designation for both teams, plus posted starters
   var c=ctxOf(m);if(!c)return "";var o="";
   [m.a,m.h].forEach(function(t){var l=c.inj[t]||[],u=c.lu&&c.lu[t];
-    if(u&&u.st.length&&!c.past)o+='<div class="kv"><span><b>'+t+' starters</b></span><span>'+u.st.map(function(x){return esc(x[1])}).join(", ")+'</span></div>';
+    if(u&&u.st.length&&(!c.past||c.actual))o+='<div class="kv"><span><b>'+t+' starters</b></span><span>'+u.st.map(function(x){return esc(x[1])}).join(", ")+'</span></div>';
     if(l.length)o+='<div class="inj"><span class="tm">'+t+'</span>'+l.map(function(x){return '<span title="'+esc(x.c)+'">'+esc(x.n)+' <span class="tag '+(/^out/i.test(x.st)?"l":"q")+'">'+esc(x.st.toUpperCase())+(x.ty?" · "+esc(x.ty.toUpperCase()):"")+'</span></span>'}).join("")+'</div>'});
-  return o?'<h3>'+(c.past?"Availability as flagged before tip":"Availability")+'</h3>'+o:""}
+  return o?'<h3>'+(c.past?(c.actual?"Lineups · who actually started":"Availability as flagged before tip"):"Availability")+'</h3>'+o:""}
 /* ---- which jumper to rate: the usual one, unless availability says otherwise ---- */
 function teamJumpersBefore(t,day){ // most likely jumpers first: by how many of the team's last 30 tips they took, ties to the more recent
   var l=[];D.games.forEach(function(g){var tp=g.tip;if(g.d>=day||!tp)return;var p=tp.wt===t?tp.w:(tp.lt===t?tp.l:null);if(p)l.push(p)});
