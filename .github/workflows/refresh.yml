@@ -2,7 +2,7 @@ name: Refresh Tip-Off Ledger
 
 on:
   schedule:
-    - cron: "7,27,47 * * * *"
+        - cron: "*/5 * * * *"        # every 5 minutes (the most often GitHub allows)
   workflow_dispatch:
   push:
     branches: [main]
