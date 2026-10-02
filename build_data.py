@@ -136,7 +136,7 @@ def lineup(gid):
     for side in ("homeTeam", "awayTeam"):
         t = game.get(side) or {}
         ps = t.get("players") or []
-        st = [[int(p["personId"]), p.get("nameI") or p.get("name", "")] for p in ps if str(p.get("starter")) == "1"]
+        st = [[int(p["personId"]), p.get("nameI") or p.get("name", ""), (p.get("position") or "").upper()] for p in ps if str(p.get("starter")) == "1"]
         off = [[int(p["personId"]), p.get("nameI") or p.get("name", ""), p.get("notPlayingDescription") or ""]
                for p in ps if p.get("status") == "INACTIVE"]
         if (st or off) and t.get("teamTricode"):
@@ -458,7 +458,45 @@ def remember_odds(sched, old):
     return store
 
 
-def remember_flags(sched, inj, old):
+def remember_positions(flags, sched, games, limit=30):
+    """Each starter's listed position (PG, SG, SF, PF, C), kept under "_pos" in flags.json.
+
+    Positions come with the posted lineups. For teams whose recent starters have none on record yet, the
+    box scores of their latest games are read, a few per run, each game only once.
+    """
+    pos = dict(flags.get("_pos") or {})
+    tried = set(flags.get("_posTried") or [])
+    for u in sched:
+        for side in (u.get("lu") or {}).values():
+            for x in side.get("st", []):
+                if len(x) > 2 and x[2]:
+                    pos[str(x[0])] = x[2]
+    last = {}
+    for g in games or []:
+        for t in (g["h"], g["a"]):
+            last.setdefault(t, []).append(g)
+    n = 0
+    for t, gs in last.items():
+        for g in gs[-3:][::-1]:
+            st = (g.get("st") or {}).get(t, [])
+            if n >= limit or g["id"] in tried or all(str(p) in pos for p in st):
+                continue
+            tried.add(g["id"])
+            n += 1
+            lu = lineup(f"{int(g['id']):010d}")
+            for side in (lu or {}).values():
+                for x in side.get("st", []):
+                    if len(x) > 2 and x[2]:
+                        pos.setdefault(str(x[0]), x[2])
+            time.sleep(0.2)
+    if pos:
+        flags["_pos"] = pos
+    if tried:
+        flags["_posTried"] = sorted(tried)[-400:]
+    return flags
+
+
+def remember_flags(sched, inj, old, games=None):
     """Keep what was flagged before each of today's games, so it can still be shown after they are played.
 
     One entry per game, keyed "date|away|home": the injury designations for both teams and the posted
@@ -483,6 +521,10 @@ def remember_flags(sched, inj, old):
             rec["lu"] = u["lu"]
         if rec:
             flags[key] = rec
+    try:
+        remember_positions(flags, sched, games)
+    except Exception as e:
+        print(f"positions unavailable: {e}", file=sys.stderr)
     if json.dumps(flags, sort_keys=True) != before:
         with open(FLAGS, "w", encoding="utf-8") as f:
             json.dump(flags, f, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
@@ -554,7 +596,7 @@ def make(source, season, prev=False, html=None):
         inj = load_injuries()
         if inj is not None:
             out["inj"] = inj
-        out["flags"] = remember_flags(sched, inj, old)
+        out["flags"] = remember_flags(sched, inj, old, games)
         out["odds"] = remember_odds(sched, old)
     if notes:
         out["note"] = "; ".join(notes)

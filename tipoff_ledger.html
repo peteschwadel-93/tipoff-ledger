@@ -27,8 +27,11 @@ header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justif
 .lteam{display:flex;flex-direction:column;gap:8px;min-width:0}
 .lteam h3{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;color:var(--soft)}
 .lteam ol{list-style:none;margin:0;padding:0}
-.lteam li{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14.5px}
-.lteam li:last-child{border-bottom:0}
+.lteam li{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;padding:8px 10px;border-radius:8px;font-size:14.5px}
+.lteam li:nth-child(odd){background:linear-gradient(90deg,rgba(240,145,74,.17),rgba(240,145,74,.04) 75%,transparent)}
+.lteam li:nth-child(even){background:linear-gradient(90deg,rgba(255,255,255,.07),rgba(255,255,255,.015) 75%,transparent)}
+.lcard.lock .lteam li:nth-child(odd){background:linear-gradient(90deg,rgba(99,210,180,.2),rgba(99,210,180,.04) 75%,transparent)}
+.lpos{font:500 11.5px/1 var(--mono);color:var(--muted);width:24px;flex:none;letter-spacing:.02em}
 .lteam li .o{margin-left:auto}
 .lrep{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--soft)}
 .lrep div{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
@@ -500,8 +503,8 @@ function topShooters(t,day,m){
     .sort(function(a,b){return (b.st>0)-(a.st>0)||b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)}).slice(0,10);
   function mark(x){if(pk[x.p])return ' <span class="tag w">PICK</span>';if(cand[x.p])return "";
     var i=c&&injOf(c,t,x.p);return ' <span class="tag'+(i&&/^out/i.test(i.st)?' l">OUT':'">NOT STARTING')+'</span>'}
-  return '<div class="tw"><table style="width:auto"><thead><tr><th>Shooter</th><th class="n">Per start</th><th class="n">Attempts</th><th class="n">Starts</th><th class="n">Last 3 games</th>'+cs.map(function(k){return '<th class="n">'+k+'</th>'}).join("")+'</tr></thead><tbody>'+
-    ten.map(function(x){return '<tr'+(pk[x.p]||cand[x.p]?'':' style="opacity:.6"')+'><td>'+esc(x.name)+mark(x)+'</td><td class="n">'+(x.st?(x.c/x.st).toFixed(2):"–")+'</td><td class="n">'+x.c+'</td><td class="n">'+x.st+'</td><td class="n">'+x.n+" of "+(l3.length*3)+'</td>'+cs.map(function(k){return '<td class="n">'+(x.mix[k]||'<span class="o">·</span>')+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table></div>'}
+  return '<div class="tw"><table style="width:auto"><thead><tr><th>Shooter</th><th>Pos</th><th class="n">Per start</th><th class="n">Attempts</th><th class="n">Starts</th><th class="n">Last 3 games</th>'+cs.map(function(k){return '<th class="n">'+k+'</th>'}).join("")+'</tr></thead><tbody>'+
+    ten.map(function(x){return '<tr'+(pk[x.p]||cand[x.p]?'':' style="opacity:.6"')+'><td>'+esc(x.name)+mark(x)+'</td><td>'+(posOf(x.p)||'<span class="o">–</span>')+'</td><td class="n">'+(x.st?(x.c/x.st).toFixed(2):"–")+'</td><td class="n">'+x.c+'</td><td class="n">'+x.st+'</td><td class="n">'+x.n+" of "+(l3.length*3)+'</td>'+cs.map(function(k){return '<td class="n">'+(x.mix[k]||'<span class="o">·</span>')+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table></div>'}
 /* ---- first-basket prices and a rough value score ----
    Model: chance the team scores first = 50% + a third of its tip edge (fitted on both seasons), times the
    player's share of the team's early attempts among its five likeliest starters, pulled slightly toward an
@@ -594,6 +597,8 @@ function vPicks(){
   view.innerHTML='<div class="picks">'+hd+round+cards+other+others+'</div>';
 }
 /* ---- daily lineups: posted starters when the NBA has them, otherwise the likeliest five from recent games ---- */
+var POS_RANK={PG:1,G:1.5,SG:2,GF:2.5,SF:3,F:3.5,PF:4,FC:4.5,C:5};
+function posOf(p,over){var v=(over&&over[p])||((D.flags||{})._pos||{})[p]||"";return POS_RANK[v]?v:""}
 function vLineups(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
   sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
@@ -612,14 +617,18 @@ function vLineups(){
     return{l:l,n:n,k:gs.length}}
   function itag(i){return i?'<span class="tag '+(/^out/i.test(i.st)?"l":"q")+'" title="'+esc(i.c||"")+'">'+esc(i.st.toUpperCase())+(i.ty?" · "+esc(i.ty.toUpperCase()):"")+'</span>':""}
   function team(m,t,c){
-    var u=!m.g&&c&&c.lu&&c.lu[t],posted=!!(u&&u.st.length>=5),fin=!!m.g,ids,ex=null,names={};
+    var u=!m.g&&c&&c.lu&&c.lu[t],posted=!!(u&&u.st.length>=5),fin=!!m.g,ids,ex=null,names={},tonight={};
+    if(fin&&c&&c.lu&&c.lu[t])c.lu[t].st.forEach(function(x){if(x[2])tonight[x[0]]=x[2]});
     if(fin)ids=(m.g.st[t]||[]).slice();
-    else if(posted){ids=u.st.map(function(x){names[x[0]]=x[1];return x[0]})}
+    else if(posted){ids=u.st.map(function(x){names[x[0]]=x[1];if(x[2])tonight[x[0]]=x[2];return x[0]})}
     else{ex=expected(t,c);ids=ex.l}
     var j;if(fin){var tp=m.g.tip;j=tp?(tp.wt===t?tp.w:(tp.lt===t?tp.l:null)):null}
     else{j=IX.proj(t);if(c)j=pickJumper(c,t,j,day);if(ids.indexOf(j)<0&&!posted){var o=teamJumpersBefore(t,day).filter(function(p){return ids.indexOf(p)>=0});j=o.length?o[0]:j}}
+    // point guard at the top down to centre; with no position on record a player sits mid-list and the jumper goes last
+    var rk=function(p){var v=posOf(p,tonight);return v?POS_RANK[v]:(p===j?6:3.2)},ord={};ids.forEach(function(p,i){ord[p]=i});
+    ids.sort(function(a,b){return rk(a)-rk(b)||ord[a]-ord[b]});
     var rows=ids.map(function(p){var i=c&&injOf(c,t,p);
-      return '<li><span>'+(D.players[p]?nm(p):esc(names[p]||"#"+p))+'</span>'+(p===j?'<span class="tag w">'+(fin?"TOOK THE TIP":"JUMPER")+'</span>':'')+itag(i)+(ex?'<span class="o">started '+(ex.n[p]||0)+' of last '+ex.k+'</span>':'')+'</li>'}).join("");
+      return '<li><span class="lpos">'+(posOf(p,tonight)||"–")+'</span><span>'+(D.players[p]?nm(p):esc(names[p]||"#"+p))+'</span>'+(p===j?'<span class="tag w">'+(fin?"TOOK THE TIP":"JUMPER")+'</span>':'')+itag(i)+(ex?'<span class="o">started '+(ex.n[p]||0)+' of last '+ex.k+'</span>':'')+'</li>'}).join("");
     var inj=(c&&c.inj[t]||[]),rep=inj.map(function(x){return '<div><span>'+esc(x.n)+'</span>'+itag(x)+(x.d?'<span class="o">'+fmtD(x.d)+'</span>':'')+(x.c?'<small>'+esc(x.c)+'</small>':'')+'</div>'}).join("");
     var off=u&&u.out&&u.out.length?'<div><span class="o">Inactive tonight</span> '+u.out.map(function(x){return esc(x[1])+(x[2]?' <span class="o">('+esc(x[2])+')</span>':'')}).join(", ")+'</div>':"";
     var st=fin?'<span class="tag">STARTED</span>':posted?'<span class="tag w"><span class="ldot"></span>LOCKED</span>':'<span class="tag q">EXPECTED</span>';
@@ -635,7 +644,7 @@ function vLineups(){
   Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   view.innerHTML='<section class="panel"><div class="phead"><h2>Daily lineups</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
     (nUp?'<span class="tag '+(nLock===nUp?"w":nLock?"q":"")+'">'+nLock+' OF '+nUp+' LOCKED</span>':'')+'</div></div>'+
-    '<p class="note">'+(ms.length?'':'No games on this day. ')+'A game lights up once the NBA has posted both starting fives, usually about half an hour before tip. Until then each side shows its expected five: the players with the most starts in the team\'s last five games, leaving out anyone listed out. Injury designations and notes come from the league injury report'+(D.inj?'':' (not available in this copy)')+'. For games already played, the five shown are the players who actually started.</p>'+
+    '<p class="note">'+(ms.length?'':'No games on this day. ')+'A game lights up once the NBA has posted both starting fives, usually about half an hour before tip. Until then each side shows its expected five: the players with the most starts in the team\'s last five games, leaving out anyone listed out. Each five runs point guard down to centre, using the position the NBA lists for a starter in its box scores; a dash means none is on record yet. Injury designations and notes come from the league injury report'+(D.inj?'':' (not available in this copy)')+'. For games already played, the five shown are the players who actually started.</p>'+
     (cards?'<div class="lgrid">'+cards+'</div>':'')+'</section>'}
 function vMatchup(){
   var a=S.a,b=S.b;if(a===b)b=teams().filter(function(t){return t!==a})[0];
