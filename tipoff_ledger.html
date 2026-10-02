@@ -253,7 +253,9 @@ function likelyJumper(t){ // most recent of the team's regular jumpers: most tip
 }
 function h2h(a,b){var r={aw:0,bw:0,log:[]};
   G.forEach(function(g){var t=g.tip;if(!t)return;if(t.w===a&&t.l===b){r.aw++;r.log.push({g:g,w:a})}else if(t.w===b&&t.l===a){r.bw++;r.log.push({g:g,w:b})}});return r}
-function season(p){var w=0,n=0;G.forEach(function(g){var t=g.tip;if(!t)return;if(t.w===p){w++;n++}else if(t.l===p)n++});return{w:w,n:n}}
+function season(p){ // a jumper's record over his own most recent tips, following the Window
+  var r=[];G.forEach(function(g){var t=g.tip;if(!t)return;if(t.w===p)r.push(1);else if(t.l===p)r.push(0)});
+  r=lastN(r);var w=0;r.forEach(function(x){w+=x});return{w:w,n:r.length}}
 function firstShots(t){
   var gs=teamGames(t),P={},tot={n:0,tipN:0,made1:0,mix:{},att:0};
   function r(p){return P[p]=P[p]||{p:p,name:D.players[p]||p,st:0,s1:0,s1tip:0,s1made:0,att3:0,tfb:0,gfb:0,mix:{}}}
@@ -333,7 +335,7 @@ function recentGames(t,k){
       att(g,t).slice(0,3).map(shotLine).join("")+'</div></div>'}).join("")+'</div>';
 }
 function jumperSelect(id,t,val){var tt=teamTipAll(t);
-  return '<select id="'+id+'">'+tt.map(function(j){return '<option value="'+j.p+'"'+(j.p===val?' selected':'')+'>'+nm(j.p)+" ("+j.w+"–"+(j.n-j.w)+")</option>"}).join("")+'</select>'}
+  return '<select id="'+id+'">'+tt.map(function(j){return '<option value="'+j.p+'"'+(j.p===val?' selected':'')+'>'+nm(j.p)+" ("+season(j.p).w+"–"+(season(j.p).n-season(j.p).w)+")</option>"}).join("")+'</select>'}
 function teamTipAll(t){var keep=S.n;S.n=0;var o=teamTip(t);S.n=keep;return o.jl}
 
 function todayET(){try{return new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York"}).format(new Date())}catch(_){return new Date().toISOString().slice(0,10)}}
@@ -448,7 +450,7 @@ function vMatchup(){
     '<div class="circle">'+side(a,ta,S.ja,sa,"",jumperSelect("selJA",a,S.ja))+
     '<div class="mid"><span>Head to head</span><b>'+hh.aw+"–"+hh.bw+'</b><span>'+(hh.aw+hh.bw?"meetings":"never met")+'</span></div>'+
     side(b,tb,S.jb,sb,"r",jumperSelect("selJB",b,S.jb))+'</div>'+
-    '<p class="note">Estimate from each jumper\'s win rate: <b>'+nm(S.ja)+' '+Math.round(est*100)+'%</b>, '+nm(S.jb)+' '+(100-Math.round(est*100))+'%. Jumper records and head-to-head use every game in the Games filter; team records follow the Window.'+
+    '<p class="note">Estimate from each jumper\'s win rate: <b>'+nm(S.ja)+' '+Math.round(est*100)+'%</b>, '+nm(S.jb)+' '+(100-Math.round(est*100))+'%. Jumper and team records follow the Window (a jumper\'s last tips, a team\'s last games); head-to-head counts every meeting in the Season and Games filters.'+
     (hh.log.length?' Meetings: '+hh.log.map(function(e){return fmtD(e.g.d)+" "+nm(e.w)}).join(", ")+'.':'')+'</p></section>';
   h+='<div class="picks" style="margin-top:20px">'+[a,b].map(function(t,i){var st=shotTable("ms"+i,t);
     return '<section class="panel"><div class="phead"><h2>'+t+' first attempts</h2><span class="tag">'+st.fs.tot.n+' games · first attempt made '+pct(st.fs.tot.made1,st.fs.tot.n)+'</span></div>'+
