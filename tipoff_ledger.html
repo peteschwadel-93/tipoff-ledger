@@ -428,6 +428,26 @@ function adjust(o,m,day){ // swap in a replacement jumper where needed, keeping 
     var r=nj?recBefore(nj,day):{l15:{w:0,n:0},full:{w:0,n:0}};o[k[4]]=j;o[k[0]]=nj;o[k[1]]=r.l15;o[k[2]]=r.full});
   return o}
 function swapTag(orig,now){return orig===undefined?"":'<span class="tag q">'+(now?"IN FOR "+nm(orig).toUpperCase():"NO KNOWN JUMPER · "+nm(orig).toUpperCase()+" OUT")+'</span>'}
+/* ---- top shooters for a pick ----
+   Backtested on both seasons: ranking by first-three attempts per start over the season caught more of a
+   team's first three attempts, first shots and first baskets than the last-three-games count, and the
+   last-three tie-break was no better than chance. Each rate is pulled toward the league average (0.6 per
+   start) by five phantom starts. Early in a season (under five team games) the last 20 games are used. */
+function topShooters(t,day,m){
+  var prev=D.games.filter(function(g){return g.d<day&&(g.h===t||g.a===t)}),mo=+day.slice(5,7),sy=+day.slice(0,4)-(mo>=9?0:1);
+  var sp=prev.filter(function(g){return g.s===sy}),win=sp.length>=5?sp:prev.slice(-20),c=m?ctxOf(m):null,u=c&&c.lu&&c.lu[t],P={},cand={};
+  function r(p){return P[p]=P[p]||{p:p,name:D.players[p]||"",c:0,st:0,n:0,made:0,mix:{}}}
+  win.forEach(function(g){(g.st[t]||[]).forEach(function(p){r(p).st++});att(g,t).slice(0,3).forEach(function(s){var x=r(s[0]),k=cat(s);x.c++;x.mix[k]=(x.mix[k]||0)+1})});
+  var l3=prev.slice(-3);l3.forEach(function(g){att(g,t).slice(0,3).forEach(function(s){var x=r(s[0]);x.n++;if(s[2])x.made++})});
+  // who is expected to start: the posted lineup if there is one, otherwise recent starters who are not listed out
+  if(u&&u.st.length)u.st.forEach(function(x){cand[x[0]]=1;if(!P[x[0]])r(x[0]).name=D.players[x[0]]||x[1]});
+  else prev.slice(-5).forEach(function(g){(g.st[t]||[]).forEach(function(p){var i=c&&injOf(c,t,p);if(!(i&&/^out/i.test(i.st)))cand[p]=1})});
+  var rows=Object.keys(cand).map(function(p){var x=r(+p);x.rate=(x.c+3)/(x.st+5);return x}).sort(function(a,b){return b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)}).slice(0,3);
+  var cs=CATS.filter(function(k){return S.ft||k!=="Free throws"});
+  topShooters.rows=rows;topShooters.games=win.length;topShooters.season=sp.length>=5;
+  if(!rows.length)return '<p class="note">No earlier games for '+t+' in this data.</p>';
+  return '<div class="tw"><table style="width:auto"><thead><tr><th>Shooter</th><th class="n">Per start</th><th class="n">Attempts</th><th class="n">Starts</th><th class="n">Last 3 games</th>'+cs.map(function(k){return '<th class="n">'+k+'</th>'}).join("")+'</tr></thead><tbody>'+
+    rows.map(function(x){return '<tr><td>'+esc(x.name)+'</td><td class="n">'+(x.st?(x.c/x.st).toFixed(2):"–")+'</td><td class="n">'+x.c+'</td><td class="n">'+x.st+'</td><td class="n">'+x.n+" of "+(l3.length*3)+'</td>'+cs.map(function(k){return '<td class="n">'+(x.mix[k]||'<span class="o">·</span>')+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table></div>'}
 function vPicks(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
   sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
@@ -462,13 +482,13 @@ function vPicks(){
   var hd='<section class="panel"><div class="phead"><h2>Picks</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
     '<label class="f">Minimum rating <select id="selLv">'+[[1,"One chevron · 55%+"],[2,"Two chevrons · 60%+"],[3,"Three chevrons · 65%+"],[4,"Four chevrons · 75%+"]].map(function(n){return '<option value="'+n[0]+'"'+(n[0]===S.minLv?' selected':'')+'>'+n[1]+'</option>'}).join("")+'</select></label></div></div>'+
     '<p class="note">'+(ms.length?picks.length+" of "+ms.length+" matchups reach the rating. ":"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips. The rating is the favoured jumper\'s estimated chance of winning the tip, from both jumpers\' full records in this data: one chevron at 55%, two at 60%, three at 65%, four at 75%.'+
-    (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are flagged but not re-ranked. Whatever was flagged before tip stays on the card after the game.":"")+
+    (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are ranked by first-three attempts per start this season, among players expected to start: the posted lineup once there is one, otherwise recent starters not listed out. Whatever was flagged before tip stays on the card after the game.":"")+
     (up.length?"":" This data has no upcoming schedule, so past game days are shown as they looked before tip-off. Run python3 build_data.py --install once and today\'s games load on their own.")+'</p>'+
     '<div class="kv"><span><b>Track record at '+["","one chevron","two chevrons","three chevrons","four chevrons"][S.minLv]+' or more</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
   function card(r,id){ // full detail for one game: the favoured side's shooters, or both sides when nothing is favoured
     var m=r.m,sides=r.fav&&r.lv>0?[r.fav]:[m.a,m.h],body="";
-    sides.forEach(function(t,k){var tbl=last3(t,H,3);if(!k&&r.fav){r.top=(last3.rows||[]).slice();r.of=last3.of}
-      body+=firsts(t)+'<h3>'+t+' top 3 shooters, last 3 games · first three attempts</h3>'+tbl});
+    sides.forEach(function(t,k){var tbl=topShooters(t,day,m);if(!k&&r.fav)r.top=(topShooters.rows||[]).slice();
+      body+=firsts(t)+'<h3>'+t+' top 3 shooters · first-three attempts per start, '+(topShooters.season?"this season":"last "+topShooters.games+" games")+'</h3>'+tbl});
     return '<section class="panel" id="'+id+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
       (r.ok?'<span class="edge">'+(r.lv?r.fav+" ":"Even ")+r.abs+'%</span>':'<span class="tag">NO RATING</span>')+'</span></div>'+
       '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,r.fav&&isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
@@ -486,7 +506,7 @@ function vPicks(){
           var l=g?att(g,r.fav):[],ts=g&&teamFirstScore(g,r.fav),fo=Infinity; // fo: where the game's first score falls in the order of attempts
           if(g)[g.h,g.a].forEach(function(t){att(g,t).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
           function yn(lab,v){return '<span>'+lab+'</span>'+(g?'<span class="tag'+(v?" w":"")+'">'+(v?"YES":"NO")+'</span>':'<span class="o">–</span>')}
-          return '<li'+((fs&&fs[0]===s.p)||(fa&&fa.s[0]===s.p)?' class="hit"':'')+'><div class="rl"><span>'+esc(s.name)+'</span><span class="o">'+s.n+" of "+r.of+'</span></div>'+(avail(m,r.fav,s.p)?'<div class="rf">'+avail(m,r.fav,s.p)+'</div>':'')+'<div class="rq">'+
+          return '<li'+((fs&&fs[0]===s.p)||(fa&&fa.s[0]===s.p)?' class="hit"':'')+'><div class="rl"><span>'+esc(s.name)+'</span><span class="o">'+(s.st?(s.c/s.st).toFixed(2):"–")+' per start</span></div>'+(avail(m,r.fav,s.p)?'<div class="rf">'+avail(m,r.fav,s.p)+'</div>':'')+'<div class="rq">'+
             yn("1st basket attempt",l.some(function(x){return x[0]===s.p&&x[6]<=fo}))+yn("Team's first 3",l.slice(0,3).some(function(x){return x[0]===s.p}))+
             yn("Team's 1st shot",l[0]&&l[0][0]===s.p)+yn("Team's 1st "+(S.ft?"score":"basket"),ts&&ts[0]===s.p)+'</div></li>'}).join("")+'</ol></div>'+
         (!g?"":'<div class="rblock rres"><h3>What happened</h3><div><span class="o">Tip</span>'+(g&&g.tip?'<span class="tag '+(won?"w":"l")+'">'+(won?"WON":"LOST")+'</span>':"<span>–</span>")+'</div><div'+(hitShot?' class="hit"':'')+'><span class="o">First shot</span><span>'+(fa?nm(fa.s[0])+" ("+fa.t+")":"–")+(hitShot?' <span class="tag w">HIT</span>':'')+'</span></div><div'+(hitScore?' class="hit"':'')+'><span class="o">First score</span><span>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+(hitScore?' <span class="tag w">HIT</span>':'')+'</span></div></div>')+'</div>'}).join("")+'</div></section>':"";
