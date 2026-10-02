@@ -74,13 +74,14 @@ tbody tr.on td{background:var(--accent-soft)}
 .side.r{text-align:right;align-items:flex-end}
 .big{font:700 48px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--accent)}
 .who{font:600 22px/1.1 var(--display);text-transform:uppercase;letter-spacing:.04em;overflow-wrap:anywhere}
-.mid{width:136px;height:136px;border:1px solid var(--line);background:var(--surface);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}
+.mid{width:144px;height:144px;border:1px solid var(--line);background:var(--surface);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}
 .midw{display:flex;flex-direction:column;align-items:center;gap:8px}
 .hh{font-size:12px;color:var(--muted);letter-spacing:.04em}.hh b{color:var(--ink);font-weight:500}
-.chev{width:66px;height:28px;display:block;flex:none}
-.chev.sm{width:44px;height:19px}
+.chev{width:86px;height:28px;display:block;flex:none;--c:var(--muted)}
+.chev.sm{width:58px;height:19px}
+.chev.lv1{--c:#f0a94a}.chev.lv2{--c:#e2d24e}.chev.lv3{--c:#9fdc58}.chev.lv4{--c:#3ef07f}
 .chev polyline{fill:none;stroke:var(--sunk);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
-.chev polyline.on{stroke:var(--made);filter:drop-shadow(0 0 4px var(--made))}
+.chev polyline.on{stroke:var(--c);filter:drop-shadow(0 0 4px var(--c))}
 .chev.off polyline.on,.mid.off .chev polyline.on{stroke:var(--muted);filter:none}
 .rl .rname{min-width:0}
 .mid b{font:700 30px/1 var(--display);font-variant-numeric:tabular-nums}
@@ -207,7 +208,7 @@ section[id^="pick-"]{scroll-margin-top:16px}
 <script>
 (function(){
 "use strict";
-var D=null, G=[], S={minLv:2,ldDays:30,ldScope:3,ldTeam:"",tab:"matchup",po:"all",ssn:"all",day:null,margin:20,n:0,ft:1,a:null,b:null,ja:null,jb:null,jumper:null,q:"",minTips:10,shotTeam:null,logTeam:"",logN:40,sort:{}};
+var D=null, G=[], S={minLv:3,ldDays:30,ldScope:3,ldTeam:"",tab:"matchup",po:"all",ssn:"all",day:null,margin:20,n:0,ft:1,a:null,b:null,ja:null,jb:null,jumper:null,q:"",minTips:10,shotTeam:null,logTeam:"",logN:40,sort:{}};
 var $=function(id){return document.getElementById(id)};
 var view=$("view");
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -366,15 +367,17 @@ function pickIndex(){ // what was known before each game day: projected jumpers 
    Backtested on 2024-25 and 2025-26: a jumper's whole record to date predicted tip winners better than
    his last 15, recency-weighted records or head-to-head. Each record is pulled toward 50% by eight
    phantom tips, and the gap between the two becomes a win chance through a logistic curve fitted to
-   those seasons (K). Levels: one chevron 55%+, two 62%+, three 70%+. */
+   those seasons (K). Levels: one chevron 55%+, two 60%+, three 65%+, four 75%+. Those are the bands
+   that separated in past results (favourite won about 58%, 61%, 66% and 73%); 65-69% and 70-74% did
+   not differ, so they share a level, and under 55% was a coin flip. */
 var ADV_K=4.17;
 function rating(left,right){ // left/right: {w,n} full records; null when either jumper has under five tips
   if(!left||!right||left.n<5||right.n<5)return null;
   var pr=1/(1+Math.exp(-ADV_K*((right.w+4)/(right.n+8)-(left.w+4)/(left.n+8)))),p=Math.max(pr,1-pr);
-  var pc=Math.round(p*100);return{p:p,pct:pc,right:pr>=.5,lv:pc>=70?3:pc>=62?2:pc>=55?1:0}} // levels use the rounded figure shown on screen
-function chev(lv,left,cls){ // three chevrons pointing at the favoured side, lit up to the level
-  var s='<svg class="chev '+(cls||"")+'" viewBox="0 0 66 28" aria-hidden="true"'+(left?' style="transform:scaleX(-1)"':'')+'>';
-  for(var i=0;i<3;i++)s+='<polyline points="'+(8+i*20)+',4 '+(20+i*20)+',14 '+(8+i*20)+',24"'+(i<lv?' class="on"':'')+'/>';return s+'</svg>'}
+  var pc=Math.round(p*100);return{p:p,pct:pc,right:pr>=.5,lv:pc>=75?4:pc>=65?3:pc>=60?2:pc>=55?1:0}} // levels use the rounded figure shown on screen
+function chev(lv,left,cls){ // four chevrons pointing at the favoured side, lit up to the level and coloured by it
+  var s='<svg class="chev lv'+lv+' '+(cls||"")+'" viewBox="0 0 86 28" aria-hidden="true"'+(left?' style="transform:scaleX(-1)"':'')+'>';
+  for(var i=0;i<4;i++)s+='<polyline points="'+(8+i*20)+',4 '+(20+i*20)+',14 '+(8+i*20)+',24"'+(i<lv?' class="on"':'')+'/>';return s+'</svg>'}
 function advBlock(rt,leftT,rightT,hh,off){ // centre of a matchup: chevrons, win chance, favoured side, head-to-head beneath
   var c=rt?'<div class="mid'+(off?" off":"")+'">'+chev(rt.lv,!rt.right)+'<b>'+rt.pct+'%</b><span>'+(rt.lv?(rt.right?rightT:leftT)+" advantage":"Even")+'</span></div>'
           :'<div class="mid"><span>No rating</span><span>too few tips</span></div>';
@@ -456,11 +459,11 @@ function vPicks(){
   var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
   Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   var hd='<section class="panel"><div class="phead"><h2>Picks</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
-    '<label class="f">Minimum rating <select id="selLv">'+[[1,"One chevron · 55%+"],[2,"Two chevrons · 62%+"],[3,"Three chevrons · 70%+"]].map(function(n){return '<option value="'+n[0]+'"'+(n[0]===S.minLv?' selected':'')+'>'+n[1]+'</option>'}).join("")+'</select></label></div></div>'+
-    '<p class="note">'+(ms.length?picks.length+" of "+ms.length+" matchups reach the rating. ":"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips. The rating is the favoured jumper\'s estimated chance of winning the tip, from both jumpers\' full records in this data: one chevron at 55%, two at 62%, three at 70%.'+
+    '<label class="f">Minimum rating <select id="selLv">'+[[1,"One chevron · 55%+"],[2,"Two chevrons · 60%+"],[3,"Three chevrons · 65%+"],[4,"Four chevrons · 75%+"]].map(function(n){return '<option value="'+n[0]+'"'+(n[0]===S.minLv?' selected':'')+'>'+n[1]+'</option>'}).join("")+'</select></label></div></div>'+
+    '<p class="note">'+(ms.length?picks.length+" of "+ms.length+" matchups reach the rating. ":"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips. The rating is the favoured jumper\'s estimated chance of winning the tip, from both jumpers\' full records in this data: one chevron at 55%, two at 60%, three at 65%, four at 75%.'+
     (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are flagged but not re-ranked. Whatever was flagged before tip stays on the card after the game.":"")+
     (up.length?"":" This data has no upcoming schedule, so past game days are shown as they looked before tip-off. Run python3 build_data.py --install once and today\'s games load on their own.")+'</p>'+
-    '<div class="kv"><span><b>Track record at '+["","one chevron","two chevrons","three chevrons"][S.minLv]+' or more</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
+    '<div class="kv"><span><b>Track record at '+["","one chevron","two chevrons","three chevrons","four chevrons"][S.minLv]+' or more</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
   var cards=picks.map(function(r,i){var m=r.m,tbl=last3(r.fav,H,3);r.top=(last3.rows||[]).slice();r.of=last3.of;
     return '<section class="panel" id="pick-'+i+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+'<span class="edge">'+r.fav+' '+r.abs+'%</span></span></div>'+
       '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
