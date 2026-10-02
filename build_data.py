@@ -229,7 +229,7 @@ def load_nba(season, cache="pbp_cache"):
             lu = lineup(u["gid"])
             if lu:
                 u["lu"] = lu
-        del u["ts"], u["gid"]
+        del u["gid"]
     return (pd.DataFrame(rows) if rows else None), upcoming
 
 
@@ -371,6 +371,88 @@ def label(yr):
 
 
 FLAGS = "flags.json"
+ODDS = "odds.json"
+ODDS_API = "https://api.the-odds-api.com/v4/sports/basketball_nba"
+TEAM_NAMES = {"Atlanta Hawks": "ATL", "Boston Celtics": "BOS", "Brooklyn Nets": "BKN", "Charlotte Hornets": "CHA", "Chicago Bulls": "CHI",
+              "Cleveland Cavaliers": "CLE", "Dallas Mavericks": "DAL", "Denver Nuggets": "DEN", "Detroit Pistons": "DET",
+              "Golden State Warriors": "GSW", "Houston Rockets": "HOU", "Indiana Pacers": "IND", "Los Angeles Clippers": "LAC",
+              "LA Clippers": "LAC", "Los Angeles Lakers": "LAL", "Memphis Grizzlies": "MEM", "Miami Heat": "MIA", "Milwaukee Bucks": "MIL",
+              "Minnesota Timberwolves": "MIN", "New Orleans Pelicans": "NOP", "New York Knicks": "NYK", "Oklahoma City Thunder": "OKC",
+              "Orlando Magic": "ORL", "Philadelphia 76ers": "PHI", "Phoenix Suns": "PHX", "Portland Trail Blazers": "POR",
+              "Sacramento Kings": "SAC", "San Antonio Spurs": "SAS", "Toronto Raptors": "TOR", "Utah Jazz": "UTA", "Washington Wizards": "WAS"}
+
+
+def parse_first_basket(doc):
+    """Best first-basket price per player across books: [[player, american price, book], ...]."""
+    best = {}
+    for bk in doc.get("bookmakers") or []:
+        for mk in bk.get("markets") or []:
+            if mk.get("key") != "player_first_basket":
+                continue
+            for o in mk.get("outcomes") or []:
+                who = o.get("description") or o.get("name")
+                price = o.get("price")
+                if not who or who in ("Yes", "No") or str(o.get("name")) == "No" or not isinstance(price, (int, float)):
+                    continue
+                if who not in best or price > best[who][1]:
+                    best[who] = [who, int(price), bk.get("title") or bk.get("key") or ""]
+    return sorted(best.values(), key=lambda x: x[1])
+
+
+def remember_odds(sched, old):
+    """First-basket prices for today's games from The Odds API, kept in odds.json so each game is asked for at most twice.
+
+    Needs the key in the ODDS_API_KEY environment variable; without it this only returns what is already stored.
+    The free plan allows 500 requests a month and each game costs one, so a game is fetched once inside four hours
+    of tip and refreshed once inside the last hour. Fetching stops when fewer than 15 requests remain.
+    """
+    store = dict((old or {}).get("odds") or {})
+    try:
+        with open(ODDS, encoding="utf-8") as f:
+            store.update(json.load(f))
+    except Exception:
+        pass
+    key = os.environ.get("ODDS_API_KEY", "").strip()
+    if not key:
+        return store
+    before = json.dumps(store, sort_keys=True)
+    now = datetime.now(ET)
+    want = []
+    for u in sched:
+        if u.get("lv") or not u.get("ts"):
+            continue
+        mins = (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60
+        k = f"{u['d']}|{u['a']}|{u['h']}"
+        rec = store.get(k) or {}
+        if (not rec.get("p") and 0 < mins <= 240 and rec.get("tries", 0) < 6) or (rec.get("p") and rec.get("n", 1) < 2 and 0 < mins <= 60):
+            want.append((k, u))
+    if want:
+        try:
+            events = json.loads(get(f"{ODDS_API}/events?apiKey={key}"))   # listing events is free
+            ids = {(TEAM_NAMES.get(e.get("away_team")), TEAM_NAMES.get(e.get("home_team"))): e["id"] for e in events}
+            for k, u in want:
+                eid = ids.get((u["a"], u["h"]))
+                if not eid:
+                    continue
+                req = urllib.request.Request(f"{ODDS_API}/events/{eid}/odds?apiKey={key}&regions=us&markets=player_first_basket&oddsFormat=american", headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=60, context=CTX or ssl_context()) as r:
+                    left = r.headers.get("x-requests-remaining")
+                    prices = parse_first_basket(json.loads(r.read()))
+                rec = store.get(k) or {}
+                if prices:
+                    rec.update({"p": prices, "n": rec.get("n", 0) + 1, "at": now.strftime("%Y-%m-%dT%H:%M")})
+                else:
+                    rec["tries"] = rec.get("tries", 0) + 1
+                store[k] = rec
+                if left is not None and float(left) < 15:
+                    print("odds: monthly request allowance nearly used; stopping", file=sys.stderr)
+                    break
+        except Exception as e:
+            print(f"odds unavailable: {str(e).replace(key, '***')}", file=sys.stderr)
+    if json.dumps(store, sort_keys=True) != before:
+        with open(ODDS, "w", encoding="utf-8") as f:
+            json.dump(store, f, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
+    return store
 
 
 def remember_flags(sched, inj, old):
@@ -470,6 +552,7 @@ def make(source, season, prev=False, html=None):
         if inj is not None:
             out["inj"] = inj
         out["flags"] = remember_flags(sched, inj, old)
+        out["odds"] = remember_odds(sched, old)
     if notes:
         out["note"] = "; ".join(notes)
     return out
