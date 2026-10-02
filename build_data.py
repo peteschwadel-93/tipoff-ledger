@@ -187,6 +187,8 @@ def load_nba(season, cache="pbp_cache"):
                         upcoming.append({"d": when.strftime("%Y-%m-%d"), "t": when.strftime("%-I:%M %p ET") if os.name != "nt" else when.strftime("%I:%M %p ET").lstrip("0"),
                                          "h": g["homeTeam"]["teamTricode"], "a": g["awayTeam"]["teamTricode"],
                                          "pre": 1 if gid[:3] == "001" else 0, "ts": when.isoformat(), "gid": gid})
+                        if status == 2:
+                            upcoming[-1]["lv"] = 1
                 except Exception:
                     pass
                 if status != 2:
@@ -368,6 +370,40 @@ def label(yr):
     return f"{yr}-{str(yr + 1)[2:]}"
 
 
+FLAGS = "flags.json"
+
+
+def remember_flags(sched, inj, old):
+    """Keep what was flagged before each of today's games, so it can still be shown after they are played.
+
+    One entry per game, keyed "date|away|home": the injury designations for both teams and the posted
+    lineups, as last seen before tip. Stored in flags.json next to the script and inside the page data.
+    """
+    flags = dict((old or {}).get("flags") or {})
+    try:
+        with open(FLAGS, encoding="utf-8") as f:
+            flags.update(json.load(f))
+    except Exception:
+        pass
+    before = json.dumps(flags, sort_keys=True)
+    today = datetime.now(ET).strftime("%Y-%m-%d")
+    for u in sched:
+        if u["d"] != today:
+            continue
+        key = f"{u['d']}|{u['a']}|{u['h']}"
+        rec = flags.get(key, {})
+        if inj is not None and not (u.get("lv") and rec.get("inj") is not None):  # freeze designations at tip
+            rec["inj"] = {t: [[x["n"], x["st"], x["ty"]] for x in inj.get(t, [])] for t in (u["a"], u["h"]) if inj.get(t)}
+        if u.get("lu"):
+            rec["lu"] = u["lu"]
+        if rec:
+            flags[key] = rec
+    if json.dumps(flags, sort_keys=True) != before:
+        with open(FLAGS, "w", encoding="utf-8") as f:
+            json.dump(flags, f, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
+    return flags
+
+
 def embedded(path):
     """Data already inside the dashboard file, or None."""
     try:
@@ -387,7 +423,7 @@ def make(source, season, prev=False, html=None):
     """
     yr = season or current_season()
     frames, sched, notes = [], [], []
-    old_games, old_players = [], {}
+    old_games, old_players, old = [], {}, None
     if source == "nba":
         cur, sched = load_nba(yr)
         if cur is not None:
@@ -433,6 +469,7 @@ def make(source, season, prev=False, html=None):
         inj = load_injuries()
         if inj is not None:
             out["inj"] = inj
+        out["flags"] = remember_flags(sched, inj, old)
     if notes:
         out["note"] = "; ".join(notes)
     return out

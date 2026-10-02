@@ -126,7 +126,8 @@ section[id^="pick-"]{scroll-margin-top:16px}
 .rres .hit>span:last-child,.rcard li.hit .rl>span:first-child{color:var(--made);font-weight:600}
 .rcard li.hit .rl>span:first-child:before{color:var(--made)}
 .tag.q{color:var(--accent);background:var(--accent-soft);border-color:transparent}
-.rf{display:flex;flex-wrap:wrap;gap:6px;padding-left:1.5em}
+.rf{display:flex;flex-wrap:wrap;gap:6px;padding-left:1.5em;align-items:center}
+.rf .o{font-size:12px;color:var(--muted)}
 .side.r .rf{justify-content:flex-end}.side .rf{padding-left:0}
 .rcard.warn .edge{opacity:.5}
 .inj{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:13.5px;color:var(--soft)}
@@ -353,21 +354,26 @@ function grade(o){ // margin and favourite from two last-15 records
   o.ok=o.ra.n>=5&&o.rh.n>=5;o.diff=o.ok?Math.round(100*(o.rh.w/o.rh.n-o.ra.w/o.ra.n)):null;
   o.abs=o.diff==null?-1:Math.abs(o.diff);o.fav=o.diff==null?null:(o.diff>=0?o.m.h:o.m.a);return o}
 /* ---- availability: ESPN injury designations and, once posted, NBA starting lineups ---- */
-function normName(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z ]/g,"").replace(/\s+(jr|sr|ii|iii|iv)$/,"").replace(/\s+/g," ").trim()}
-function injOf(t,p){var l=(D.inj||{})[t]||[],n=normName(D.players[p]);if(!n)return null;for(var i=0;i<l.length;i++)if(normName(l[i].n)===n)return l[i];return null}
-function luOf(m,t,p){var u=m.lu&&m.lu[t];if(!u)return null;if(u.st.some(function(x){return x[0]===p}))return "start";if(u.out.some(function(x){return x[0]===p}))return "out";return u.st.length?"bench":null}
-function isOut(m,t,p){if(m.g||!p)return false;var l=luOf(m,t,p),i=injOf(t,p);return l==="out"||l==="bench"||(!l&&i&&/^out/i.test(i.st))}
-function avail(m,t,p){ // tags for one player in a game still to be played
-  if(m.g||!p)return "";var l=luOf(m,t,p),i=injOf(t,p),o="";
-  if(l==="start")o+='<span class="tag w">STARTING</span>';else if(l==="out")o+='<span class="tag l">INACTIVE</span>';else if(l==="bench")o+='<span class="tag l">NOT STARTING</span>';
+function normName(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z ]/g,"").replace(/\s+(jr|sr|ii|iii|iv)$/,"").replace(/\s+/g," ").trim()}
+function ctxOf(m){ // what is known about availability: live feeds for games to come, the saved pre-tip note for played ones
+  if(!m.g)return D.inj||m.lu?{inj:D.inj||{},lu:m.lu||null,past:false}:null;
+  var f=(D.flags||{})[m.g.d+"|"+m.a+"|"+m.h];if(!f)return null;var inj={};
+  Object.keys(f.inj||{}).forEach(function(t){inj[t]=f.inj[t].map(function(x){return{n:x[0],st:x[1],ty:x[2],c:""}})});
+  return{inj:inj,lu:f.lu||null,past:true}}
+function injOf(c,t,p){var l=c.inj[t]||[],n=normName(D.players[p]);if(!n)return null;for(var i=0;i<l.length;i++)if(normName(l[i].n)===n)return l[i];return null}
+function luOf(c,t,p){var u=c.lu&&c.lu[t];if(!u)return null;if(u.st.some(function(x){return x[0]===p}))return "start";if(u.out.some(function(x){return x[0]===p}))return "out";return u.st.length?"bench":null}
+function isOut(m,t,p){var c=ctxOf(m);if(!c||!p)return false;var l=luOf(c,t,p),i=injOf(c,t,p);return l==="out"||l==="bench"||(!l&&i&&/^out/i.test(i.st))}
+function avail(m,t,p){ // tags for one player: current for games to come, as flagged before tip for played ones
+  var c=ctxOf(m);if(!c||!p)return "";var l=luOf(c,t,p),i=injOf(c,t,p),o="";
+  if(l==="start")o+=c.past?"":'<span class="tag w">STARTING</span>';else if(l==="out")o+='<span class="tag l">INACTIVE</span>';else if(l==="bench")o+='<span class="tag l">NOT STARTING</span>';
   if(i&&l!=="start")o+='<span class="tag '+(/^out/i.test(i.st)?"l":"q")+'" title="'+esc(i.c)+'">'+esc(i.st.toUpperCase())+(i.ty?" · "+esc(i.ty.toUpperCase()):"")+'</span>';
-  return o}
+  return o&&c.past?'<span class="o">Before tip</span>'+o:o}
 function injReport(m){ // every listed designation for both teams, plus posted starters
-  if(m.g)return "";var o="";
-  [m.a,m.h].forEach(function(t){var l=(D.inj||{})[t]||[],u=m.lu&&m.lu[t];
-    if(u&&u.st.length)o+='<div class="kv"><span><b>'+t+' starters</b></span><span>'+u.st.map(function(x){return esc(x[1])}).join(", ")+'</span></div>';
+  var c=ctxOf(m);if(!c)return "";var o="";
+  [m.a,m.h].forEach(function(t){var l=c.inj[t]||[],u=c.lu&&c.lu[t];
+    if(u&&u.st.length&&!c.past)o+='<div class="kv"><span><b>'+t+' starters</b></span><span>'+u.st.map(function(x){return esc(x[1])}).join(", ")+'</span></div>';
     if(l.length)o+='<div class="inj"><span class="tm">'+t+'</span>'+l.map(function(x){return '<span title="'+esc(x.c)+'">'+esc(x.n)+' <span class="tag '+(/^out/i.test(x.st)?"l":"q")+'">'+esc(x.st.toUpperCase())+(x.ty?" · "+esc(x.ty.toUpperCase()):"")+'</span></span>'}).join("")+'</div>'});
-  return o?'<h3>Availability</h3>'+o:""}
+  return o?'<h3>'+(c.past?"Availability as flagged before tip":"Availability")+'</h3>'+o:""}
 function vPicks(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
   sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
@@ -401,7 +407,7 @@ function vPicks(){
   var hd='<section class="panel"><div class="phead"><h2>Picks</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
     '<label class="f">Wide margin <select id="selMargin">'+[10,15,20,25,30,40].map(function(n){return '<option value="'+n+'"'+(n===S.margin?' selected':'')+'>'+n+'+ pts</option>'}).join("")+'</select></label></div></div>'+
     '<p class="note">'+(ms.length?picks.length+" of "+ms.length+" matchups clear the margin. ":"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips; the margin is the gap in tip win rate over each jumper\'s last 15 tips, in percentage points.'+
-    (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. Picks are not re-ranked when a player is out.":"")+
+    (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. Picks are not re-ranked when a player is out. Whatever was flagged before tip stays on the card after the game.":"")+
     (up.length?"":" This data has no upcoming schedule, so past game days are shown as they looked before tip-off. Run python3 build_data.py --install once and today\'s games load on their own.")+'</p>'+
     '<div class="kv"><span><b>Track record at '+S.margin+'+ pts</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
   var cards=picks.map(function(r,i){var m=r.m,tbl=last3(r.fav,H,3);r.top=(last3.rows||[]).slice();r.of=last3.of;
@@ -413,7 +419,7 @@ function vPicks(){
       var inTop=function(p){return r.top.slice(0,3).some(function(s){return s.p===p})},hitShot=!!(fa&&inTop(fa.s[0])),hitScore=!!(fs&&inTop(fs[0]));
       var jOut=isOut(m,r.fav,j);
       return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+m.a+' @ '+m.h+'</span><span class="edge">'+r.fav+' +'+r.abs+'</span></div>'+
-        (m.t?'<div><span class="tag">'+esc(m.t)+'</span>'+(m.pre?' <span class="tag">PRESEASON</span>':'')+' <span class="tag">RESULTS PENDING</span>'+(jOut?' <span class="tag l">CHECK · JUMPER UNAVAILABLE</span>':'')+'</div>':(g&&g.lv?'<div><span class="tag w">LIVE · SO FAR</span></div>':''))+
+        (m.t?'<div><span class="tag">'+esc(m.t)+'</span>'+(m.pre?' <span class="tag">PRESEASON</span>':'')+' <span class="tag">RESULTS PENDING</span>'+(jOut?' <span class="tag l">CHECK · JUMPER UNAVAILABLE</span>':'')+'</div>':((g&&g.lv)||jOut?'<div>'+(g&&g.lv?'<span class="tag w">LIVE · SO FAR</span> ':'')+(jOut?'<span class="tag l">JUMPER WAS FLAGGED UNAVAILABLE</span>':'')+'</div>':''))+
         '<div class="rblock"><h3>Tip pick</h3><div class="rname">'+nm(j)+'</div>'+(avail(m,r.fav,j)?'<div class="rf" style="padding-left:0">'+avail(m,r.fav,j)+'</div>':'')+'</div>'+
         '<div class="rblock"><h3>'+r.fav+' shooters</h3><ol>'+[0,1,2].map(function(k){var s=r.top[k];if(!s)return "";
           var l=g?att(g,r.fav):[],ts=g&&teamFirstScore(g,r.fav);
