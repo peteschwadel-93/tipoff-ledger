@@ -424,7 +424,9 @@ def remember_odds(sched, old):
         mins = (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60
         k = f"{u['d']}|{u['a']}|{u['h']}"
         rec = store.get(k) or {}
-        if (not rec.get("p") and 0 < mins <= 240 and rec.get("tries", 0) < 6) or (rec.get("p") and rec.get("n", 1) < 2 and 0 < mins <= 60):
+        # empty-handed tries are spaced half an hour apart, so a five-minute refresh does not use them all at once
+        waited = not rec.get("tt") or (now - datetime.fromisoformat(rec["tt"]).replace(tzinfo=ET)).total_seconds() >= 30 * 60
+        if (not rec.get("p") and 0 < mins <= 240 and rec.get("tries", 0) < 6 and waited) or (rec.get("p") and rec.get("n", 1) < 2 and 0 < mins <= 60):
             want.append((k, u))
     if want:
         try:
@@ -443,6 +445,7 @@ def remember_odds(sched, old):
                     rec.update({"p": prices, "n": rec.get("n", 0) + 1, "at": now.strftime("%Y-%m-%dT%H:%M")})
                 else:
                     rec["tries"] = rec.get("tries", 0) + 1
+                    rec["tt"] = now.strftime("%Y-%m-%dT%H:%M")
                 store[k] = rec
                 if left is not None and float(left) < 15:
                     print("odds: monthly request allowance nearly used; stopping", file=sys.stderr)
