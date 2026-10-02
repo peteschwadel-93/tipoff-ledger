@@ -326,7 +326,7 @@ def build(df):
                     last[2] += made; last[8] += 1
                 elif same and last[2] and str(r.subType).strip() == "1 of 1":   # and-one
                     last[9] = made
-                elif nfg[t] < N_SHOTS:
+                elif nfg[t] < N_SHOTS or first_fg is None:
                     order += 1
                     kind = r.descriptor if pd.notna(r.descriptor) else None
                     lst.append([int(r.personId), 1, made, None, "Free Throw", el, order, kind, 1, None])
@@ -338,7 +338,7 @@ def build(df):
                     first_fg = [int(r.personId), t]
                 if made and first_pts is None:
                     first_pts = [int(r.personId), t]
-                if nfg[t] < N_SHOTS:
+                if nfg[t] < N_SHOTS or first_fg is None or (made and first_fg == [int(r.personId), t] and nfg[t] >= N_SHOTS):
                     nfg[t] += 1
                     dist = int(round(r.shotDistance)) if pd.notna(r.shotDistance) else None
                     lst.append([int(r.personId), 3 if r.actionType == "3pt" else 2, made, dist, r.subType,
