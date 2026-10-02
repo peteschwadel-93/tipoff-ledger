@@ -48,6 +48,9 @@ GH = "https://raw.githubusercontent.com/shufinskiy/nba_data/main/datasets/{name}
 NBA_HOSTS = ("https://cdn.nba.com/static/json", "https://nba-prod-us-east-1-mediaops-stats.s3.amazonaws.com/NBA")
 NBA_SCHEDULE = "/staticData/scheduleLeagueV2.json"
 NBA_PBP = "/liveData/playbyplay/playbyplay_{gid}.json"
+NBA_BOX = "/liveData/boxscore/boxscore_{gid}.json"
+ESPN_INJ = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
+ESPN_ABBR = {"GS": "GSW", "NY": "NYK", "SA": "SAS", "NO": "NOP", "UTAH": "UTA", "WSH": "WAS"}
 UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.nba.com/", "Accept": "application/json"}
 COLS = {"gameId", "orderNumber", "period", "clock", "timeActual", "actionType", "subType", "descriptor",
         "personId", "playerNameI", "teamTricode", "shotResult", "shotDistance", "scoreHome",
@@ -101,6 +104,46 @@ def get_nba(path):
     raise err
 
 
+def load_injuries():
+    """Current injury designations by team from ESPN, or None if the feed cannot be read."""
+    try:
+        data = json.loads(get(ESPN_INJ))
+        out = {}
+        for team in data.get("injuries", []):
+            for it in team.get("injuries", []):
+                ath = it.get("athlete") or {}
+                ab = (ath.get("team") or {}).get("abbreviation")
+                short = ath.get("shortName") or (f"{ath.get('firstName', '')[:1]}. {ath.get('lastName', '')}").strip()
+                if not ab or not short:
+                    continue
+                out.setdefault(ESPN_ABBR.get(ab, ab), []).append({
+                    "n": short, "f": ath.get("displayName") or short, "st": it.get("status") or "",
+                    "ty": (it.get("details") or {}).get("type") or "", "c": (it.get("shortComment") or "")[:200],
+                    "d": (it.get("date") or "")[:10]})
+        return out
+    except Exception as e:
+        print(f"injury feed unavailable: {e}", file=sys.stderr)
+        return None
+
+
+def lineup(gid):
+    """Starters and inactive players from the NBA box score, once it is posted shortly before tip."""
+    try:
+        game = json.loads(get_nba(NBA_BOX.format(gid=gid)))["game"]
+    except Exception:
+        return None
+    out = {}
+    for side in ("homeTeam", "awayTeam"):
+        t = game.get(side) or {}
+        ps = t.get("players") or []
+        st = [[int(p["personId"]), p.get("nameI") or p.get("name", "")] for p in ps if str(p.get("starter")) == "1"]
+        off = [[int(p["personId"]), p.get("nameI") or p.get("name", ""), p.get("notPlayingDescription") or ""]
+               for p in ps if p.get("status") == "INACTIVE"]
+        if (st or off) and t.get("teamTricode"):
+            out[t["teamTricode"]] = {"st": st, "out": off}
+    return out or None
+
+
 def load_github(season):
     frames = []
     for name, po in ((f"cdnnba_{season}", 0), (f"cdnnba_po_{season}", 1)):
@@ -143,7 +186,7 @@ def load_nba(season, cache="pbp_cache"):
                     if 0 <= ahead <= 7:
                         upcoming.append({"d": when.strftime("%Y-%m-%d"), "t": when.strftime("%-I:%M %p ET") if os.name != "nt" else when.strftime("%I:%M %p ET").lstrip("0"),
                                          "h": g["homeTeam"]["teamTricode"], "a": g["awayTeam"]["teamTricode"],
-                                         "pre": 1 if gid[:3] == "001" else 0, "ts": when.isoformat()})
+                                         "pre": 1 if gid[:3] == "001" else 0, "ts": when.isoformat(), "gid": gid})
                 except Exception:
                     pass
                 if status != 2:
@@ -177,8 +220,14 @@ def load_nba(season, cache="pbp_cache"):
                 row["live"] = 1 if status == 2 else 0
                 rows.append(row)
     upcoming.sort(key=lambda x: x["ts"])
+    now = datetime.now(ET)
     for u in upcoming:
-        del u["ts"]
+        # lineups are posted roughly half an hour before tip; start looking 90 minutes out
+        if (datetime.fromisoformat(u["ts"]) - now).total_seconds() <= 90 * 60:
+            lu = lineup(u["gid"])
+            if lu:
+                u["lu"] = lu
+        del u["ts"], u["gid"]
     return (pd.DataFrame(rows) if rows else None), upcoming
 
 
@@ -380,6 +429,10 @@ def make(source, season, prev=False, html=None):
     out = {"season": " + ".join(label(y) for y in seasons), "seasons": seasons, "source": source,
            "built": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
            "through": games[-1]["d"], "nShots": N_SHOTS, "sched": sched, "players": players, "games": games}
+    if source == "nba":
+        inj = load_injuries()
+        if inj is not None:
+            out["inj"] = inj
     if notes:
         out["note"] = "; ".join(notes)
     return out
