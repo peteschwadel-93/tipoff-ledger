@@ -415,18 +415,20 @@ function teamJumpersBefore(t,day){ // most likely jumpers first: by how many of 
   var l=[];D.games.forEach(function(g){var tp=g.tip;if(g.d>=day||!tp)return;var p=tp.wt===t?tp.w:(tp.lt===t?tp.l:null);if(p)l.push(p)});
   l=l.slice(-30);var c={},last={};l.forEach(function(p,i){c[p]=(c[p]||0)+1;last[p]=i});
   return Object.keys(c).map(Number).sort(function(a,b){return c[b]-c[a]||last[b]-last[a]})}
-function jumpShare(t,j,day){ // how many of the team's last 10 opening tips this player took
-  var l=[];D.games.forEach(function(g){var tp=g.tip;if(g.d>=day||!tp)return;var p=tp.wt===t?tp.w:(tp.lt===t?tp.l:null);if(p)l.push(p)});
-  l=l.slice(-10);var n=0;l.forEach(function(p){if(p===j)n++});return{n:n,of:l.length,split:l.length>=5&&n/l.length<.8}}
-function shareTag(t,j,day){if(!j)return "";var s=jumpShare(t,j,day);if(!s.of)return "";
-  return '<span class="tag '+(s.split?"q":"")+'" title="In past seasons a starter who took 8 or more of the last 10 jumped again about 97% of the time; under 8, closer to 89%.">'+(s.split?"SPLIT ROLE · ":"")+s.n+" OF LAST "+s.of+' TIPS</span>'}
+function startShare(t,j,day){ // of this player's last 10 starts for the team, how many opening tips he took
+  var l=[];D.games.forEach(function(g){if(g.d>=day||(g.h!==t&&g.a!==t)||(g.st[t]||[]).indexOf(j)<0)return;var tp=g.tip,p=tp?(tp.wt===t?tp.w:(tp.lt===t?tp.l:null)):null;if(p)l.push(p===j?1:0)});
+  l=l.slice(-10);var w=0;l.forEach(function(x){w+=x});return{w:w,k:l.length,split:l.length>=5&&w/l.length<.8}}
+function shareTag(t,j,day){if(!j)return "";var s=startShare(t,j,day);if(!s.k)return '<span class="tag q">NO STARTS ON RECORD</span>';
+  return '<span class="tag '+(s.split||s.k<5?"q":"")+'" title="Backtest, when he started: took every tip in his last 10 starts, jumped again 99% of the time; 80 to 99%, about 92%; under 60%, about 65%.">'+(s.split?"SPLIT ROLE · ":"")+"JUMPED IN "+s.w+" OF LAST "+s.k+(s.k===1?" START":" STARTS")+'</span>'}
 function recBefore(p,day){var r=[];D.games.forEach(function(g){var t=g.tip;if(g.d>=day||!t)return;if(t.w===p)r.push(1);else if(t.l===p)r.push(0)});
   function s(l){var w=0;l.forEach(function(x){w+=x});return{w:w,n:l.length}}return{full:s(r),l15:s(r.slice(-15))}}
 function pickJumper(c,t,j,day){ // returns the jumper to rate, or null when nobody suitable is known
   var u=c.lu&&c.lu[t],order=teamJumpersBefore(t,day),i;
   if(u&&u.st.length){var st={};u.st.forEach(function(x){st[x[0]]=1});
-    if(j&&st[j])return j;
-    for(i=0;i<order.length;i++)if(st[order[i]])return order[i];              // a starter who has jumped for this team
+    // the starter who takes the tip most often when he starts (two phantom starts keep a 1-for-1 newcomer from leading);
+    // backtest: right 95% of the time against 92% for whoever took most of the team's recent tips
+    var pick=null,ps=0;u.st.forEach(function(x){var s=startShare(t,x[0],day),v=s.w/(s.k+2);if(v>ps||(v===ps&&v>0&&order.indexOf(x[0])>=0&&(order.indexOf(pick)<0||order.indexOf(x[0])<order.indexOf(pick)))){ps=v;pick=x[0]}});
+    if(pick)return pick;
     var best=null,bn=0;u.st.forEach(function(x){var n=recBefore(x[0],day).full.n;if(n>bn){bn=n;best=x[0]}});return best} // else the starter with most tips anywhere
   var inj=j&&injOf(c,t,j);
   if(inj&&/^out/i.test(inj.st)){for(i=0;i<order.length;i++){var q=injOf(c,t,order[i]);if(order[i]!==j&&!(q&&/^out/i.test(q.st)))return order[i]}return null}
