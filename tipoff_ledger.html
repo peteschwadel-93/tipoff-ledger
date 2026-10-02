@@ -461,8 +461,14 @@ function topShooters(t,day,m){
   var cs=CATS.filter(function(k){return S.ft||k!=="Free throws"});
   topShooters.rows=rows;topShooters.games=win.length;topShooters.season=sp.length>=5;
   if(!rows.length)return '<p class="note">No earlier games for '+t+' in this data.</p>';
+  // the table lists the ten highest on the roster; the three picks above are unchanged and marked
+  var pk={};rows.forEach(function(x){pk[x.p]=1});
+  var ten=Object.keys(P).map(function(p){var x=P[p];x.rate=(x.c+3)/(x.st+5);return x}).filter(function(x){return x.c||cand[x.p]})
+    .sort(function(a,b){return (b.st>0)-(a.st>0)||b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)}).slice(0,10);
+  function mark(x){if(pk[x.p])return ' <span class="tag w">PICK</span>';if(cand[x.p])return "";
+    var i=c&&injOf(c,t,x.p);return ' <span class="tag'+(i&&/^out/i.test(i.st)?' l">OUT':'">NOT STARTING')+'</span>'}
   return '<div class="tw"><table style="width:auto"><thead><tr><th>Shooter</th><th class="n">Per start</th><th class="n">Attempts</th><th class="n">Starts</th><th class="n">Last 3 games</th>'+cs.map(function(k){return '<th class="n">'+k+'</th>'}).join("")+'</tr></thead><tbody>'+
-    rows.map(function(x){return '<tr><td>'+esc(x.name)+'</td><td class="n">'+(x.st?(x.c/x.st).toFixed(2):"–")+'</td><td class="n">'+x.c+'</td><td class="n">'+x.st+'</td><td class="n">'+x.n+" of "+(l3.length*3)+'</td>'+cs.map(function(k){return '<td class="n">'+(x.mix[k]||'<span class="o">·</span>')+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table></div>'}
+    ten.map(function(x){return '<tr'+(pk[x.p]||cand[x.p]?'':' style="opacity:.6"')+'><td>'+esc(x.name)+mark(x)+'</td><td class="n">'+(x.st?(x.c/x.st).toFixed(2):"–")+'</td><td class="n">'+x.c+'</td><td class="n">'+x.st+'</td><td class="n">'+x.n+" of "+(l3.length*3)+'</td>'+cs.map(function(k){return '<td class="n">'+(x.mix[k]||'<span class="o">·</span>')+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table></div>'}
 /* ---- first-basket prices and a rough value score ----
    Model: chance the team scores first = 50% + a third of its tip edge (fitted on both seasons), times the
    player's share of the team's early attempts among its five likeliest starters, pulled slightly toward an
@@ -522,7 +528,7 @@ function vPicks(){
     var od=oddsOf(m);
     sides.forEach(function(t,k){var tbl=topShooters(t,day,m),v=od?valueRows(r,t,topShooters.all||[],od):[];if(!k&&r.fav){r.top=(topShooters.rows||[]).slice();r.val=v;r.od=od}
       tbl+=priceTable(t,v,od&&od.at);
-      body+=firsts(t)+'<h3>'+t+' top 3 shooters · first-three attempts per start, '+(topShooters.season?"this season":"last "+topShooters.games+" games")+'</h3>'+tbl});
+      body+=firsts(t)+'<h3>'+t+' top 10 shooters · first-three attempts per start, '+(topShooters.season?"this season":"last "+topShooters.games+" games")+'</h3>'+tbl});
     return '<section class="panel" id="'+id+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
       (r.ok?'<span class="edge">'+(r.lv?r.fav+" ":"Even ")+r.abs+'%</span>':'<span class="tag">NO RATING</span>')+'</span></div>'+
       '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,r.fav&&isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
