@@ -43,8 +43,11 @@ except ImportError:  # --install adds it
     pd = None
 
 GH = "https://raw.githubusercontent.com/shufinskiy/nba_data/main/datasets/{name}.tar.xz"
-NBA_SCHEDULE = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json"
-NBA_PBP = "https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_{gid}.json"
+# The NBA serves the same files from two hosts. The first refuses some cloud servers (HTTP 403),
+# so each request falls back to the second.
+NBA_HOSTS = ("https://cdn.nba.com/static/json", "https://nba-prod-us-east-1-mediaops-stats.s3.amazonaws.com/NBA")
+NBA_SCHEDULE = "/staticData/scheduleLeagueV2.json"
+NBA_PBP = "/liveData/playbyplay/playbyplay_{gid}.json"
 UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.nba.com/", "Accept": "application/json"}
 COLS = {"gameId", "orderNumber", "period", "clock", "timeActual", "actionType", "subType", "descriptor",
         "personId", "playerNameI", "teamTricode", "shotResult", "shotDistance", "scoreHome",
@@ -83,6 +86,21 @@ def get(url, timeout=60):
 
 
 # ---------- sources ----------
+def get_nba(path):
+    """Fetch an NBA data file, remembering whichever host answered."""
+    global NBA_HOSTS
+    err = None
+    for host in NBA_HOSTS:
+        try:
+            raw = get(host + path)
+            if host != NBA_HOSTS[0]:
+                NBA_HOSTS = (host,) + tuple(h for h in NBA_HOSTS if h != host)
+            return raw
+        except Exception as e:
+            err = err or e
+    raise err
+
+
 def load_github(season):
     frames = []
     for name, po in ((f"cdnnba_{season}", 0), (f"cdnnba_po_{season}", 1)):
@@ -108,7 +126,7 @@ def load_nba(season, cache="pbp_cache"):
     """Returns (play-by-play of finished games or None, games scheduled over the next week)."""
     os.makedirs(cache, exist_ok=True)
     try:
-        sched = json.loads(get(NBA_SCHEDULE))["leagueSchedule"]
+        sched = json.loads(get_nba(NBA_SCHEDULE))["leagueSchedule"]
     except Exception as e:
         raise RuntimeError(f"Could not reach the NBA schedule ({e})")
     yy = str(season)[2:]
@@ -136,13 +154,13 @@ def load_nba(season, cache="pbp_cache"):
             path = os.path.join(cache, f"{gid}.json")
             if status == 2:  # in progress: read what has happened so far, never cache it
                 try:
-                    actions = json.loads(get(NBA_PBP.format(gid=gid)))["game"]["actions"]
+                    actions = json.loads(get_nba(NBA_PBP.format(gid=gid)))["game"]["actions"]
                 except Exception:
                     continue
             else:
                 if not os.path.exists(path):
                     try:
-                        raw = get(NBA_PBP.format(gid=gid))
+                        raw = get_nba(NBA_PBP.format(gid=gid))
                     except Exception as e:
                         print(f"skip {gid}: {e}", file=sys.stderr)
                         continue
