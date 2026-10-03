@@ -18,6 +18,10 @@ body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body);-webkit
 .wrap{max-width:1760px;margin:0 auto;padding-inline:24px;padding-block:28px 64px;display:flex;flex-direction:column;gap:20px}
 header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
 .topr{display:flex;align-items:center;gap:22px}
+.tml{display:inline-flex;align-items:center;gap:.35em;white-space:nowrap;vertical-align:middle}
+.tlogo{width:1.5em;height:1.5em;flex:none;object-fit:contain;filter:drop-shadow(0 0 1px rgba(255,255,255,.9)) drop-shadow(0 0 1px rgba(255,255,255,.55))}
+td .tlogo{width:22px;height:22px}.lteam h3 .tlogo{width:22px;height:22px}
+.at{color:var(--muted);font-weight:400}
 .kv.f3{margin-top:-6px}.kv.f3 .o{font-size:12px}
 td.rate,th.rate{background:rgba(255,255,255,.035);white-space:nowrap}
 td.rate b{font-weight:600}td.rate .chev{vertical-align:-3px;margin-right:6px}
@@ -582,7 +586,7 @@ function vPicks(){
     [m.a,m.h].forEach(function(t){if(sides.indexOf(t)>=0)return;topShooters(t,day,m);var al=topShooters.all||[];
       confRows(r,t,al).forEach(function(e){confL.push({e:e,t:t,r:r,id:id})});
       if(od){var v2=valueRows(r,t,al,od);v2.forEach(function(e){slate.push({e:e,t:t,r:r,id:id})});body+=priceTable(t,v2,od.at)}});
-    return '<section class="panel" id="'+id+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
+    return '<section class="panel" id="'+id+'"><div class="phead"><h2>'+vsL(m.a,m.h)+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
       (r.ok?'<span class="edge">'+(r.lv?r.fav+" ":"Even ")+r.abs+'%</span>':'<span class="tag">NO RATING</span>')+'</span></div>'+
       '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,r.fav&&isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
       what(m)+injReport(m)+body+'</section>'}
@@ -593,7 +597,7 @@ function vPicks(){
       var inTop=function(p){return r.top.slice(0,3).some(function(s){return s.p===p})},hitShot=!!(fa&&inTop(fa.s[0])),hitScore=!!(fs&&inTop(fs[0]));
       var jOut=isOut(m,r.fav,j);
       var fi=r.fav===m.h?1:0,hhFlag=r.hh&&r.hh[0]+r.hh[1]>=3&&r.hh[1-fi]>r.hh[fi]?'<span class="tag q" title="The favourite trails this head-to-head series '+r.hh[fi]+'–'+r.hh[1-fi]+'. Not part of the rating; in the backtest favourites in this spot won 54% of tips against 62% otherwise.">HEAD TO HEAD FLAG · TRAILS '+r.hh[fi]+'–'+r.hh[1-fi]+'</span>':"";
-      return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+m.a+' @ '+m.h+'</span><span class="edge">'+r.fav+' '+r.abs+'%</span></div>'+
+      return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+vsL(m.a,m.h)+'</span><span class="edge">'+r.fav+' '+r.abs+'%</span></div>'+
         (m.t?'<div><span class="tag">'+esc(m.t)+'</span>'+(m.pre?' <span class="tag">PRESEASON</span>':'')+' <span class="tag">RESULTS PENDING</span>'+(jOut?' <span class="tag l">CHECK · JUMPER UNAVAILABLE</span>':'')+'</div>':((g&&g.lv)||jOut?'<div>'+(g&&g.lv?'<span class="tag w">LIVE · SO FAR</span> ':'')+(jOut?'<span class="tag l">JUMPER WAS FLAGGED UNAVAILABLE</span>':'')+'</div>':''))+
         '<div class="rblock"><h3>Tip pick</h3><div class="rl"><div class="rname">'+nm(j)+'</div>'+chev(r.lv,false,"sm"+(jOut?" off":""))+'</div>'+(swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+shareTag(r.fav,j,day)+hhFlag?'<div class="rf" style="padding-left:0">'+swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+shareTag(r.fav,j,day)+hhFlag+'</div>':'')+'</div>'+
         '<div class="rblock"><h3>'+r.fav+' shooters</h3><ol>'+[0,1,2].map(function(k){var s=r.top[k];if(!s)return "";
@@ -608,7 +612,7 @@ function vPicks(){
             '<div class="rq"><span>Model chance</span><span>'+(e.p*100).toFixed(1)+'%</span><span>Break-even</span><span>'+(e.be*100).toFixed(1)+'%</span><span>Edge</span><span class="tag '+(e.ev>0?"w":"")+'">'+(e.ev>0?"+":"")+Math.round(e.ev*100)+'%</span></div></div>'})()+
         (!g?"":'<div class="rblock rres"><h3>What happened</h3><div><span class="o">Tip</span>'+(g&&g.tip?'<span class="tag '+(won?"w":"l")+'">'+(won?"WON":"LOST")+'</span>':"<span>–</span>")+'</div><div'+(hitShot?' class="hit"':'')+'><span class="o">First shot</span><span>'+(fa?nm(fa.s[0])+" ("+fa.t+")":"–")+(hitShot?' <span class="tag w">HIT</span>':'')+'</span></div><div'+(hitScore?' class="hit"':'')+'><span class="o">First score</span><span>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+(hitScore?' <span class="tag w">HIT</span>':'')+'</span></div></div>')+'</div>'}).join("")+'</div></section>':"";
   var other=rest.length?'<section class="panel"><div class="phead"><h2>Below the rating</h2><span class="tag">select a row to jump to its data</span></div><div class="tw"><table><thead><tr><th>Game</th><th>Away jumper</th><th class="n">Last 15</th><th>Home jumper</th><th class="n">Last 15</th><th class="n">Record</th><th class="n rate">Rating</th>'+(!played.length?"":"<th>Tip won by</th><th>First shot</th><th>First score</th>")+'</tr></thead><tbody>'+
-    rest.map(function(r,i){var m=r.m,g=m.g,t=g&&g.tip,fa=g&&firstAtt(g),fs=g&&firstScore(g);return '<tr class="pick" tabindex="0" data-goto="game-'+i+'"><td><span class="tm">'+m.a+' @ '+m.h+'</span>'+(m.t?' <span class="tag">'+esc(m.t)+'</span>':'')+'</td><td>'+nm(r.ja)+'</td><td class="n">'+rec(r.ra)+" · "+pct(r.ra.w,r.ra.n)+'</td><td>'+nm(r.jh)+'</td><td class="n">'+rec(r.rh)+" · "+pct(r.rh.w,r.rh.n)+'</td><td class="n">'+rec(r.fa)+" v "+rec(r.fh)+'</td><td class="n rate rlv'+(r.ok?r.lv:"x")+'">'+(r.ok?(r.lv?chev(r.lv,false,"sm")+' ':'')+'<b>'+(r.lv?r.fav+" ":"Even ")+r.abs+"%</b>":'<span class="o">too few tips</span>')+'</td>'+
+    rest.map(function(r,i){var m=r.m,g=m.g,t=g&&g.tip,fa=g&&firstAtt(g),fs=g&&firstScore(g);return '<tr class="pick" tabindex="0" data-goto="game-'+i+'"><td><span class="tm">'+vsL(m.a,m.h)+'</span>'+(m.t?' <span class="tag">'+esc(m.t)+'</span>':'')+'</td><td>'+nm(r.ja)+'</td><td class="n">'+rec(r.ra)+" · "+pct(r.ra.w,r.ra.n)+'</td><td>'+nm(r.jh)+'</td><td class="n">'+rec(r.rh)+" · "+pct(r.rh.w,r.rh.n)+'</td><td class="n">'+rec(r.fa)+" v "+rec(r.fh)+'</td><td class="n rate rlv'+(r.ok?r.lv:"x")+'">'+(r.ok?(r.lv?chev(r.lv,false,"sm")+' ':'')+'<b>'+(r.lv?r.fav+" ":"Even ")+r.abs+"%</b>":'<span class="o">too few tips</span>')+'</td>'+
       (!played.length?"":'<td>'+(t?(t.w?nm(t.w)+" ("+t.wt+")":t.pos):"–")+'</td><td>'+(fa?nm(fa.s[0])+" ("+fa.t+")":"–")+'</td><td>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+'</td>')+'</tr>'}).join("")+'</tbody></table></div></section>':"";
   S._days=days;
   slate.sort(function(a,b){return b.e.ev-a.e.ev});
@@ -617,7 +621,7 @@ function vPicks(){
     '<p class="note">Every expected starter with a first-basket price across the day\'s games, best edge first, whatever the game\'s rating. The edge compares the best price with a rough model of his chance and has not been backtested, so read it as a prompt to look closer. Select a row to jump to its game.</p>'+
     '<div class="tw"><table><thead><tr><th>#</th><th>Player</th><th>Team</th><th>Game</th><th class="n">Team wins tip</th><th class="n">Best price</th><th>Book</th><th class="n">Break-even</th><th class="n">Model</th><th class="n">Edge</th><th class="n">Per start</th>'+(anyPlayed?'<th>First basket</th>':'')+'</tr></thead><tbody>'+
     shown.map(function(s,i){var e=s.e,r=s.r,m=r.m,tc=r.rt?(s.t===r.fav?r.rt.p:1-r.rt.p):.5,pick=s.t===r.fav&&r.lv>=S.minLv&&(r.top||[]).slice(0,3).some(function(x){return x.p===e.x.p}),fs=m.g&&firstScore(m.g);
-      return '<tr role="button" tabindex="0" data-goto="'+s.id+'" style="cursor:pointer"><td class="o">'+(i+1)+'</td><td>'+esc(e.x.name)+(pick?' <span class="tag w">PICK</span>':'')+'</td><td>'+s.t+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n">'+Math.round(tc*100)+'%</td><td class="n">'+fmtP(e.price)+'</td><td>'+esc(e.book)+'</td><td class="n">'+(e.be*100).toFixed(1)+'%</td><td class="n">'+(e.p*100).toFixed(1)+'%</td><td class="n"><span class="tag '+(e.ev>0?"w":"")+'">'+(e.ev>0?"+":"")+Math.round(e.ev*100)+'%</span></td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td>'+
+      return '<tr role="button" tabindex="0" data-goto="'+s.id+'" style="cursor:pointer"><td class="o">'+(i+1)+'</td><td>'+esc(e.x.name)+(pick?' <span class="tag w">PICK</span>':'')+'</td><td>'+tmL(s.t)+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n">'+Math.round(tc*100)+'%</td><td class="n">'+fmtP(e.price)+'</td><td>'+esc(e.book)+'</td><td class="n">'+(e.be*100).toFixed(1)+'%</td><td class="n">'+(e.p*100).toFixed(1)+'%</td><td class="n"><span class="tag '+(e.ev>0?"w":"")+'">'+(e.ev>0?"+":"")+Math.round(e.ev*100)+'%</span></td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td>'+
         (anyPlayed?'<td>'+(m.g?(fs&&fs[0]===e.x.p?'<span class="tag w">HIT</span>':'<span class="o">no</span>'):'<span class="o">pending</span>')+'</td>':'')+'</tr>'}).join("")+'</tbody></table></div>'+
     (slate.length>shown.length?'<p class="note">Showing the top '+shown.length+' of '+slate.length+'. Each game\'s full value tables are in its card below.</p>':'')+'</section>':"";
   confL.sort(function(a,b){return b.e.p-a.e.p});
@@ -630,7 +634,7 @@ function vPicks(){
     cShown.map(function(s,i){var e=s.e,r=s.r,m=r.m,g=m.g,pick=s.t===r.fav&&r.lv>=S.minLv&&(r.top||[]).slice(0,3).some(function(x){return x.p===e.x.p}),fs=g&&firstScore(g),fo=Infinity;
       if(g)[g.h,g.a].forEach(function(t){att(g,t).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
       var tried=g&&att(g,s.t).some(function(x){return x[0]===e.x.p&&x[6]<=fo}),lv=e.p>=.16?4:e.p>=.14?3:e.p>=.12?2:e.p>=.105?1:0;
-      return '<tr role="button" tabindex="0" data-goto="'+s.id+'" style="cursor:pointer"><td class="o">'+(i+1)+'</td><td>'+s.t+'</td><td>'+esc(e.x.name)+(pick?' <span class="tag w">PICK</span>':'')+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n">'+(e.rated?Math.round(e.tc*100)+'%':'<span class="o">no rating</span>')+'</td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td><td class="n">'+e.x.st+'</td><td class="n rate rlv'+lv+'"><b>'+(e.p*100).toFixed(1)+'%</b></td>'+
+      return '<tr role="button" tabindex="0" data-goto="'+s.id+'" style="cursor:pointer"><td class="o">'+(i+1)+'</td><td>'+tmL(s.t)+'</td><td>'+esc(e.x.name)+(pick?' <span class="tag w">PICK</span>':'')+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n">'+(e.rated?Math.round(e.tc*100)+'%':'<span class="o">no rating</span>')+'</td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td><td class="n">'+e.x.st+'</td><td class="n rate rlv'+lv+'"><b>'+(e.p*100).toFixed(1)+'%</b></td>'+
         (cOdds?(s.price!=null?'<td class="n" title="'+esc(s.book)+'">'+fmtP(s.price)+'</td><td class="n"><span class="tag '+(s.ev>0?"w":"")+'">'+(s.ev>0?"+":"")+Math.round(s.ev*100)+'%</span></td>':'<td class="n"><span class="o">–</span></td><td class="n"><span class="o">–</span></td>'):'')+
         (cPlayed?(g?'<td><span class="tag'+(tried?" w":"")+'">'+(tried?"YES":"NO")+'</span></td><td>'+(fs&&fs[0]===e.x.p?'<span class="tag w">HIT</span>':'<span class="o">no</span>')+'</td>':'<td><span class="o">pending</span></td><td><span class="o">pending</span></td>'):'')+'</tr>'}).join("")+'</tbody></table></div></section>':"";
   view.innerHTML='<div class="picks">'+hd+round+confTbl+slateTbl+cards+other+others+'</div>';
@@ -638,6 +642,10 @@ function vPicks(){
 /* ---- daily lineups: posted starters when the NBA has them, otherwise the likeliest five from recent games ---- */
 var POS_RANK={PG:1,G:1.5,SG:2,GF:2.5,SF:3,F:3.5,PF:4,FC:4.5,C:5};
 function posOf(p,over){var v=(over&&over[p])||((D.flags||{})._pos||{})[p]||"";return POS_RANK[v]?v:""}
+/* team logos: read from the "NBA Logos" folder beside the page; where a file is missing the image removes itself and the code stands alone */
+function lg(t){return '<img class="tlogo" alt="" loading="lazy" src="NBA%20Logos/'+t+'logo.svg" onerror="this.remove()">'}
+function tmL(t){return '<span class="tml">'+lg(t)+t+'</span>'}
+function vsL(a,b){return tmL(a)+' <span class="at">@</span> '+tmL(b)}
 function vLineups(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
   sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
@@ -671,12 +679,12 @@ function vLineups(){
     var inj=(c&&c.inj[t]||[]),rep=inj.map(function(x){return '<div><span>'+esc(x.n)+'</span>'+itag(x)+(x.d?'<span class="o">'+fmtD(x.d)+'</span>':'')+(x.c?'<small>'+esc(x.c)+'</small>':'')+'</div>'}).join("");
     var off=u&&u.out&&u.out.length?'<div><span class="o">Inactive tonight</span> '+u.out.map(function(x){return esc(x[1])+(x[2]?' <span class="o">('+esc(x[2])+')</span>':'')}).join(", ")+'</div>':"";
     var st=fin?'<span class="tag">STARTED</span>':posted?'<span class="tag w"><span class="ldot"></span>LOCKED</span>':'<span class="tag q">EXPECTED</span>';
-    return{lock:posted||fin,posted:posted,html:'<div class="lteam"><h3>'+t+' '+st+'</h3>'+(rows?'<ol>'+rows+'</ol>':'<p class="note">No earlier games for '+t+' in this data.</p>')+
+    return{lock:posted||fin,posted:posted,html:'<div class="lteam"><h3>'+tmL(t)+' '+st+'</h3>'+(rows?'<ol>'+rows+'</ol>':'<p class="note">No earlier games for '+t+' in this data.</p>')+
       (rep||off?'<h3>'+(fin?"Flagged before tip":"Injury report")+'</h3><div class="lrep">'+off+rep+'</div>':(c&&!fin&&D.inj?'<p class="note">Nobody listed.</p>':''))+'</div>'}}
   var nLock=0,nUp=0;
   var cards=ms.map(function(m){var c=ctxOf(m),a=team(m,m.a,c),b=team(m,m.h,c),lock=!m.g&&a.posted&&b.posted;
     if(!m.g){nUp++;if(lock)nLock++}
-    return '<div class="lcard'+(lock?" lock":"")+'"><div class="lhead"><span class="tm">'+m.a+' @ '+m.h+'</span><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
+    return '<div class="lcard'+(lock?" lock":"")+'"><div class="lhead"><span class="tm">'+vsL(m.a,m.h)+'</span><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
       (m.g?'<span class="tag">'+(m.g.lv?"LIVE":"FINAL")+' · ACTUAL STARTERS</span>':lock?'<span class="tag w"><span class="ldot"></span>LINEUPS LOCKED</span>':'<span class="tag q">'+(a.posted||b.posted?"ONE SIDE POSTED":"NOT POSTED YET")+'</span>')+'</span></div>'+
       '<div class="lteams">'+a.html+b.html+'</div></div>'}).join("");
   var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
