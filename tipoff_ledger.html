@@ -164,6 +164,8 @@ h2.sep{margin-top:12px;color:var(--muted)}
 .rcard li{counter-increment:s;display:flex;flex-direction:column;gap:8px;padding-bottom:10px}
 .rcard li+li{border-top:1px solid var(--line);padding-top:12px}
 .rl{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.rl.pk{flex-direction:column;align-items:stretch;gap:4px}.rl.pk>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding-left:1.5em;font-size:13px}
 .rq{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--muted);padding-left:1.5em}
 .rq .tag{min-width:38px;text-align:center}
 .rcard li .rl>span:first-child:before{content:counter(s);color:var(--accent);font-weight:600;display:inline-block;width:1.5em}
@@ -612,11 +614,11 @@ function vPicks(){
           var l=g?att(g,r.fav):[],ts=g&&teamFirstScore(g,r.fav),fo=Infinity; // fo: where the game's first score falls in the order of attempts
           if(g)[g.h,g.a].forEach(function(t){att(g,t).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
           function yn(lab,v){return '<span>'+lab+'</span>'+(g?'<span class="tag'+(v?" w":"")+'">'+(v?"YES":"NO")+'</span>':'<span class="o">–</span>')}
-          return '<li'+((fs&&fs[0]===s.p)||(fa&&fa.s[0]===s.p)?' class="hit"':'')+'><div class="rl"><span>'+esc(s.name)+'</span><span class="o">'+(s.st?(s.c/s.st).toFixed(2):"–")+' per start'+(function(){var pr=r.od&&priceOf(r.od,s.p),cf=r.cf&&r.cf[s.p],o="";
+          return '<li'+((fs&&fs[0]===s.p)||(fa&&fa.s[0]===s.p)?' class="hit"':'')+'><div class="rl pk"><span>'+esc(s.name)+'</span><span class="o pd"><span>'+(s.st?(s.c/s.st).toFixed(2):"–")+' per start</span>'+(function(){var pr=r.od&&priceOf(r.od,s.p),cf=r.cf&&r.cf[s.p],o="";
             if(pr){var ev=cf!=null?cf*(pr[1]>0?1+pr[1]/100:1+100/-pr[1])-1:null,cl=ev==null?"":ev>=.1?" v4":ev>=0?" v3":ev>=-.1?" v2":" v1";
-              o+=' · <b class="px'+cl+'" title="'+esc(pr[2])+(ev!=null?" · "+(ev>0?"+":"")+Math.round(ev*100)+"% edge against the break-even price":"")+'">'+fmtP(pr[1])+'</b>'}
-            if(cf!=null)o+=(pr?' ':' · ')+'<span class="be" title="Break-even odds: the price he needs for a bet to pay on the model\'s estimate of his chance.">(BE '+fairOdds(cf)+')</span>';
-            return o})()+'</span></div>'+(avail(m,r.fav,s.p)?'<div class="rf">'+avail(m,r.fav,s.p)+'</div>':'')+'<div class="rq">'+
+              o+='<b class="px'+cl+'" title="'+esc(pr[2])+(ev!=null?" · "+(ev>0?"+":"")+Math.round(ev*100)+"% edge against the break-even price":"")+'">'+fmtP(pr[1])+'</b>'}
+            if(cf!=null)o+=(pr?' ':'')+'<span class="be" title="Break-even odds: the price he needs for a bet to pay on the model\'s estimate of his chance.">(BE '+fairOdds(cf)+')</span>';
+            return o?'<span>'+o+'</span>':""})()+'</span></div>'+(avail(m,r.fav,s.p)?'<div class="rf">'+avail(m,r.fav,s.p)+'</div>':'')+'<div class="rq">'+
             yn("1st basket attempt",l.some(function(x){return x[0]===s.p&&x[6]<=fo}))+yn("Team's first 3",l.slice(0,3).some(function(x){return x[0]===s.p}))+
             yn("Team's 1st shot",l[0]&&l[0][0]===s.p)+yn("Team's 1st "+(S.ft?"score":"basket"),ts&&ts[0]===s.p)+'</div></li>'}).join("")+'</ol></div>'+
         (function(){var e=r.val&&r.val[0];if(!e)return "";var hitV=fs&&fs[0]===e.x.p;
