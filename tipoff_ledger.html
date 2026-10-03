@@ -504,8 +504,8 @@ function topShooters(t,day,m){
   var pk={};rows.forEach(function(x){pk[x.p]=1});
   var ten=Object.keys(P).map(function(p){var x=P[p];x.rate=(x.c+3)/(x.st+5);return x}).filter(function(x){return x.c||cand[x.p]})
     .sort(function(a,b){return (b.st>0)-(a.st>0)||b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)});
-  // the three picks always lead the table in pick order, then the best of the rest up to ten rows
-  ten=rows.concat(ten.filter(function(x){return !pk[x.p]})).slice(0,10);
+  // order: the three picks, then the other expected starters, then the next five players by rate
+  ten=rows.concat((topShooters.all||[]).filter(function(x){return !pk[x.p]}),ten.filter(function(x){return !pk[x.p]&&!cand[x.p]}).slice(0,5));
   function mark(x){if(pk[x.p])return ' <span class="tag w">PICK</span>';if(cand[x.p])return "";
     var i=c&&injOf(c,t,x.p);return ' <span class="tag'+(i&&/^out/i.test(i.st)?' l">OUT':'">NOT STARTING')+'</span>'}
   return '<div class="tw"><table style="width:auto"><thead><tr><th>Pos</th><th>Shooter</th><th class="n">Per start</th><th class="n">Attempts</th><th class="n">Starts</th><th class="n">Last 3 games</th>'+cs.map(function(k){return '<th class="n">'+k+'</th>'}).join("")+'</tr></thead><tbody>'+
@@ -571,7 +571,7 @@ function vPicks(){
     sides.forEach(function(t,k){var tbl=topShooters(t,day,m),v=od?valueRows(r,t,topShooters.all||[],od):[];if(!k&&r.fav){r.top=(topShooters.rows||[]).slice();r.val=v;r.od=od}
       v.forEach(function(e){slate.push({e:e,t:t,r:r,id:id})});
       tbl+=priceTable(t,v,od&&od.at);
-      body+=firsts(t)+'<h3>'+t+' top 10 shooters · first-three attempts per start, '+(topShooters.season?"this season":"last "+topShooters.games+" games")+'</h3>'+tbl});
+      body+=firsts(t)+'<h3>'+t+' shooters · picks, other starters, then the next five · first-three attempts per start, '+(topShooters.season?"this season":"last "+topShooters.games+" games")+'</h3>'+tbl});
     // the other side gets its value table too, so a price can be weighed on either team
     if(od)[m.a,m.h].forEach(function(t){if(sides.indexOf(t)>=0)return;topShooters(t,day,m);var v2=valueRows(r,t,topShooters.all||[],od);v2.forEach(function(e){slate.push({e:e,t:t,r:r,id:id})});body+=priceTable(t,v2,od.at)});
     return '<section class="panel" id="'+id+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
