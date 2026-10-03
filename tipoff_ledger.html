@@ -928,8 +928,30 @@ if(served){
     }).catch(function(){say("Not refreshed: the local helper did not answer. Start build_data.py --serve again.")})
     .then(function(){b.disabled=false;b.textContent="Refresh from NBA"})});
   setInterval(function(){var b=$("refreshBtn");if(D&&!b.disabled&&!document.hidden&&(D.sched||[]).some(function(x){return x.d===todayET()}))b.click()},600000);
-}else if(/^https?:$/.test(location.protocol)){ // hosted copy: a scheduled job rebuilds the page, so pick up the new one on game days
-  setInterval(function(){if(D&&!document.hidden&&(D.sched||[]).some(function(x){return x.d===todayET()}))location.reload()},600000);
+}else if(/^https?:$/.test(location.protocol)){
+  /* hosted copy: a scheduled job republishes the page. While a game is due or under way today, look every 30 seconds for
+     a newer copy (a cheap header check) and, when there is one, swap its data in without reloading, so the tab, day and
+     scroll position stay where they are and a pick card turns green as soon as the published data has the basket. */
+  var seen=null,busy=false;
+  function liveNow(){return D&&(D.sched||[]).some(function(x){return x.d===todayET()})}
+  function pull(force){if(busy||document.hidden||(!force&&!liveNow()))return;busy=true;
+    fetch(location.pathname+"?_="+Date.now(),{method:"HEAD",cache:"no-store"}).then(function(r){
+      var tag=r.headers.get("etag")||r.headers.get("last-modified");if(!r.ok||!tag)return;
+      if(seen===null){seen=tag;return}
+      if(tag===seen)return;
+      return fetch(location.pathname+"?_="+Date.now(),{cache:"no-store"}).then(function(r2){return r2.text()}).then(function(t){
+        var m=t.match(/<script id="tipoff-data" type="application\/json">([\s\S]*?)<\/script>/);if(!m)return;
+        var d=JSON.parse(m[1]);if(d&&d.games&&d.built!==D.built){var y=window.scrollY;start(d);window.scrollTo(0,y)}
+        seen=tag})
+    }).catch(function(){}).then(function(){busy=false})}
+  setInterval(pull,30000);pull(true);
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)pull()});
+  /* can this browser read the NBA's live files directly? Shown under the data stamp; if it can, results could be read
+     straight from the NBA within seconds instead of waiting for the next publish. */
+  (function(){var hosts=["https://cdn.nba.com/static/json","https://nba-prod-us-east-1-mediaops-stats.s3.amazonaws.com/NBA"],ok=[];
+    function t(i){if(i>=hosts.length){window.__nbaDirect=ok;say("NBA live link from this browser: "+(ok.length?"reachable ("+ok.join(", ")+")":"not reachable")+" · page checks for new results every 30 seconds on game days");return}
+      fetch(hosts[i]+"/liveData/scoreboard/todaysScoreboard_00.json",{cache:"no-store"}).then(function(r){if(r.ok)return r.json().then(function(j){if(j&&j.scoreboard)ok.push(i?"backup":"main")})}).catch(function(){}).then(function(){t(i+1)})}
+    t(0)})();
 }else if(location.protocol==="file:"){say("This copy does not update itself. Run python3 build_data.py --install once, then use http://localhost:8765")}
 var emb=$("tipoff-data"),inline=null;
 try{if(emb&&emb.textContent.trim())inline=JSON.parse(emb.textContent)}catch(_){}
