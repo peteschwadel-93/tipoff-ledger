@@ -51,6 +51,7 @@ jobs:
 
       # Keep what was flagged before each game (flags.json) and the prices fetched (odds.json) in the repository.
       - name: Save pre-tip flags and prices
+        id: save
         continue-on-error: true
         run: |
           if [ -n "$(git status --porcelain flags.json odds.json)" ]; then
@@ -58,8 +59,8 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add flags.json odds.json 2>/dev/null || git add flags.json || git add odds.json
             git commit -m "Record pre-tip flags and prices"
-            git pull --rebase
-            git push
+            # the refreshed page is still modified in the working copy, so a plain pull would refuse to run
+            git push || (git pull --rebase --autostash && git push)
           fi
 
       - name: Assemble site
@@ -75,6 +76,12 @@ jobs:
           path: _site
       - id: deploy
         uses: actions/deploy-pages@v4
+
+      - name: Report a failed save
+        if: steps.save.outcome == 'failure'
+        run: |
+          echo "Saving flags.json / odds.json to the repository failed; prices and flags from this run were not kept." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: Report a failed refresh
         if: steps.build.outcome == 'failure'
