@@ -520,7 +520,7 @@ function valueRows(r,t,all,o){ // every expected starter with a price: model cha
   return all.map(function(x){var pr=priceOf(o,x.p);if(!pr||!sum)return null;var sh=.2+.85*(Math.min(x.rate/sum,.5)-.2),p=teamFirst*sh,pay=pr[1]>0?1+pr[1]/100:1+100/-pr[1];
     return{x:x,price:pr[1],book:pr[2],p:p,be:breakEven(pr[1]),ev:p*pay-1}}).filter(Boolean).sort(function(a,b){return b.ev-a.ev})}
 function priceTable(t,v,at){if(!v.length)return "";
-  return '<h3>'+t+' first-basket prices'+(at?' · fetched '+esc(at.replace("T"," "))+' ET':'')+'</h3><div class="tw"><table style="width:auto"><thead><tr><th>Player</th><th class="n">Best price</th><th>Book</th><th class="n">Break-even</th><th class="n">Model</th><th class="n">Edge</th><th class="n">Per start</th></tr></thead><tbody>'+
+  return '<h3>'+t+' value table · first-basket prices'+(at?' · fetched '+esc(at.replace("T"," "))+' ET':'')+'</h3><div class="tw"><table style="width:auto"><thead><tr><th>Player</th><th class="n">Best price</th><th>Book</th><th class="n">Break-even</th><th class="n">Model</th><th class="n">Edge</th><th class="n">Per start</th></tr></thead><tbody>'+
     v.map(function(e){return '<tr><td>'+esc(e.x.name)+'</td><td class="n">'+fmtP(e.price)+'</td><td>'+esc(e.book)+'</td><td class="n">'+(e.be*100).toFixed(1)+'%</td><td class="n">'+(e.p*100).toFixed(1)+'%</td><td class="n"><span class="tag '+(e.ev>0?"w":"")+'">'+(e.ev>0?"+":"")+Math.round(e.ev*100)+'%</span></td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td></tr>'}).join("")+'</tbody></table></div>'}
 function vPicks(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
@@ -565,6 +565,8 @@ function vPicks(){
     sides.forEach(function(t,k){var tbl=topShooters(t,day,m),v=od?valueRows(r,t,topShooters.all||[],od):[];if(!k&&r.fav){r.top=(topShooters.rows||[]).slice();r.val=v;r.od=od}
       tbl+=priceTable(t,v,od&&od.at);
       body+=firsts(t)+'<h3>'+t+' top 10 shooters · first-three attempts per start, '+(topShooters.season?"this season":"last "+topShooters.games+" games")+'</h3>'+tbl});
+    // the other side gets its value table too, so a price can be weighed on either team
+    if(od)[m.a,m.h].forEach(function(t){if(sides.indexOf(t)>=0)return;topShooters(t,day,m);body+=priceTable(t,valueRows(r,t,topShooters.all||[],od),od.at)});
     return '<section class="panel" id="'+id+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
       (r.ok?'<span class="edge">'+(r.lv?r.fav+" ":"Even ")+r.abs+'%</span>':'<span class="tag">NO RATING</span>')+'</span></div>'+
       '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,r.fav&&isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
