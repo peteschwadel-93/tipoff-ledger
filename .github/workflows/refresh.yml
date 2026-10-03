@@ -2,8 +2,8 @@ name: Refresh Tip-Off Ledger
 
 on:
   schedule:
-        - cron: "*/5 * * * *"        # every 5 minutes (the most often GitHub allows)
-  workflow_dispatch:
+    - cron: "*/5 * * * *"        # every 5 minutes (the most often GitHub allows)
+  workflow_dispatch:            # "Run workflow" button
   push:
     branches: [main]
 
@@ -33,12 +33,15 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # play-by-play already downloaded on earlier runs
       - uses: actions/cache@v4
         with:
           path: pbp_cache
           key: pbp-${{ github.run_id }}
           restore-keys: pbp-
 
+      # Pull new games and the schedule from the NBA API into the page.
+      # If the API cannot be reached, publish the page as it is rather than nothing.
       - name: Refresh data
         id: build
         continue-on-error: true
@@ -46,6 +49,7 @@ jobs:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: python build_data.py --source nba --html tipoff_ledger.html --out data.json
 
+      # Keep what was flagged before each game (flags.json) and the prices fetched (odds.json) in the repository.
       - name: Save pre-tip flags and prices
         continue-on-error: true
         run: |
@@ -62,6 +66,7 @@ jobs:
         run: |
           mkdir -p _site
           cp tipoff_ledger.html _site/index.html
+          if [ -d "NBA Logos" ]; then cp -r "NBA Logos" _site/; fi   # team logos shown beside team names
           touch _site/.nojekyll
 
       - uses: actions/configure-pages@v5
