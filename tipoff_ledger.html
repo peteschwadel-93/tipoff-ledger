@@ -18,6 +18,7 @@ body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body);-webkit
 .wrap{max-width:1760px;margin:0 auto;padding-inline:24px;padding-block:28px 64px;display:flex;flex-direction:column;gap:20px}
 header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
 .topr{display:flex;align-items:center;gap:22px}
+.kv.f3{margin-top:-6px}.kv.f3 .o{font-size:12px}
 td.rate,th.rate{background:rgba(255,255,255,.035);white-space:nowrap}
 td.rate b{font-weight:600}td.rate .chev{vertical-align:-3px;margin-right:6px}
 td.rlv1 b{color:#f0a94a}td.rlv2 b{color:#e2d24e}td.rlv3 b{color:#9fdc58}td.rlv4 b{color:#3ef07f}td.rlv0 b{color:var(--muted);font-weight:500}
@@ -524,6 +525,9 @@ function valueRows(r,t,all,o){ // every expected starter with a price: model cha
   var tc=r.rt?(t===r.fav?r.rt.p:1-r.rt.p):.5,teamFirst=.5+.333*(tc-.5),top=all.slice(0,5),sum=0;top.forEach(function(x){sum+=x.rate});
   return all.map(function(x){var pr=priceOf(o,x.p);if(!pr||!sum)return null;var sh=.2+.85*(Math.min(x.rate/sum,.5)-.2),p=teamFirst*sh,pay=pr[1]>0?1+pr[1]/100:1+100/-pr[1];
     return{x:x,price:pr[1],book:pr[2],p:p,be:breakEven(pr[1]),ev:p*pay-1}}).filter(Boolean).sort(function(a,b){return b.ev-a.ev})}
+function confRows(r,t,all){ // chance each expected starter scores the game's first basket: team's chance of scoring first x his share of its early shots
+  var tc=r.rt?(t===r.fav?r.rt.p:1-r.rt.p):.5,teamFirst=.5+.333*(tc-.5),top=all.slice(0,5),sum=0;top.forEach(function(x){sum+=x.rate});
+  return sum?all.map(function(x){return{x:x,tc:tc,rated:!!r.rt,p:teamFirst*(.2+.85*(Math.min(x.rate/sum,.5)-.2))}}):[]}
 function priceTable(t,v,at){if(!v.length)return "";
   return '<h3>'+t+' value table · first-basket prices'+(at?' · fetched '+esc(at.replace("T"," "))+' ET':'')+'</h3><div class="tw"><table style="width:auto"><thead><tr><th>Player</th><th class="n">Best price</th><th>Book</th><th class="n">Break-even</th><th class="n">Model</th><th class="n">Edge</th><th class="n">Per start</th></tr></thead><tbody>'+
     v.map(function(e){return '<tr><td>'+esc(e.x.name)+'</td><td class="n">'+fmtP(e.price)+'</td><td>'+esc(e.book)+'</td><td class="n">'+(e.be*100).toFixed(1)+'%</td><td class="n">'+(e.p*100).toFixed(1)+'%</td><td class="n"><span class="tag '+(e.ev>0?"w":"")+'">'+(e.ev>0?"+":"")+Math.round(e.ev*100)+'%</span></td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td></tr>'}).join("")+'</tbody></table></div>'}
@@ -551,7 +555,8 @@ function vPicks(){
   function rec(r){return r.n?r.w+"–"+(r.n-r.w):"no tips"}
   function what(m){if(!m.g)return "";var g=m.g,t=g.tip,fa=firstAtt(g),fs=firstScore(g);
     return '<div class="kv"><span><b>What happened</b></span><span>Tip '+(t?(t.viol?"violation, ball to "+t.pos:"<b>"+nm(t.w)+" ("+t.wt+")</b> over "+nm(t.l)):"not logged")+'</span>'+
-      '<span>First shot '+(fa?'<b>'+nm(fa.s[0])+" ("+fa.t+")</b> "+method(fa.s)+" "+result(fa.s):"–")+'</span><span>First '+(S.ft?"score":"basket")+' <b>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+'</b></span></div>'}
+      '<span>First shot '+(fa?'<b>'+nm(fa.s[0])+" ("+fa.t+")</b> "+method(fa.s)+" "+result(fa.s):"–")+'</span><span>First '+(S.ft?"score":"basket")+' <b>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+'</b></span></div>'+
+      [g.a,g.h].map(function(tm){var l=att(g,tm).slice(0,3);return l.length?'<div class="kv f3"><span><b>'+tm+' first 3 shots</b></span>'+l.map(function(s,i){return '<span><span class="o">'+(i+1)+'</span> '+attText(s)+'</span>'}).join("")+'</div>':""}).join("")}
   function firsts(t){var gs=H.filter(function(g){return g.h===t||g.a===t}).slice(-3).reverse();if(!gs.length)return "";
     return '<h3>'+t+' first shot and first score, last 3 games</h3><div class="tw"><table><thead><tr><th>Game</th><th>Tip</th><th>'+t+' first shot</th><th>'+t+' first score</th><th>Game\'s first score</th></tr></thead><tbody>'+
       gs.map(function(g){var fs=firstScore(g),won=g.tip&&g.tip.pos===t;return '<tr><td>'+fmtD(g.d)+" "+(g.h===t?"vs ":"at ")+opp(g,t)+'</td><td><span class="tag '+(won?"w":"l")+'">'+(won?"WON":"LOST")+'</span></td><td class="cell">'+attText(att(g,t)[0])+'</td><td class="cell">'+(teamFirstScore(g,t)?attText(teamFirstScore(g,t)):'<span class="o">none in first 5 shots</span>')+'</td><td>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+'</td></tr>'}).join("")+'</tbody></table></div>'}
@@ -564,16 +569,19 @@ function vPicks(){
     (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are ranked by first-three attempts per start this season, among players expected to start: the posted lineup once there is one, otherwise recent starters not listed out. Whatever was flagged before tip stays on the card after the game.":"")+(D.odds&&Object.keys(D.odds).length?" First-basket prices are the best available across US books, fetched once a few hours before tip and once in the last hour. Best value is the starter whose price most exceeds a rough model of his chance; it has not been backtested.":"")+
     (up.length?"":" This data has no upcoming schedule, so past game days are shown as they looked before tip-off. Run python3 build_data.py --install once and today\'s games load on their own.")+'</p>'+
     '<div class="kv"><span><b>Track record at '+["","one chevron","two chevrons","three chevrons","four chevrons"][S.minLv]+' or more</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
-  var slate=[]; // every priced starter on the night, gathered as each game's card is built
+  var slate=[],confL=[]; // every priced starter on the night, and every expected starter's confidence, gathered as each game's card is built
   function card(r,id){ // full detail for one game: the favoured side's shooters, or both sides when nothing is favoured
     var m=r.m,sides=r.fav&&r.lv>0?[r.fav]:[m.a,m.h],body="";
     var od=oddsOf(m);
     sides.forEach(function(t,k){var tbl=topShooters(t,day,m),v=od?valueRows(r,t,topShooters.all||[],od):[];if(!k&&r.fav){r.top=(topShooters.rows||[]).slice();r.val=v;r.od=od}
       v.forEach(function(e){slate.push({e:e,t:t,r:r,id:id})});
+      confRows(r,t,topShooters.all||[]).forEach(function(e){confL.push({e:e,t:t,r:r,id:id})});
       tbl+=priceTable(t,v,od&&od.at);
       body+=firsts(t)+'<h3>'+t+' shooters · picks, other starters, then the next five · first-three attempts per start, '+(topShooters.season?"this season":"last "+topShooters.games+" games")+'</h3>'+tbl});
     // the other side gets its value table too, so a price can be weighed on either team
-    if(od)[m.a,m.h].forEach(function(t){if(sides.indexOf(t)>=0)return;topShooters(t,day,m);var v2=valueRows(r,t,topShooters.all||[],od);v2.forEach(function(e){slate.push({e:e,t:t,r:r,id:id})});body+=priceTable(t,v2,od.at)});
+    [m.a,m.h].forEach(function(t){if(sides.indexOf(t)>=0)return;topShooters(t,day,m);var al=topShooters.all||[];
+      confRows(r,t,al).forEach(function(e){confL.push({e:e,t:t,r:r,id:id})});
+      if(od){var v2=valueRows(r,t,al,od);v2.forEach(function(e){slate.push({e:e,t:t,r:r,id:id})});body+=priceTable(t,v2,od.at)}});
     return '<section class="panel" id="'+id+'"><div class="phead"><h2>'+m.a+' @ '+m.h+'</h2><span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':'')+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
       (r.ok?'<span class="edge">'+(r.lv?r.fav+" ":"Even ")+r.abs+'%</span>':'<span class="tag">NO RATING</span>')+'</span></div>'+
       '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,r.fav&&isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
@@ -612,7 +620,17 @@ function vPicks(){
       return '<tr role="button" tabindex="0" data-goto="'+s.id+'" style="cursor:pointer"><td class="o">'+(i+1)+'</td><td>'+esc(e.x.name)+(pick?' <span class="tag w">PICK</span>':'')+'</td><td>'+s.t+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n">'+Math.round(tc*100)+'%</td><td class="n">'+fmtP(e.price)+'</td><td>'+esc(e.book)+'</td><td class="n">'+(e.be*100).toFixed(1)+'%</td><td class="n">'+(e.p*100).toFixed(1)+'%</td><td class="n"><span class="tag '+(e.ev>0?"w":"")+'">'+(e.ev>0?"+":"")+Math.round(e.ev*100)+'%</span></td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td>'+
         (anyPlayed?'<td>'+(m.g?(fs&&fs[0]===e.x.p?'<span class="tag w">HIT</span>':'<span class="o">no</span>'):'<span class="o">pending</span>')+'</td>':'')+'</tr>'}).join("")+'</tbody></table></div>'+
     (slate.length>shown.length?'<p class="note">Showing the top '+shown.length+' of '+slate.length+'. Each game\'s full value tables are in its card below.</p>':'')+'</section>':"";
-  view.innerHTML='<div class="picks">'+hd+round+slateTbl+cards+other+others+'</div>';
+  confL.sort(function(a,b){return b.e.p-a.e.p});
+  var cPlayed=confL.some(function(s){return s.r.m.g}),cShown=confL.slice(0,20);
+  var confTbl=confL.length?'<section class="panel"><div class="phead"><h2>Slate confidence</h2><span class="tag">top '+cShown.length+' of '+confL.length+' expected starters</span></div>'+
+    '<p class="note">Every expected starter on the night, ranked by his estimated chance of scoring the game\'s first basket: his team\'s chance of scoring first, from the tip rating, times his share of the team\'s early shots. In the backtest the score matched what happened (the top tenth scored first about 15% of the time and took a shot before the first basket about 29%), and it surfaces strong shooters in games just under four chevrons. It says nothing about price. Select a row to jump to its game.</p>'+
+    '<div class="tw"><table><thead><tr><th>#</th><th>Pos</th><th>Player</th><th>Team</th><th>Game</th><th class="n">Team wins tip</th><th class="n">Per start</th><th class="n">Starts</th><th class="n rate">Confidence</th>'+(cPlayed?'<th>Attempt before 1st basket</th><th>First basket</th>':'')+'</tr></thead><tbody>'+
+    cShown.map(function(s,i){var e=s.e,r=s.r,m=r.m,g=m.g,pick=s.t===r.fav&&r.lv>=S.minLv&&(r.top||[]).slice(0,3).some(function(x){return x.p===e.x.p}),fs=g&&firstScore(g),fo=Infinity;
+      if(g)[g.h,g.a].forEach(function(t){att(g,t).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
+      var tried=g&&att(g,s.t).some(function(x){return x[0]===e.x.p&&x[6]<=fo}),lv=e.p>=.16?4:e.p>=.14?3:e.p>=.12?2:e.p>=.105?1:0;
+      return '<tr role="button" tabindex="0" data-goto="'+s.id+'" style="cursor:pointer"><td class="o">'+(i+1)+'</td><td>'+(posOf(e.x.p)||'<span class="o">–</span>')+'</td><td>'+esc(e.x.name)+(pick?' <span class="tag w">PICK</span>':'')+'</td><td>'+s.t+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n">'+(e.rated?Math.round(e.tc*100)+'%':'<span class="o">no rating</span>')+'</td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td><td class="n">'+e.x.st+'</td><td class="n rate rlv'+lv+'"><b>'+(e.p*100).toFixed(1)+'%</b></td>'+
+        (cPlayed?(g?'<td><span class="tag'+(tried?" w":"")+'">'+(tried?"YES":"NO")+'</span></td><td>'+(fs&&fs[0]===e.x.p?'<span class="tag w">HIT</span>':'<span class="o">no</span>')+'</td>':'<td><span class="o">pending</span></td><td><span class="o">pending</span></td>'):'')+'</tr>'}).join("")+'</tbody></table></div></section>':"";
+  view.innerHTML='<div class="picks">'+hd+round+confTbl+slateTbl+cards+other+others+'</div>';
 }
 /* ---- daily lineups: posted starters when the NBA has them, otherwise the likeliest five from recent games ---- */
 var POS_RANK={PG:1,G:1.5,SG:2,GF:2.5,SF:3,F:3.5,PF:4,FC:4.5,C:5};
