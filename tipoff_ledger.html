@@ -503,7 +503,9 @@ function topShooters(t,day,m){
   // the table lists the ten highest on the roster; the three picks above are unchanged and marked
   var pk={};rows.forEach(function(x){pk[x.p]=1});
   var ten=Object.keys(P).map(function(p){var x=P[p];x.rate=(x.c+3)/(x.st+5);return x}).filter(function(x){return x.c||cand[x.p]})
-    .sort(function(a,b){return (b.st>0)-(a.st>0)||b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)}).slice(0,10);
+    .sort(function(a,b){return (b.st>0)-(a.st>0)||b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)});
+  // the three picks always lead the table in pick order, then the best of the rest up to ten rows
+  ten=rows.concat(ten.filter(function(x){return !pk[x.p]})).slice(0,10);
   function mark(x){if(pk[x.p])return ' <span class="tag w">PICK</span>';if(cand[x.p])return "";
     var i=c&&injOf(c,t,x.p);return ' <span class="tag'+(i&&/^out/i.test(i.st)?' l">OUT':'">NOT STARTING')+'</span>'}
   return '<div class="tw"><table style="width:auto"><thead><tr><th>Pos</th><th>Shooter</th><th class="n">Per start</th><th class="n">Attempts</th><th class="n">Starts</th><th class="n">Last 3 games</th>'+cs.map(function(k){return '<th class="n">'+k+'</th>'}).join("")+'</tr></thead><tbody>'+
