@@ -675,10 +675,11 @@ function vLineups(){
     return{l:l,n:n,k:gs.length}}
   function itag(i){return i?'<span class="tag '+(/^out/i.test(i.st)?"l":"q")+'" title="'+esc(i.c||"")+'">'+esc(i.st.toUpperCase())+(i.ty?" · "+esc(i.ty.toUpperCase()):"")+'</span>':""}
   function team(m,t,c){
-    var u=!m.g&&c&&c.lu&&c.lu[t],posted=!!(u&&u.st.length>=5),fin=!!m.g,ids,ex=null,names={},tonight={};
+    var u=!m.g&&c&&c.lu&&c.lu[t],posted=!!(u&&u.st.length>=5),fin=!!m.g,ids,ex=null,nbaEx=null,names={},tonight={};
     if(fin&&c&&c.lu&&c.lu[t])c.lu[t].st.forEach(function(x){if(x[2])tonight[x[0]]=x[2]});
     if(fin)ids=(m.g.st[t]||[]).slice();
     else if(posted){ids=u.st.map(function(x){names[x[0]]=x[1];if(x[2])tonight[x[0]]=x[2];return x[0]})}
+    else if(m.ex&&m.ex[t]&&m.ex[t].st.length>=5){nbaEx=m.ex[t];ids=nbaEx.st.map(function(x){names[x[0]]=x[1];if(x[2])tonight[x[0]]=x[2];return x[0]})} // the NBA's own expected five, before the team confirms it
     else{ex=expected(t,c);ids=ex.l}
     var j;if(fin){var tp=m.g.tip;j=tp?(tp.wt===t?tp.w:(tp.lt===t?tp.l:null)):null}
     else{j=IX.proj(t);if(c)j=pickJumper(c,t,j,day);if(ids.indexOf(j)<0&&!posted){var o=teamJumpersBefore(t,day).filter(function(p){return ids.indexOf(p)>=0});j=o.length?o[0]:j}}
@@ -688,8 +689,8 @@ function vLineups(){
     var rows=ids.map(function(p){var i=c&&injOf(c,t,p);
       return '<li><span class="lpos">'+(posOf(p,tonight)||"–")+'</span><span>'+(D.players[p]?nm(p):esc(names[p]||"#"+p))+'</span>'+(p===j?'<span class="tag w">'+(fin?"TOOK THE TIP":"JUMPER")+'</span>':'')+itag(i)+(ex?'<span class="o">started '+(ex.n[p]||0)+' of last '+ex.k+'</span>':'')+'</li>'}).join("");
     var inj=(c&&c.inj[t]||[]),rep=inj.map(function(x){return '<div><span>'+esc(x.n)+'</span>'+itag(x)+(x.d?'<span class="o">'+fmtD(x.d)+'</span>':'')+(x.c?'<small>'+esc(x.c)+'</small>':'')+'</div>'}).join("");
-    var off=u&&u.out&&u.out.length?'<div><span class="o">Inactive tonight</span> '+u.out.map(function(x){return esc(x[1])+(x[2]?' <span class="o">('+esc(x[2])+')</span>':'')}).join(", ")+'</div>':"";
-    var st=fin?'<span class="tag">STARTED</span>':posted?'<span class="tag w"><span class="ldot"></span>LOCKED</span>':'<span class="tag q">EXPECTED</span>';
+    var uo=u||nbaEx,off=uo&&uo.out&&uo.out.length?'<div><span class="o">Inactive tonight</span> '+uo.out.map(function(x){return esc(x[1])+(x[2]?' <span class="o">('+esc(x[2])+')</span>':'')}).join(", ")+'</div>':"";
+    var st=fin?'<span class="tag">STARTED</span>':posted?'<span class="tag w"><span class="ldot"></span>LOCKED</span>':'<span class="tag q">'+(nbaEx?"EXPECTED · NBA LINEUPS PAGE":"EXPECTED")+'</span>';
     return{lock:posted||fin,posted:posted,html:'<div class="lteam"><h3>'+tmL(t)+' '+st+'</h3>'+(rows?'<ol>'+rows+'</ol>':'<p class="note">No earlier games for '+t+' in this data.</p>')+
       (rep||off?'<h3>'+(fin?"Flagged before tip":"Injury report")+'</h3><div class="lrep">'+off+rep+'</div>':(c&&!fin&&D.inj?'<p class="note">Nobody listed.</p>':''))+'</div>'}}
   var nLock=0,nUp=0;
@@ -702,7 +703,7 @@ function vLineups(){
   Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   view.innerHTML='<section class="panel"><div class="phead"><h2>Daily lineups</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
     (nUp?'<span class="tag '+(nLock===nUp?"w":nLock?"q":"")+'">'+nLock+' OF '+nUp+' LOCKED</span>':'')+'</div></div>'+
-    '<p class="note">'+(ms.length?'':'No games on this day. ')+'A game lights up once the NBA has posted both starting fives, usually about half an hour before tip. Until then each side shows its expected five: the players with the most starts in the team\'s last five games, leaving out anyone listed out. Each five runs point guard down to centre, using the position the NBA lists for a starter in its box scores; a dash means none is on record yet. Injury designations and notes come from the league injury report'+(D.inj?'':' (not available in this copy)')+'. For games already played, the five shown are the players who actually started.</p>'+
+    '<p class="note">'+(ms.length?'':'No games on this day. ')+'A game lights up once the NBA has posted both starting fives, usually about half an hour before tip. Until then each side shows its expected five: the one on the NBA\'s lineups page when it has one, otherwise the players with the most starts in the team\'s last five games, leaving out anyone listed out. Each five runs point guard down to centre, using the position the NBA lists for a starter in its box scores; a dash means none is on record yet. Injury designations and notes come from the league injury report'+(D.inj?'':' (not available in this copy)')+'. For games already played, the five shown are the players who actually started.</p>'+
     (cards?'<div class="lgrid">'+cards+'</div>':'')+'</section>'}
 function vMatchup(){
   var a=S.a,b=S.b;if(a===b)b=teams().filter(function(t){return t!==a})[0];

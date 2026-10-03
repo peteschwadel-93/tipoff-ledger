@@ -32,9 +32,9 @@ standalone dashboard file, so you can just reopen it in your browser.
 --season is the year the season starts (2025 = 2025-26). Left out, it is the
 season in progress, falling back to the previous one until games are played.
 """
-import argparse, io, json, os, re, shutil, socket, subprocess, sys, tarfile, threading, time, urllib.request, webbrowser
+import argparse, io, json, os, re, shutil, socket, subprocess, sys, tarfile, threading, time, urllib.error, urllib.request, webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 try:
@@ -144,6 +144,45 @@ def lineup(gid):
     return out or None
 
 
+NBA_DAILY_LINEUPS = "https://stats.nba.com/js/data/leaders/00_daily_lineups_{ymd}.json"
+
+
+def daily_lineups(day):
+    """The NBA's own lineups page data for one day (YYYY-MM-DD): {gameId: {TEAM: (lineup, confirmed)}}.
+
+    Lists each team's five starters, marked Expected hours ahead and Confirmed once the team announces them,
+    which is earlier than the box score shows starters. Returns {} if the file cannot be read.
+    """
+    try:
+        req = urllib.request.Request(NBA_DAILY_LINEUPS.format(ymd=day.replace("-", "")),
+                                     headers={**UA, "Referer": "https://www.nba.com/", "Origin": "https://www.nba.com", "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=30, context=CTX or ssl_context()) as r:
+            doc = json.loads(r.read())
+    except Exception as e:
+        print(f"daily lineups {day}: unavailable ({e})", file=sys.stderr, flush=True)
+        return {}
+    out = {}
+    for g in doc.get("games") or []:
+        lu = {}
+        for side in ("homeTeam", "awayTeam"):
+            t = g.get(side) or {}
+            st, off, ok = [], [], True
+            for p in t.get("players") or []:
+                nm = p.get("playerName") or f"{p.get('firstName', '')} {p.get('lastName', '')}".strip()
+                short = f"{p['firstName'][:1]}. {p['lastName']}" if p.get("firstName") and p.get("lastName") else nm
+                pos = (p.get("position") or "").upper()
+                if str(p.get("rosterStatus", "")).lower() == "inactive":
+                    off.append([int(p["personId"]), short, ""])
+                elif pos:
+                    st.append([int(p["personId"]), short, pos])
+                    ok = ok and str(p.get("lineupStatus", "")).lower() == "confirmed"
+            if t.get("teamAbbreviation") and len(st) == 5:
+                lu[t["teamAbbreviation"]] = ({"st": st, "out": off}, ok)
+        if lu:
+            out[str(g.get("gameId", ""))] = lu
+    return out
+
+
 def load_github(season):
     frames = []
     for name, po in ((f"cdnnba_{season}", 0), (f"cdnnba_po_{season}", 1)):
@@ -223,12 +262,35 @@ def load_nba(season, cache="pbp_cache"):
                 rows.append(row)
     upcoming.sort(key=lambda x: x["ts"])
     now = datetime.now(ET)
+    daily = {}
     for u in upcoming:
-        # lineups are posted roughly half an hour before tip; start looking 90 minutes out
-        if (datetime.fromisoformat(u["ts"]) - now).total_seconds() <= 90 * 60:
-            lu = lineup(u["gid"])
+        # Starters: the NBA's lineups page first (confirmed there as soon as a team announces), then the box score,
+        # which shows them from about half an hour before tip. Looked for from three hours out; each attempt is logged.
+        mins = (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60
+        if mins <= 180:
+            if u["d"] not in daily:
+                daily[u["d"]] = daily_lineups(u["d"])
+            note = []
+            found = daily[u["d"]].get(u["gid"]) or {}
+            lu = {t: x[0] for t, x in found.items() if x[1]}
+            ex = {t: x[0] for t, x in found.items() if not x[1]}
+            note.append("lineups page: " + (", ".join(f"{t} {'confirmed' if x[1] else 'expected'}" for t, x in found.items()) or "nothing"))
+            if len(lu) < 2 and mins <= 90:
+                box = lineup(u["gid"]) or {}
+                got = [t for t, x in box.items() if len(x.get("st", [])) >= 5]
+                for t in got:
+                    lu.setdefault(t, box[t])
+                    ex.pop(t, None)
+                for t, x in box.items():  # the box score's inactive list is the fuller one
+                    tgt = lu.get(t) or ex.get(t)
+                    if tgt is not None and x.get("out"):
+                        tgt["out"] = x["out"]
+                note.append("box score: " + (("starters for " + ", ".join(got)) if got else ("no starters yet" if box else "not available")))
             if lu:
                 u["lu"] = lu
+            if ex:
+                u["ex"] = ex
+            print(f"lineup {u['a']} @ {u['h']} ({mins:+.0f} min to tip): " + "; ".join(note), flush=True)
         del u["gid"]
     return (pd.DataFrame(rows) if rows else None), upcoming
 
@@ -397,6 +459,130 @@ def parse_first_basket(doc):
                 if who not in best or price > best[who][1]:
                     best[who] = [who, int(price), bk.get("title") or bk.get("key") or ""]
     return sorted(best.values(), key=lambda x: x[1])
+
+
+def odds_get(url):
+    """One request to The Odds API: (parsed JSON, credits remaining or None, credits this call used or None)."""
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=60, context=CTX or ssl_context()) as r:
+        num = lambda h: float(r.headers[h]) if r.headers.get(h) not in (None, "") else None
+        return json.loads(r.read()), num("x-requests-remaining"), num("x-requests-last")
+
+
+def backfill_odds(season, html, max_credits=0, reserve=300):
+    """Fill odds.json with first-basket prices for a past season from The Odds API's historical data (paid plans only).
+
+    For every game of the season already in the dashboard: find the event as it was listed that morning (1 credit a
+    day), then read its first-basket prices ten minutes before tip (10 credits), or an hour before if that snapshot
+    has none. Games already in odds.json are skipped, so the job can be stopped and run again. It stops when
+    max_credits have been used (0 = no limit) or fewer than `reserve` credits remain on the key.
+    """
+    key = os.environ.get("ODDS_API_KEY", "").strip()
+    if not key:
+        sys.exit("Set ODDS_API_KEY to a paid Odds API key first.")
+    old = embedded(html) if html else None
+    if not old:
+        sys.exit(f"Could not read the games inside {html}.")
+    store = {}
+    try:
+        with open(ODDS, encoding="utf-8") as f:
+            store = json.load(f)
+    except Exception:
+        pass
+    days = {}
+    for g in old["games"]:
+        if g["s"] == season:
+            days.setdefault(g["d"], []).append(g)
+    hist = "https://api.the-odds-api.com/v4/historical/sports/basketball_nba"
+    used, got, empty, left = 0, 0, 0, None
+    iso = lambda t: t.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def save():
+        with open(ODDS, "w", encoding="utf-8") as f:
+            json.dump(store, f, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
+
+    def spent(remaining, cost, fallback):
+        nonlocal used, left
+        used += cost if cost is not None else fallback
+        if remaining is not None:
+            left = remaining
+
+    def out_of_budget(need):
+        return (max_credits and used + need > max_credits) or (left is not None and left - need < reserve)
+
+    stop = False
+    try:
+        try:  # a free call, to learn how many credits the key has before spending any
+            left = odds_get(f"https://api.the-odds-api.com/v4/sports?apiKey={key}")[1]
+        except urllib.error.HTTPError:
+            raise
+        except Exception:
+            pass
+        for d in sorted(days):
+            if stop:
+                break
+            todo = [g for g in days[d] if f"{d}|{g['a']}|{g['h']}" not in store]
+            if not todo:
+                continue
+            if out_of_budget(1 + 10 * len(todo)):
+                print(f"stopping before {d}: credit limit reached", flush=True)
+                break
+            doc, rem, cost = odds_get(f"{hist}/events?apiKey={key}&date={d}T14:00:00Z")
+            spent(rem, cost, 1)
+            events = {}
+            for e in doc.get("data") or []:
+                when = datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00"))
+                if when.astimezone(ET).strftime("%Y-%m-%d") == d:
+                    events[(TEAM_NAMES.get(e.get("away_team")), TEAM_NAMES.get(e.get("home_team")))] = (e["id"], when)
+            for g in todo:
+                k = f"{d}|{g['a']}|{g['h']}"
+                ev = events.get((g["a"], g["h"]))
+                if not ev:
+                    store[k] = {"hist": 1, "miss": "no event listed"}
+                    empty += 1
+                    continue
+                if out_of_budget(10):
+                    print(f"stopping during {d}: credit limit reached", flush=True)
+                    stop = True
+                    break
+                prices, at = [], None
+                for back in (10, 60):
+                    snap = ev[1] - timedelta(minutes=back)
+                    doc, rem, cost = odds_get(f"{hist}/events/{ev[0]}/odds?apiKey={key}&date={iso(snap)}&regions=us"
+                                              f"&markets=player_first_basket&oddsFormat=american")
+                    spent(rem, cost, 10)
+                    prices = parse_first_basket(doc.get("data") or {})
+                    if prices:
+                        at = doc.get("timestamp") or iso(snap)
+                        break
+                    if out_of_budget(10):
+                        break
+                if prices:
+                    when = datetime.fromisoformat(at.replace("Z", "+00:00")).astimezone(ET)
+                    store[k] = {"p": prices, "n": 1, "at": when.strftime("%Y-%m-%dT%H:%M"), "hist": 1}
+                    got += 1
+                else:
+                    store[k] = {"hist": 1, "miss": "no first-basket prices in the snapshot"}
+                    empty += 1
+                time.sleep(0.15)
+            if got == 0 and empty >= 20:  # nothing is matching: stop before spending more, and leave those games to be tried again
+                for k in [k for k, v in store.items() if v.get("hist") and v.get("miss")]:
+                    del store[k]
+                save()
+                sys.exit("No first-basket prices found in the first 20 games tried, so the backfill stopped to save credits. "
+                         "The key's plan may not include historical data for this market.")
+            save()
+            print(f"{d}: {len(todo)} games, {used:.0f} credits used so far" + (f", {left:.0f} left" if left is not None else ""), flush=True)
+    except urllib.error.HTTPError as e:
+        save()
+        body = ""
+        try:
+            body = e.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        sys.exit(f"The Odds API refused a request ({e.code}). {body}\nSaved what was fetched: {got} games.")
+    save()
+    print(f"done: prices for {got} games, {empty} without, {used:.0f} credits used" + (f", {left:.0f} left on the key" if left is not None else ""))
 
 
 def remember_odds(sched, old):
@@ -774,11 +960,15 @@ def main():
     ap.add_argument("--every", type=float, default=2, help="hours between automatic refreshes while serving (0 = off)")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true")
+    ap.add_argument("--backfill-odds", type=int, metavar="SEASON", help="fill odds.json with a past season's first-basket prices (paid Odds API key)")
+    ap.add_argument("--max-credits", type=int, default=0, help="with --backfill-odds: stop after using this many credits (0 = no limit)")
     a = ap.parse_args()
     if a.install:
         return install(a)
     if a.uninstall:
         return uninstall(a)
+    if a.backfill_odds:
+        return backfill_odds(a.backfill_odds, a.html or "tipoff_ledger.html", a.max_credits)
     if pd is None:
         sys.exit("pandas is missing. Run:  python3 build_data.py --install")
     if a.serve:
