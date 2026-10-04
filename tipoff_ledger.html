@@ -19,6 +19,8 @@ body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body);-webkit
 header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
 .topr{display:flex;align-items:center;gap:22px}
 .be{font-size:11.5px;color:var(--muted)}
+.nightly{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;align-items:center}
+.tag.nu{font-weight:700}.tag.nu.up{background:var(--made-soft);border-color:transparent;color:#3ef07f}.tag.nu.dn{color:#e8705f;border-color:rgba(232,112,95,.5)}
 tbody tr.near>td,tbody tr.near:nth-child(odd)>td{background:rgba(240,145,74,.11)}tbody tr.near>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}.cf{font-weight:600;color:var(--muted)}.cf1{color:#f0a94a}.cf2{color:#e2d24e}.cf3{color:#9fdc58}.cf4{color:#3ef07f}
 .tml{display:inline-flex;align-items:center;gap:.35em;white-space:nowrap;vertical-align:middle}
 .tlogo{width:1.5em;height:1.5em;flex:none;object-fit:contain;filter:drop-shadow(0 0 1px rgba(255,255,255,.9)) drop-shadow(0 0 1px rgba(255,255,255,.55))}
@@ -602,7 +604,23 @@ function vPicks(){
       what(m)+injReport(m)+body+'</section>'}
   var cards=picks.map(function(r,i){return card(r,"pick-"+i)}).join("");
   var others=rest.length?'<h2 class="sep">Other games · below the rating</h2>'+rest.map(function(r,i){return card(r,"game-"+i)}).join(""):"";
-  var round=picks.length?'<section class="panel"><div class="phead"><h2>Round-up</h2><span class="tag">'+picks.length+(picks.length===1?" pick":" picks")+' · select a card to jump to its data</span></div><div class="rcards">'+
+  // the night so far: of the picked players whose game has had its first basket, how many scored it or shot before it, and the units at one per pick
+  var nt={n:0,hit:0,att:0,games:0,ghit:0,pend:0,u:0,priced:0};
+  picks.forEach(function(r){var g=r.m.g,fb=g&&firstScore(g),top=(r.top||[]).slice(0,3); // same rule as the cards: first points, free throws included unless switched off
+    if(!fb){nt.pend+=top.length;return}
+    var fo=Infinity;[g.h,g.a].forEach(function(t){att(g,t).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
+    nt.games++;var any=false;
+    top.forEach(function(s){var won=fb[0]===s.p,pr=r.od&&priceOf(r.od,s.p);nt.n++;if(won){nt.hit++;any=true}
+      if(att(g,r.fav).some(function(x){return x[0]===s.p&&x[6]<=fo}))nt.att++;
+      if(pr){nt.priced++;nt.u+=won?(pr[1]>0?pr[1]/100:100/-pr[1]):-1}});
+    if(any)nt.ghit++});
+  var allPriced=nt.n>0&&nt.priced===nt.n;
+  var night=nt.n?'<span class="tag '+(nt.hit?"w":"")+'" title="Picked players who scored their game\'s first points, free throws included, the same rule the cards use. Only games that have had a score are counted.">'+nt.hit+' OF '+nt.n+' FIRST BASKET</span> '+
+      '<span class="tag" title="Picked players who took a shot before their game\'s first basket.">'+nt.att+' OF '+nt.n+' SHOT EARLY</span> '+
+      '<span class="tag" title="Games where one of the three picks scored the first basket.">'+nt.ghit+' OF '+nt.games+(nt.games===1?' GAME':' GAMES')+' HIT</span> '+
+      (allPriced?'<span class="tag nu '+(nt.u>0?"up":nt.u<0?"dn":"")+'" title="One unit on each pick at the best price on record.">'+(nt.u>0?"+":nt.u<0?"−":"")+Math.abs(nt.u).toFixed(1)+'U</span> ':nt.priced?'<span class="tag" title="Units need a price for every pick; '+nt.priced+' of '+nt.n+' have one.">UNITS: '+nt.priced+' OF '+nt.n+' PRICED</span> ':'')+
+      (nt.pend?'<span class="tag q">'+nt.pend+' PENDING</span> ':''):(nt.pend?'<span class="tag q">'+nt.pend+' PICKS PENDING</span> ':'');
+  var round=picks.length?'<section class="panel"><div class="phead"><h2>Round-up</h2><span class="nightly">'+night+'<span class="tag">'+picks.length+(picks.length===1?" game":" games")+' · select a card to jump to its data</span></span></div><div class="rcards">'+
     picks.map(function(r,i){var m=r.m,g=m.g,j=r.fav===m.h?r.jh:r.ja,fa=g&&firstAtt(g),fs=g&&firstScore(g),won=g&&g.tip&&g.tip.pos===r.fav;
       var inTop=function(p){return r.top.slice(0,3).some(function(s){return s.p===p})},hitShot=!!(fa&&inTop(fa.s[0])),hitScore=!!(fs&&inTop(fs[0]));
       var jOut=isOut(m,r.fav,j);
