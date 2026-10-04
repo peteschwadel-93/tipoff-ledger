@@ -407,7 +407,7 @@ def build(df):
                                 el, order, r.descriptor if pd.notna(r.descriptor) else None, 1, None])
             if first_fg and all(n >= N_SHOTS for n in nfg.values()) and el > max(x[-1][5] for x in shots.values()):
                 break
-        games.append({"id": int(gid), "d": ts.strftime("%Y-%m-%d"), "po": int(g.po.iloc[0]), "s": int(g.ssn.iloc[0]),
+        games.append({"id": int(gid), "d": ts.strftime("%Y-%m-%d"), "t": ts.strftime("%I:%M %p ET").lstrip("0"), "po": int(g.po.iloc[0]), "s": int(g.ssn.iloc[0]),
                       "h": home, "a": away, "tip": tip, "fs": shots, "st": starters, "fb": first_fg, "fp": first_pts})
         if "live" in g.columns and g.live.iloc[0] == 1:
             games[-1]["lv"] = 1
