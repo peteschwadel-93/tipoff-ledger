@@ -561,12 +561,12 @@ function vPicks(){
   var rows=ms.map(function(m){var o;
     if(m.g){var e=IX.g[m.g.id];o={m:m,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh}}
     else{var ja=IX.proj(m.a),jh=IX.proj(m.h),z={w:0,n:0};o={m:m,ja:ja,jh:jh,ra:ja?IX.l15(ja):z,rh:jh?IX.l15(jh):z,fa:ja?IX.full(ja):z,fh:jh?IX.full(jh):z}}
-    adjust(o,m,day);grade(o);o.hh=o.ja&&o.jh?met(o.ja,o.jh):[0,0];return o}).sort(function(x,y){return y.abs-x.abs});
+    adjust(o,m,day);grade(o);if(!o.fav&&S.minLv<0)o.fav=m.h; /* "all games": an unrated game still gets a card, shown from the home side */ o.hh=o.ja&&o.jh?met(o.ja,o.jh):[0,0];return o}).sort(function(x,y){return y.abs-x.abs});
   var picks=rows.filter(function(r){return r.lv>=S.minLv}),rest=rows.filter(function(r){return r.lv<S.minLv});
   // track record of this margin over every past game in the data
   var tr={n:0,tip:0,shot:0,score:0};
   all.forEach(function(g){var e=IX.g[g.id],o={m:g,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh};
-    if(D.flags&&D.flags[g.d+"|"+g.a+"|"+g.h])adjust(o,{h:g.h,a:g.a,g:g},g.d);grade(o);if(o.lv<S.minLv||!g.tip)return;
+    if(D.flags&&D.flags[g.d+"|"+g.a+"|"+g.h])adjust(o,{h:g.h,a:g.a,g:g},g.d);grade(o);if(o.lv<Math.max(S.minLv,0)||!g.tip)return;
     var fa=firstAtt(g),fs=firstScore(g);tr.n++;if(g.tip.pos===o.fav)tr.tip++;if(fa&&fa.t===o.fav)tr.shot++;if(fs&&fs[1]===o.fav)tr.score++});
   function rec(r){return r.n?r.w+"–"+(r.n-r.w):"no tips"}
   function what(m){if(!m.g)return "";var g=m.g,t=g.tip,fa=firstAtt(g),fs=firstScore(g);
@@ -580,14 +580,14 @@ function vPicks(){
   var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
   Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   var hd='<section class="panel"><div class="phead"><h2>Picks</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
-    '<label class="f">Minimum rating <select id="selLv">'+[[1,"One chevron · 55%+"],[2,"Two chevrons · 60%+"],[3,"Three chevrons · 65%+"],[4,"Four chevrons · 75%+"]].map(function(n){return '<option value="'+n[0]+'"'+(n[0]===S.minLv?' selected':'')+'>'+n[1]+'</option>'}).join("")+'</select></label></div></div>'+
-    '<p class="note">'+(ms.length?picks.length+" of "+ms.length+" matchups reach the rating. ":"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips. The rating is the favoured jumper\'s estimated chance of winning the tip, from both jumpers\' full records in this data: one chevron at 55%, two at 60%, three at 65%, four at 75%.'+
+    '<label class="f">Minimum rating <select id="selLv">'+[[-1,"All games"],[1,"One chevron · 55%+"],[2,"Two chevrons · 60%+"],[3,"Three chevrons · 65%+"],[4,"Four chevrons · 75%+"]].map(function(n){return '<option value="'+n[0]+'"'+(n[0]===S.minLv?' selected':'')+'>'+n[1]+'</option>'}).join("")+'</select></label></div></div>'+
+    '<p class="note">'+(ms.length?(S.minLv<0?"Showing all "+ms.length+" matchups, whatever the rating; an unrated game is shown from the home side. ":picks.length+" of "+ms.length+" matchups reach the rating. "):"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips. The rating is the favoured jumper\'s estimated chance of winning the tip, from both jumpers\' full records in this data: one chevron at 55%, two at 60%, three at 65%, four at 75%.'+
     (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are ranked by first-three attempts per start this season, among players expected to start: the posted lineup once there is one, otherwise recent starters not listed out. Whatever was flagged before tip stays on the card after the game.":"")+(D.odds&&Object.keys(D.odds).length?" First-basket prices are the best available across US books, fetched once a few hours before tip and once in the last hour. Best value is the starter with the highest value score: the edge on his price, weighted by how likely he is to score. It has not been backtested.":"")+
     (up.length?"":" This data has no upcoming schedule, so past game days are shown as they looked before tip-off. Run python3 build_data.py --install once and today\'s games load on their own.")+'</p>'+
-    '<div class="kv"><span><b>Track record at '+["","one chevron","two chevrons","three chevrons","four chevrons"][S.minLv]+' or more</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
+    '<div class="kv"><span><b>Track record '+(S.minLv<1?"across every rated game":"at "+["","one chevron","two chevrons","three chevrons","four chevrons"][S.minLv]+" or more")+'</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
   var slate=[],confL=[]; // every priced starter on the night, and every expected starter's confidence, gathered as each game's card is built
   function card(r,id){ // full detail for one game: the favoured side's shooters, or both sides when nothing is favoured
-    var m=r.m,sides=r.fav&&r.lv>0?[r.fav]:[m.a,m.h],body="";
+    var m=r.m,sides=r.fav&&r.lv>0?[r.fav]:(r.fav?[r.fav,r.fav===m.h?m.a:m.h]:[m.a,m.h]),body=""; // the side the card is built on always comes first
     var od=oddsOf(m);
     sides.forEach(function(t,k){var tbl=topShooters(t,day,m),v=od?valueRows(r,t,topShooters.all||[],od):[];if(!k&&r.fav){r.top=(topShooters.rows||[]).slice();r.val=v;r.od=od}
       v.forEach(function(e){slate.push({e:e,t:t,r:r,id:id})});
@@ -625,7 +625,7 @@ function vPicks(){
       var inTop=function(p){return r.top.slice(0,3).some(function(s){return s.p===p})},hitShot=!!(fa&&inTop(fa.s[0])),hitScore=!!(fs&&inTop(fs[0]));
       var jOut=isOut(m,r.fav,j);
       var fi=r.fav===m.h?1:0,hhFlag=r.hh&&r.hh[0]+r.hh[1]>=3&&r.hh[1-fi]>r.hh[fi]?'<span class="tag q" title="The favourite trails this head-to-head series '+r.hh[fi]+'–'+r.hh[1-fi]+'. Not part of the rating; in the backtest favourites in this spot won 54% of tips against 62% otherwise.">HEAD TO HEAD FLAG · TRAILS '+r.hh[fi]+'–'+r.hh[1-fi]+'</span>':"";
-      return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+vsL(m.a,m.h)+'</span><span class="edge">'+r.fav+' '+r.abs+'%</span></div>'+
+      return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+vsL(m.a,m.h)+'</span><span class="edge">'+(r.ok?(r.lv>0?r.fav+' ':'EVEN · '+r.fav+' ')+r.abs+'%':'NO RATING · '+r.fav)+'</span></div>'+
         (m.t?'<div><span class="tag">'+esc(m.t)+'</span>'+(m.pre?' <span class="tag">PRESEASON</span>':'')+' <span class="tag">RESULTS PENDING</span>'+(jOut?' <span class="tag l">CHECK · JUMPER UNAVAILABLE</span>':'')+'</div>':((g&&(g.lv||g.t))||jOut?'<div>'+(g&&g.t?'<span class="tag" title="When the game actually tipped off">TIPPED '+esc(g.t)+'</span> ':'')+(g&&g.lv?'<span class="tag w">LIVE · SO FAR</span> ':'')+(jOut?'<span class="tag l">JUMPER WAS FLAGGED UNAVAILABLE</span>':'')+'</div>':''))+
         '<div class="rblock"><h3>Tip pick</h3><div class="rl"><div class="rname">'+nm(j)+'</div>'+chev(r.lv,false,"sm"+(jOut?" off":""))+'</div>'+(swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+shareTag(r.fav,j,day)+hhFlag?'<div class="rf" style="padding-left:0">'+swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+shareTag(r.fav,j,day)+hhFlag+'</div>':'')+'</div>'+
         '<div class="rblock"><h3>'+r.fav+' shooters</h3><ol>'+[0,1,2].map(function(k){var s=r.top[k];if(!s)return "";
