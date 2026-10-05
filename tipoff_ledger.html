@@ -110,6 +110,13 @@ button:focus-visible,select:focus-visible,input:focus-visible,tr[tabindex]:focus
 .bty{font:500 13.5px var(--body);color:var(--soft)}.bty::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:8px;vertical-align:1px;background:var(--made)}.bty.bu::before{background:#f5c542}.bty.bg::before{background:var(--accent)}
 .brec{font:500 12.5px ui-monospace,Menlo,monospace;white-space:nowrap}.brec .o{font-family:var(--body)}.res.live{color:var(--accent);border-color:var(--accent)}.bets .res:not(.m):not(.x):not(.live){color:var(--muted);border-color:var(--line)}
 .bform{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center}
+.bktip{position:fixed;z-index:90;display:none;min-width:190px;padding:10px 12px;border-radius:10px;background:var(--raise);border:1px solid var(--line);box-shadow:0 12px 32px -8px rgba(0,0,0,.65);font-size:13px;pointer-events:none;max-height:70vh;overflow:auto}
+.bktip .bkh{font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;justify-content:space-between;gap:14px;white-space:nowrap}.bktip .bkh span{font-weight:400;color:var(--muted);font-size:12px}
+.bktip .bkr{display:flex;justify-content:space-between;gap:18px;padding:3px 0;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}.bktip .bkr b{font-family:ui-monospace,Menlo,monospace;font-weight:500;color:var(--ink)}
+.bktip .bkr.top span,.bktip .bkr.top b{color:#3ef07f}.bktip .bkr.at span::after{content:" · shown";color:var(--muted);font-size:11.5px}
+.bktip.pin{pointer-events:auto;border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}.bktip .bkr i{font:500 11px var(--body);font-style:normal;color:var(--accent);margin-left:-6px;opacity:.75}
+.bktip.pin .bkr{cursor:pointer;padding:6px 8px;margin:0 -8px;border-radius:7px}.bktip.pin .bkr:hover,.bktip.pin .bkr:focus-visible{background:color-mix(in srgb,var(--accent) 16%,transparent);outline:none}.bktip.pin .bkr:hover i{opacity:1}
+.bktip .bkf{margin-top:7px;padding-top:7px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);max-width:230px;line-height:1.35}
 .t3cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px}
 .t3c{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:13px;cursor:pointer;min-width:0}.t3c:hover{border-color:var(--accent)}.t3c:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .t3c.win{border-color:var(--made);background:linear-gradient(180deg,var(--made-soft),var(--bg) 55%);box-shadow:0 0 0 1px var(--made),0 10px 30px -18px var(--made)}.t3c.lost{opacity:.72}
@@ -583,13 +590,19 @@ function topShooters(t,day,m){
    test the value score itself against, so treat the edge as a guide. */
 function oddsOf(m){var o=(D.odds||{})[(m.g?m.g.d:m.d)+"|"+m.a+"|"+m.h];if(!o||!o.p||!o.p.length)return null;
   if(!o._k){o._k={};o.p.forEach(function(x){var n=normName(x[0]).split(" "),k=n[0].charAt(0)+" "+n.slice(1).join(" ");(o._k[k]=o._k[k]||[]).push(x)})}return o}
-function priceOf(o,p){var l=o&&o._k[normName(D.players[p])];return l&&l.length===1?l[0]:null} // two players sharing an initial and surname are left unpriced
+S.book="";try{S.book=localStorage.getItem("tolBook")||""}catch(_){}
+function booksOn(day){var s={},O=D.odds||{};Object.keys(O).forEach(function(k){if(k.slice(0,10)!==day)return;var o=O[k];(o.p||[]).forEach(function(x){Object.keys(x[3]||{}).forEach(function(b){s[b]=1})});(o.t3||[]).forEach(function(x){Object.keys(x[6]||{}).forEach(function(b){s[b]=1})});(o.t3a||[]).forEach(function(x){Object.keys(x[4]||{}).forEach(function(b){s[b]=1})})});return Object.keys(s).sort()}
+function bookPicker(day){var l=booksOn(day);if(S.book&&l.indexOf(S.book)<0)l.push(S.book);
+  if(!l.length)return '<label class="f">Book <select id="selBook" disabled title="No prices from individual books are stored for this day."><option>Best of all books</option></select></label>';
+  return '<label class="f">Book <select id="selBook"><option value="">Best of all books</option>'+l.map(function(b){return '<option value="'+esc(b)+'"'+(b===S.book?" selected":"")+'>'+esc(b)+'</option>'}).join("")+'</select></label>'}
+function priceOf(o,p){var l=o&&o._k[normName(D.players[p])];if(!l||l.length!==1)return null;var x=l[0]; // one book chosen: his price there, or nothing if that book has not posted him
+  if(S.book&&!S.bookOff&&x[3])return x[3][S.book]!=null?[x[0],x[3][S.book],S.book,x[3]]:null;return x} // two players sharing an initial and surname are left unpriced
 function fmtP(v){return (v>0?"+":"")+v}
 function breakEven(v){return v>0?100/(v+100):-v/(-v+100)}
 function valueRows(r,t,all,o){ // every expected starter with a price: model chance, break-even and edge
   var tc=r.rt?(t===r.fav?r.rt.p:1-r.rt.p):.5,teamFirst=.5+.333*(tc-.5),top=all.slice(0,5),sum=0;top.forEach(function(x){sum+=x.rate});
   return all.map(function(x){var pr=priceOf(o,x.p);if(!pr||!sum)return null;var sh=.2+.85*(Math.min(x.rate/sum,.5)-.2),p=teamFirst*sh,pay=pr[1]>0?1+pr[1]/100:1+100/-pr[1];
-    return{x:x,price:pr[1],book:pr[2],p:p,be:breakEven(pr[1]),ev:p*pay-1,vs:valScore(p,pay)}}).filter(Boolean).sort(function(a,b){return b.vs-a.vs})}
+    return{x:x,price:pr[1],book:pr[2],all:pr[3],p:p,be:breakEven(pr[1]),ev:p*pay-1,vs:valScore(p,pay)}}).filter(Boolean).sort(function(a,b){return b.vs-a.vs})}
 /* Value score: the edge weighted by how likely he is to score, so a fair price on a likely scorer ranks above the same
    percentage edge on a long shot, where a small error in the estimate matters most. It is the edge divided by the
    payout (the stake a bettor sizing by edge would put on it), shown per 100. */
@@ -600,7 +613,7 @@ function confRows(r,t,all){ // chance each expected starter scores the game's fi
   return sum?all.map(function(x){return{x:x,tc:tc,rated:!!r.rt,p:teamFirst*(.2+.85*(Math.min(x.rate/sum,.5)-.2))}}):[]}
 function priceTable(t,v,at,m){if(!v.length)return "";
   return '<h3>'+t+' value table · first-basket prices'+(at?' · fetched '+esc(at.replace("T"," "))+' ET':'')+'</h3><div class="tw"><table style="width:auto"><thead><tr><th>Player</th><th class="n">Best price</th><th>Book</th><th class="n">Break-even</th><th class="n">Model</th><th class="n">Edge</th><th class="n" title="Edge weighted by how likely he is to score. Rows are sorted by this.">Value score</th><th class="n">Per start</th></tr></thead><tbody>'+
-    v.map(function(e){return '<tr><td>'+esc(e.x.name)+'</td><td class="n">'+(m?bx(fmtP(e.price),e.x.p,m.g?m.g.d:m.d,t,t===m.h?m.a:m.h,t===m.h,"fb",0,e.price,e.book):fmtP(e.price))+'</td><td>'+esc(e.book)+'</td><td class="n">'+(e.be*100).toFixed(1)+'%</td><td class="n">'+(e.p*100).toFixed(1)+'%</td><td class="n"><span class="tag '+(e.ev>0?"w":"")+'">'+(e.ev>0?"+":"")+Math.round(e.ev*100)+'%</span></td><td class="n"><b>'+(e.vs>0?"+":"")+e.vs.toFixed(1)+'</b></td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td></tr>'}).join("")+'</tbody></table></div>'}
+    v.map(function(e){return '<tr><td>'+esc(e.x.name)+'</td><td class="n">'+(m?bx(fmtP(e.price),e.x.p,m.g?m.g.d:m.d,t,t===m.h?m.a:m.h,t===m.h,"fb",0,e.price,e.book,e.all):fmtP(e.price))+'</td><td>'+esc(e.book)+'</td><td class="n">'+(e.be*100).toFixed(1)+'%</td><td class="n">'+(e.p*100).toFixed(1)+'%</td><td class="n"><span class="tag '+(e.ev>0?"w":"")+'">'+(e.ev>0?"+":"")+Math.round(e.ev*100)+'%</span></td><td class="n"><b>'+(e.vs>0?"+":"")+e.vs.toFixed(1)+'</b></td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td></tr>'}).join("")+'</tbody></table></div>'}
 function vPicks(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
   sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
@@ -633,7 +646,7 @@ function vPicks(){
   function side(t,j,f,r,cls,m,orig){var tg=swapTag(orig,j)+(m&&j?avail(m,t,j):"")+shareTag(t,j,day);return '<div class="side '+cls+'"><h3>'+t+' jumper</h3><div class="who">'+nm(j)+'</div>'+(tg?'<div class="rf">'+tg+'</div>':'')+'<div class="big">'+pct(f.w,f.n)+'</div><div class="kv"><span>Record <b>'+rec(f)+'</b></span><span>Last '+(r.n||15)+' <b>'+rec(r)+'</b></span></div></div>'}
   var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
   Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
-  var hd='<section class="panel"><div class="phead"><h2>Picks</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
+  var hd='<section class="panel"><div class="phead"><h2>Picks</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+bookPicker(day)+
     '<label class="f">Minimum rating <select id="selLv">'+[[-1,"All games"],[1,"One chevron · 55%+"],[2,"Two chevrons · 60%+"],[3,"Three chevrons · 65%+"],[4,"Four chevrons · 75%+"]].map(function(n){return '<option value="'+n[0]+'"'+(n[0]===S.minLv?' selected':'')+'>'+n[1]+'</option>'}).join("")+'</select></label></div></div>'+
     '<p class="note">'+(ms.length?(S.minLv<0?"Showing all "+ms.length+" matchups, whatever the rating; an unrated game is shown from the home side. ":picks.length+" of "+ms.length+" matchups reach the rating. "):"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips. The rating is the favoured jumper\'s estimated chance of winning the tip, from both jumpers\' full records in this data: one chevron at 55%, two at 60%, three at 65%, four at 75%.'+
     (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are ranked by first-three attempts per start this season, among players expected to start: the posted lineup once there is one, otherwise recent starters not listed out. Whatever was flagged before tip stays on the card after the game.":"")+(D.odds&&Object.keys(D.odds).length?" First-basket prices are the best available across US books, fetched once a few hours before tip and once in the last hour. Best value is the starter with the highest value score: the edge on his price, weighted by how likely he is to score. It has not been backtested.":"")+
@@ -688,7 +701,7 @@ function vPicks(){
           function yn(lab,v){return '<span>'+lab+'</span>'+(g?'<span class="tag'+(v?" w":"")+'">'+(v?"YES":"NO")+'</span>':'<span class="o">–</span>')}
           return '<li'+((fs&&fs[0]===s.p)||(fa&&fa.s[0]===s.p)?' class="hit"':'')+'><div class="rl pk"><span>'+(s.p&&D.players[s.p]?nm(s.p):esc(s.name))+'</span><span class="o pd"><span>'+(s.st?(s.c/s.st).toFixed(2):"–")+' per start</span>'+(function(){var pr=r.od&&priceOf(r.od,s.p),cf=r.cf&&r.cf[s.p],o="";
             if(pr){var ev=cf!=null?cf*(pr[1]>0?1+pr[1]/100:1+100/-pr[1])-1:null,cl=ev==null?"":ev>=.1?" v4":ev>=0?" v3":ev>=-.1?" v2":" v1";
-              o+='<b class="px'+cl+'" title="'+esc(pr[2])+(ev!=null?" · "+(ev>0?"+":"")+Math.round(ev*100)+"% edge against the break-even price":"")+'">'+fmtP(pr[1])+'</b>';o=bx(o,s.p,m.g?m.g.d:m.d,r.fav,r.fav===m.h?m.a:m.h,r.fav===m.h,"fb",0,pr[1],pr[2])}
+              o+='<b class="px'+cl+'" title="'+esc(pr[2])+(ev!=null?" · "+(ev>0?"+":"")+Math.round(ev*100)+"% edge against the break-even price":"")+'">'+fmtP(pr[1])+'</b>';o=bx(o,s.p,m.g?m.g.d:m.d,r.fav,r.fav===m.h?m.a:m.h,r.fav===m.h,"fb",0,pr[1],pr[2],pr[3])}
             if(cf!=null)o+=(pr?' ':'')+'<span class="be" title="Break-even odds: the price he needs for a bet to pay on the model\'s estimate of his chance.">(BE '+fairOdds(cf)+')</span>';
             return o?'<span>'+o+'</span>':""})()+'</span></div>'+(avail(m,r.fav,s.p)?'<div class="rf">'+avail(m,r.fav,s.p)+'</div>':'')+'<div class="rq">'+
             yn("1st basket attempt",l.some(function(x){return x[0]===s.p&&x[6]<=fo}))+yn("Team's first 3",l.slice(0,3).some(function(x){return x[0]===s.p}))+
@@ -702,7 +715,7 @@ function vPicks(){
       (!played.length?"":'<td>'+(t?(t.w?nm(t.w)+" ("+t.wt+")":t.pos):"–")+'</td><td>'+(fa?nm(fa.s[0])+" ("+fa.t+")":"–")+'</td><td>'+(fs?nm(fs[0])+" ("+fs[1]+")":"–")+'</td>')+'</tr>'}).join("")+'</tbody></table></div></section>':"";
   S._days=days;
   // one slate table: with prices on record it ranks by value score (likely scorers at a fair price first); before prices arrive it ranks by confidence
-  confL.forEach(function(s){var o=oddsOf(s.r.m),pr=o&&priceOf(o,s.e.x.p);if(pr){var pay=pr[1]>0?1+pr[1]/100:1+100/-pr[1];s.price=pr[1];s.book=pr[2];s.ev=s.e.p*pay-1;s.vs=valScore(s.e.p,pay)}});
+  confL.forEach(function(s){var o=oddsOf(s.r.m),pr=o&&priceOf(o,s.e.x.p);if(pr){var pay=pr[1]>0?1+pr[1]/100:1+100/-pr[1];s.price=pr[1];s.book=pr[2];s.all=pr[3];s.ev=s.e.p*pay-1;s.vs=valScore(s.e.p,pay)}});
   var nPriced=confL.filter(function(s){return s.vs!=null}).length,cOdds=nPriced>0;
   confL.sort(function(a,b){return (b.vs!=null)-(a.vs!=null)||(cOdds&&a.vs!=null?b.vs-a.vs:0)||b.e.p-a.e.p});
   var cPlayed=confL.some(function(s){return s.r.m.g}),cShown=confL.slice(0,20),nPos=confL.filter(function(s){return s.ev>0}).length;
@@ -717,7 +730,7 @@ function vPicks(){
       var near=e.rated&&!pick&&Math.round(e.tc*100)>=70&&Math.round(e.tc*100)<=74; // a strong shooter in a game just short of four chevrons
       return '<tr role="button" tabindex="0" data-goto="'+s.id+'" style="cursor:pointer"'+(near?' class="near"':'')+'><td class="o">'+(i+1)+'</td><td>'+tmL(s.t)+'</td><td>'+esc(e.x.name)+(pick?' <span class="tag w">PICK</span>':'')+(near?' <span class="tag q" title="His team is 70 to 74% to win the tip, just short of four chevrons. Worth a look at the game card.">CHECK · NEAR MISS</span>':'')+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n">'+(e.rated?Math.round(e.tc*100)+'%':'<span class="o">no rating</span>')+'</td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td>'+
         '<td class="n'+(cOdds?'':' rate')+' rlv'+lv+'"><b>'+(e.p*100).toFixed(1)+'%</b></td><td class="n">'+fairOdds(e.p)+'</td>'+
-        (cOdds?(s.price!=null?'<td class="n" title="'+esc(s.book)+'">'+bx(fmtP(s.price),e.x.p,m.g?m.g.d:m.d,s.t,s.t===m.h?m.a:m.h,s.t===m.h,"fb",0,s.price,s.book)+' <span class="o">'+esc(s.book)+'</span></td><td class="n"><span class="tag '+(s.ev>0?"w":"")+'">'+(s.ev>0?"+":"")+Math.round(s.ev*100)+'%</span></td><td class="n rate rlv'+vl+'"><b>'+(s.vs>0?"+":"")+s.vs.toFixed(1)+'</b></td>':'<td class="n"><span class="o">–</span></td><td class="n"><span class="o">–</span></td><td class="n rate"><span class="o">no price</span></td>'):'')+
+        (cOdds?(s.price!=null?'<td class="n" title="'+esc(s.book)+'">'+bx(fmtP(s.price),e.x.p,m.g?m.g.d:m.d,s.t,s.t===m.h?m.a:m.h,s.t===m.h,"fb",0,s.price,s.book,s.all)+' <span class="o">'+esc(s.book)+'</span></td><td class="n"><span class="tag '+(s.ev>0?"w":"")+'">'+(s.ev>0?"+":"")+Math.round(s.ev*100)+'%</span></td><td class="n rate rlv'+vl+'"><b>'+(s.vs>0?"+":"")+s.vs.toFixed(1)+'</b></td>':'<td class="n"><span class="o">–</span></td><td class="n"><span class="o">–</span></td><td class="n rate"><span class="o">no price</span></td>'):'')+
         (cPlayed?(g?'<td><span class="tag'+(tried?" w":"")+'">'+(tried?"YES":"NO")+'</span></td><td>'+(fs&&fs[0]===e.x.p?'<span class="tag w">HIT</span>':'<span class="o">no</span>')+'</td>':'<td><span class="o">pending</span></td><td><span class="o">pending</span></td>'):'')+'</tr>'}).join("")+'</tbody></table></div>'+
     (confL.length>cShown.length?'<p class="note">Showing the top '+cShown.length+' of '+confL.length+'. Each game\'s card below has both teams\' full value tables once prices are in.</p>':'')+'</section>':"";
   view.innerHTML='<div class="picks">'+hd+round+confTbl+cards+other+others+'</div>';
@@ -823,7 +836,7 @@ function t3AtLeast(d,k){var s=0;for(var i=0;i<k&&i<d.length;i++)s+=d[i];return M
 function t3Odds(m){var o=(D.odds||{})[(m.g?m.g.d:m.d)+"|"+m.a+"|"+m.h];if(!o||(!o.t3&&!o.t3a))return null;
   if(!o._t3){o._t3={};var key=function(nmx){var n=normName(nmx).split(" ");return n[0].charAt(0)+" "+n.slice(1).join(" ")};
     (o.t3||[]).forEach(function(x){var e=o._t3[key(x[0])]=o._t3[key(x[0])]||{n:0,k:{}};e.n++;e.line=x});
-    (o.t3a||[]).forEach(function(x){var e=o._t3[key(x[0])]=o._t3[key(x[0])]||{n:0,k:{}};e.k[x[1]]=[x[2],x[3]]})}
+    (o.t3a||[]).forEach(function(x){var e=o._t3[key(x[0])]=o._t3[key(x[0])]||{n:0,k:{}};e.k[x[1]]=[x[2],x[3],x[4]]})}
   return o}
 function payOf(v){return v>0?1+v/100:1+100/-v}
 function t3Day(day){var all=D.games,sched=D.sched||[];
@@ -843,12 +856,15 @@ function t3Day(day){var all=D.games,sched=D.sched||[];
         mi=t3Miss(t,day,sy,function(p){var i=c&&injOf(c,t,p);return !!gone[p]||!!(i&&/^out/i.test(i.st))})}
       Object.keys(pool).map(Number).forEach(function(p){var pr=t3Proj(p,day,pool[p].st,opp,sy,mi.v);if(!pr)return;pr.mwho=mi.who;
         var d=t3Dist(pr.mu),o=od&&od._t3[normName(D.players[p])],row={p:p,t:t,opp:opp,m:m,st:pool[p].st,conf:conf,pr:pr,d:d,res:pool[p].res||null,o:o&&o.n<=1?o:null,best:null};
-        if(row.o){var cand=[],ln=row.o.line,kk=ln?Math.floor(ln[1])+1:0,io=ln&&ln[2]!=null?1/payOf(ln[2]):0,iu=ln&&ln[4]!=null?1/payOf(ln[4]):0,two=io&&iu,mo=two?io/(io+iu):io?io/1.07:0;
+        if(row.o){var cand=[],one=S.book&&!S.bookOff?S.book:null,ln=row.o.line,allO=null,allU=null;
+          if(ln&&one&&ln[6]){var q1=ln[6][one];ln=q1?[ln[0],q1[0],q1[1],one,q1[2],one,ln[6]]:null}
+          if(ln&&ln[6]){allO={};allU={};Object.keys(ln[6]).forEach(function(bk){var q=ln[6][bk],key=q[0]===ln[1]?bk:bk+" · "+q[0];if(q[1]!=null)allO[key]=q[1];if(q[2]!=null)allU[key]=q[2]})}
+          row.ln=ln;var kk=ln?Math.floor(ln[1])+1:0,io=ln&&ln[2]!=null?1/payOf(ln[2]):0,iu=ln&&ln[4]!=null?1/payOf(ln[4]):0,two=io&&iu,mo=two?io/(io+iu):io?io/1.07:0;
           if(ln){var po=t3AtLeast(d,kk);
-            if(ln[2]!=null)cand.push({lab:"Over "+ln[1],k:kk,over:1,pm:po,mk:mo,two:two,price:ln[2],book:ln[3]});
-            if(ln[4]!=null)cand.push({lab:"Under "+ln[1],k:kk,over:0,pm:1-po,mk:two?1-mo:iu/1.07,two:two,price:ln[4],book:ln[5]})}
-          Object.keys(row.o.k).map(Number).forEach(function(k){var v=row.o.k[k];if(ln&&k===kk&&ln[2]!=null&&ln[2]>=v[0])return;
-            cand.push({lab:k+"+ made",k:k,over:1,pm:t3AtLeast(d,k),mk:two&&k===kk?mo:1/payOf(v[0])/1.07,two:two&&k===kk,price:v[0],book:v[1]})});
+            if(ln[2]!=null)cand.push({lab:"Over "+ln[1],k:kk,over:1,pm:po,mk:mo,two:two,price:ln[2],book:ln[3],all:allO});
+            if(ln[4]!=null)cand.push({lab:"Under "+ln[1],k:kk,over:0,pm:1-po,mk:two?1-mo:iu/1.07,two:two,price:ln[4],book:ln[5],all:allU})}
+          Object.keys(row.o.k).map(Number).forEach(function(k){var v=row.o.k[k];if(one&&v[2]){if(v[2][one]==null)return;v=[v[2][one],one,v[2]]}if(ln&&k===kk&&ln[2]!=null&&ln[2]>=v[0])return;
+            cand.push({lab:k+"+ made",k:k,over:1,pm:t3AtLeast(d,k),mk:two&&k===kk?mo:1/payOf(v[0])/1.07,two:two&&k===kk,price:v[0],book:v[1],all:v[2]})});
           // the pick chance is the model and the market averaged half and half; a gap over 12 points usually means news the model has not seen
           cand.forEach(function(x){x.pay=payOf(x.price);x.gap=Math.abs(x.pm-x.mk);x.p=(x.pm+x.mk)/2;x.ev=x.p*x.pay-1;x.vs=valScore(x.p,x.pay);x.row=row;
             if(row.res)x.hit=x.over?row.res[2]>=x.k:row.res[2]<x.k});
@@ -874,7 +890,7 @@ function t3Calib(s){ // every regular-season projection of 2.5+ attempts against
 function t3Record(){ // the Best plays shown on every finished day that has prices on record
   if(D._t3r)return D._t3r;var days={},R={all:{n:0,h:0,u:0},by:{},list:[]};
   Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&(o.t3||o.t3a))days[k.split("|")[0]]=1});
-  Object.keys(days).sort().forEach(function(day){t3Day(day).top.forEach(function(x){if(x.hit==null)return;
+  Object.keys(days).sort().forEach(function(day){var kb=S.bookOff;S.bookOff=1;var tp=t3Day(day).top;S.bookOff=kb;tp.forEach(function(x){if(x.hit==null)return;
     var ty=x.over?(/made/.test(x.lab)?"Ladder ("+x.k+"+ made)":"Over the line"):"Under the line",u=x.hit?x.pay-1:-1;
     [R.all,R.by[ty]=R.by[ty]||{n:0,h:0,u:0}].forEach(function(a){a.n++;a.h+=x.hit?1:0;a.u+=u});R.list.push({d:day,x:x,u:u})})});
   return D._t3r=R}
@@ -914,8 +930,8 @@ function vThrees(){
   var nHit=0,nDone=0,units=0;top.forEach(function(x){if(x.hit!=null){nDone++;if(x.hit){nHit++;units+=x.pay-1}else units-=1}});
   var mo2={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo2[k]=mo2[k]||[]).push(d)});
   Object.keys(mo2).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo2[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
-  var hd='<section class="panel"><div class="phead"><h2>Threes</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button></div></div>'+
-    '<p class="note">'+(ms.length?'':'No games on this day. ')+'Projected made threes for every player expected to play: his recent minutes in tonight\'s role, times how often he shoots a three per minute, times his accuracy, adjusted for how many threes the opponent allows and for regular shooters on his own team who are out (the “% OUT” tag; for games not yet played it counts only players listed out, so it can change late). Each chance (1+, 2+, 3+ and so on) is what that projection implies. In the backtest those chances matched what happened at every line and beat both a player\'s season hit rate and his last-10 hit rate. '+
+  var hd='<section class="panel"><div class="phead"><h2>Threes</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+bookPicker(day)+'</div></div>'+
+    '<p class="note">'+(S.book?'<b>Showing '+esc(S.book)+' prices only.</b> Lines, edges and picks use that book; a player it has not posted has no price. ':'')+(ms.length?'':'No games on this day. ')+'Projected made threes for every player expected to play: his recent minutes in tonight\'s role, times how often he shoots a three per minute, times his accuracy, adjusted for how many threes the opponent allows and for regular shooters on his own team who are out (the “% OUT” tag; for games not yet played it counts only players listed out, so it can change late). Each chance (1+, 2+, 3+ and so on) is what that projection implies. In the backtest those chances matched what happened at every line and beat both a player\'s season hit rate and his last-10 hit rate. '+
     (anyOdds?'For picks, the model\'s chance is averaged half and half with the market\'s own chance (the price with the books\' margin removed), and edges are measured on that pick chance. They have not been tested against real prices yet.':'No made-threes prices are on record for this day, so there are no value plays; compare the break-even odds with your book by eye.')+'</p></section>';
   var picksTbl='<section class="panel"><div class="phead"><h2>Best plays</h2><span class="nightly">'+(nDone?'<span class="tag '+(nHit?"w":"")+'">TONIGHT '+nHit+' OF '+nDone+' HIT</span> <span class="tag nu '+(units>0?"up":units<0?"dn":"")+'">'+(units>0?"+":units<0?"−":"")+Math.abs(units).toFixed(1)+'U</span> ':'')+(function(){var R=t3Record().all;return R.n?'<span class="tag">SEASON '+R.h+' OF '+R.n+'</span> <span class="tag nu '+(R.u>0?"up":R.u<0?"dn":"")+'">'+(R.u>0?"+":R.u<0?"−":"")+Math.abs(R.u).toFixed(1)+'U</span> ':''})()+'<span class="tag">'+(top.length?top.length+' of '+T.cap+' picks · one a game, up to ten':'no plays')+'</span></span></div>'+
     (top.length?'<div class="t3cards">'+top.map(t3Card).join("")+'</div>'
@@ -925,7 +941,7 @@ function vThrees(){
   var shown=inG.filter(function(r){return S.t3All||r.pr.att>=(S.t3Game?1:2.5)||r.o}),hidden=inG.length-shown.length;if(!full)shown=shown.slice(0,60);
   var C=[{k:"mn",l:"Min",t:"Projected minutes in tonight's role",v:function(r){return r.pr.pmin}},{k:"att",l:"3PA",t:"Projected three-point attempts",v:function(r){return r.pr.att}},{k:"acc",l:"3P%",t:"His accuracy, pulled toward the league average",v:function(r){return r.pr.acc}},{k:"mu",l:"Makes",t:"Projected made threes",v:function(r){return r.pr.mu},c:" rate"}]
     .concat([1,2,3,4,5].map(function(k){return{k:"p"+k,l:k+"+",v:function(r){return t3AtLeast(r.d,k)}}}))
-    .concat(anyOdds?[{k:"line",l:"Line",v:function(r){return r.o&&r.o.line?r.o.line[1]:-1}},{k:"bet",l:"Best bet",v:function(r){return r.best?r.best.vs:-99},txt:1},{k:"edge",l:"Edge",v:function(r){return r.best?r.best.ev:-99}}]:[{k:"be",l:"Break-even 2+ / 3+ / 4+",t:"The price at which a bet on 2+, 3+ and 4+ made threes breaks even",v:function(r){return t3AtLeast(r.d,2)}}])
+    .concat(anyOdds?[{k:"line",l:"Line",v:function(r){return r.ln?r.ln[1]:-1}},{k:"bet",l:"Best bet",v:function(r){return r.best?r.best.vs:-99},txt:1},{k:"edge",l:"Edge",v:function(r){return r.best?r.best.ev:-99}}]:[{k:"be",l:"Break-even 2+ / 3+ / 4+",t:"The price at which a bet on 2+, 3+ and 4+ made threes breaks even",v:function(r){return t3AtLeast(r.d,2)}}])
     .concat([{k:"l10",l:"Last 10",t:"Made and attempted threes a game over his last 10",v:function(r){return r.pr.l10m}}]).concat(anyRes?[{k:"res",l:"Made",v:function(r){return r.res?r.res[2]:-1}}]:[]);
   var L=[{k:"team",l:"Team",v:function(r){return r.t},s:"s0"},{k:"name",l:"Player",v:function(r){return (D.players[r.p]||"").replace(/^\S+\s/,"")},s:"s1"},{k:"opp",l:"Opp",v:function(r){return r.opp},s:"s2"}];
   var so=S.sort.t3||{k:"mu",dir:-1},sc=L.concat(C).filter(function(c){return c.k===so.k})[0];
@@ -937,7 +953,7 @@ function vThrees(){
     shown.map(function(r){var d=r.d,pr=r.pr,b=r.best;
       return '<tr><td class="sk s0">'+tmL(r.t)+'</td><td class="sk s1">'+who(r)+(r.lad?' <span class="tag q" title="'+(r.lad.priced?r.lad.pos.length+" ladder rungs beat their price: "+r.lad.pos.map(function(x){return x.k+"+ "+fmtP(x.price)}).join(", "):"Ladder profile: high volume and a real chance of 4 or more")+'">LADDER</span>':'')+(pr.miss>=.15?' <span class="tag w" title="Teammates out: '+esc(pr.mwho.slice(0,4).map(function(w){return (D.players[w[0]]||"#"+w[0])+" ("+w[1].toFixed(1)+" attempts a game)"}).join(", "))+'. That is '+Math.round(pr.miss*100)+'% of this team\'s usual three-point attempts, so his attempts are raised '+Math.round((Math.exp(T3.ms*pr.miss)-1)*100)+'%.">'+Math.round(pr.miss*100)+'% OUT</span>':'')+'</td><td class="sk s2">'+r.opp+(pr.of>=1.05?' <span class="tag w" title="This opponent allows more threes than most: '+Math.round((pr.of-1)*100)+'% above average.">+'+Math.round((pr.of-1)*100)+'%</span>':pr.of<=.95?' <span class="tag l" title="This opponent allows fewer threes than most.">'+Math.round((pr.of-1)*100)+'%</span>':'')+'</td><td class="n">'+pr.pmin.toFixed(0)+'</td><td class="n">'+pr.att.toFixed(1)+'</td><td class="n">'+(pr.acc*100).toFixed(0)+'%</td><td class="n rate"><b>'+pr.mu.toFixed(2)+'</b></td>'+
         [1,2,3,4,5].map(function(k){var v=t3AtLeast(d,k);return '<td class="n"'+heat(v)+' title="Breaks even at '+fairOdds(v)+'">'+pc(v)+'</td>'}).join("")+
-        (anyOdds?'<td class="n">'+(r.o&&r.o.line?r.o.line[1]+' <span class="o">'+lnc(r,1)+' / '+lnc(r,0)+'</span>':'<span class="o">–</span>')+'</td><td'+(b?' title="'+esc(r.cand.map(function(x){return x.lab+" "+fmtP(x.price)+": pick chance "+Math.round(x.p*100)+"%, edge "+(x.ev>0?"+":"")+Math.round(x.ev*100)+"%"}).join(" · "))+'"':'')+'>'+(b?bxc(b,esc(b.lab)+' <span class="o">'+fmtP(b.price)+'</span>'):'<span class="o">'+(r.o?"no edge":"–")+'</span>')+'</td><td class="n">'+(b?'<span class="tag '+(b.ev>0?"w":"")+'">'+(b.ev>0?"+":"")+Math.round(b.ev*100)+'%</span>':'<span class="o">–</span>')+'</td>'
+        (anyOdds?'<td class="n">'+(r.ln?r.ln[1]+' <span class="o">'+lnc(r,1)+' / '+lnc(r,0)+'</span>':'<span class="o">–</span>')+'</td><td'+(b?' title="'+esc(r.cand.map(function(x){return x.lab+" "+fmtP(x.price)+": pick chance "+Math.round(x.p*100)+"%, edge "+(x.ev>0?"+":"")+Math.round(x.ev*100)+"%"}).join(" · "))+'"':'')+'>'+(b?bxc(b,esc(b.lab)+' <span class="o">'+fmtP(b.price)+'</span>'):'<span class="o">'+(r.o?"no edge":"–")+'</span>')+'</td><td class="n">'+(b?'<span class="tag '+(b.ev>0?"w":"")+'">'+(b.ev>0?"+":"")+Math.round(b.ev*100)+'%</span>':'<span class="o">–</span>')+'</td>'
           :'<td class="n"><span class="o">'+[2,3,4].map(function(k){return fairOdds(t3AtLeast(d,k))}).join(" / ")+'</span></td>')+
         '<td class="n"><span class="o">'+pr.l10m.toFixed(1)+' of '+pr.l10a.toFixed(1)+'</span></td>'+(anyRes?'<td class="n">'+resCell(r)+'</td>':'')+'</tr>'}).join("")+'</tbody></table></div>'+
     (hidden>0||S.t3All?'<p class="note" style="margin-top:12px">'+(S.t3All?'Showing every player with a projection. ':'Players projected for fewer than '+(S.t3Game?"1 attempt":"2.5 attempts")+' are hidden unless they have a price ('+hidden+' more). ')+'<button class="more" id="t3More">'+(S.t3All?"Show fewer":"Show all")+'</button></p>':'')+'</section>':"";
@@ -1066,7 +1082,8 @@ function trackTable(rows){
   [4,3,2,1,0].forEach(function(L){h+=line(L?chev(L,false,"sm"):'<span class="o">Even</span>',rows.filter(function(x){return x.lv===L}))});
   h+=line("<b>Three or more</b>",rows.filter(function(x){return x.lv>=3}),"on")+line("<b>All rated games</b>",rows);
   return h+'</tbody></table></div>'}
-function vTracker(){
+function vTracker(){S.bookOff=1;try{vTracker2()}finally{S.bookOff=0}}
+function vTracker2(){
   var today=todayET(),sy=+today.slice(0,4)-(+today.slice(5,7)>=9?0:1),lab=function(y){return y+"-"+String(y+1).slice(2)};
   var cur=trackGames(sy),shown=S.trkConf?cur.filter(function(x){return x.conf}):cur,prev=trackGames(sy-1,true);
   var log=shown.slice().reverse(),more=log.length>S.trkN;
@@ -1121,14 +1138,14 @@ function showPlayer(p,all){
 
 /* ---- threes pick cards and the "why this pick" pop-up ---- */
 function t3Last10(x){var l=t3Index().L[x.row.p]||[],n=t3Before(l,x.row.m.g?x.row.m.g.d:x.row.m.d),h=l.slice(Math.max(0,n-10),n),c=0;h.forEach(function(e){if(x.over?e.m>=x.k:e.m<x.k)c++});return{c:c,n:h.length}}
-function lnc(r,over){var v=r.o.line[over?2:4];if(v==null)return "–";var c=(r.cand||[]).filter(function(x){return (over?/^Over/:/^Under/).test(x.lab)})[0];return c?bxc(c,fmtP(v)):fmtP(v)}
+function lnc(r,over){var v=r.ln[over?2:4];if(v==null)return "–";var c=(r.cand||[]).filter(function(x){return (over?/^Over/:/^Under/).test(x.lab)})[0];return c?bxc(c,fmtP(v)):fmtP(v)}
 function t3Card(x,i){var r=x.row,pr=r.pr,m=r.m,l10=t3Last10(x),under=!x.over,vl=x.vs>=12?4:x.vs>=8?3:x.vs>=4?2:1,pos=posOf(r.p);
   var st=x.hit==null?'':'<span class="tag '+(x.hit?"w":"l")+'">'+r.res[2]+' MADE · '+(x.hit?"WON":"LOST")+'</span>';
   function row(a,b){return '<div class="rl"><span class="o">'+a+'</span><span>'+b+'</span></div>'}
   return '<article class="t3c'+(x.hit===true?" win":x.hit===false?" lost":"")+'" data-i="'+i+'" tabindex="0" role="button" aria-label="Why this pick"><div class="t3h"><span class="tm">'+lg(r.t)+m.a+' <span class="o">@</span> '+m.h+'</span><span class="bet'+(under?" un":"")+'">'+esc(x.lab.replace(" made","+ MADE").replace("++","+").toUpperCase())+'</span></div>'+
     '<div class="rl"><span class="o">'+(i+1)+' · '+r.t+(pos?" · "+pos:"")+' · '+(r.st?"START":"BENCH")+'</span><span class="o">'+(m.g&&m.g.t?"TIPPED "+esc(m.g.t):m.t?esc(m.t):"")+'</span></div>'+
     '<div><div class="t3n">'+nm(r.p)+'</div>'+(st?'<div style="margin-top:8px">'+st+'</div>':'')+'</div>'+
-    '<div class="t3b">'+row("Best price",bxc(x,'<b class="big px v'+vl+'">'+fmtP(x.price)+'</b>')+' <span class="o">'+esc(x.book)+'</span>')+row("Edge",'<span class="tag w">+'+Math.round(x.ev*100)+'%</span>')+
+    '<div class="t3b">'+row("Best price",bxc(x,'<b class="big px v'+vl+'">'+fmtP(x.price)+'</b>')+' <span class="o">'+esc(x.book)+(x.all&&Object.keys(x.all).length>1?" of "+Object.keys(x.all).length:"")+'</span>')+row("Edge",'<span class="tag w">+'+Math.round(x.ev*100)+'%</span>')+
       row("Above break-even",'<b>+'+((x.p-1/x.pay)*100).toFixed(1)+' pts</b> <span class="o">needs '+(100/x.pay).toFixed(1)+'%</span>')+row("Pick chance · fair",(x.p*100).toFixed(1)+'% <span class="o">· '+fairOdds(x.p)+'</span>')+row("Model says",(x.pm*100).toFixed(1)+'%')+row("Market says",(x.mk*100).toFixed(1)+'%')+'</div>'+
     '<div class="t3b sep">'+row("Projected makes",'<b>'+pr.mu.toFixed(2)+'</b>')+row("Minutes · attempts",pr.pmin.toFixed(0)+' · '+pr.att.toFixed(1))+row((under?"Under":x.k+"+ made")+" in last 10",l10.c+" of "+l10.n)+
       row(r.opp+" threes allowed",pr.of.toFixed(2)+"× league")+(pr.miss>=.15?row("Teammates out",Math.round(pr.miss*100)+"% of team's threes"):"")+'</div>'+
@@ -1176,7 +1193,7 @@ function t3LadderOf(row){var pr=row.pr,d=row.d;
 function t3LadderHtml(rows,top,anyOdds){var L=rows.filter(function(r){return r.lad}),pr=L.filter(function(r){return r.lad.priced}),np=L.filter(function(r){return !r.lad.priced});
   pr.sort(function(a,b){return b.lad.score-a.lad.score});np.sort(function(a,b){return b.lad.score-a.lad.score});L=pr.concat(np).slice(0,8);
   var inTop={};top.forEach(function(x){inTop[x.row.p]=1});
-  function cell(r,k){var x=r.lad.by[k],v=t3AtLeast(r.d,k),hit=r.res?r.res[2]>=k:false,ln=r.o&&r.o.line?r.o.line[1]:null,kk=ln!=null?Math.max(2,Math.floor(ln)+1):0,mark=kk===k;
+  function cell(r,k){var x=r.lad.by[k],v=t3AtLeast(r.d,k),hit=r.res?r.res[2]>=k:false,ln=r.ln?r.ln[1]:null,kk=ln!=null?Math.max(2,Math.floor(ln)+1):0,mark=kk===k;
     var lab='';
     if(!x)return '<td class="n lc0'+(mark?" lnm":"")+'">'+lab+'<div class="lc'+(hit?" hit":"")+'"><span class="o">'+Math.round(v*100)+'%</span><span class="o">'+fairOdds(v)+'</span></div></td>';
     var good=r.lad.pos.indexOf(x)>=0;
@@ -1184,7 +1201,7 @@ function t3LadderHtml(rows,top,anyOdds){var L=rows.filter(function(r){return r.l
   return '<section class="panel"><div class="phead"><h2>Ladder watch</h2><span class="tag">'+(L.length?L.length+' candidate'+(L.length>1?"s":"")+(anyOdds?' · best total edge first':' · by 4+ chance'):'no candidates')+'</span></div>'+
     '<p class="note" style="margin-bottom:14px">'+(anyOdds?'Players with two or more rungs between 2+ and 5+ that each beat their price, reaching 3+ or higher. Each cell is the best price and its edge on the pick chance; shaded rungs are the ones to ladder, with a suggested split of one unit underneath (more on the lower rungs, less on the long ones). The orange bar marks his main over/under line, where the ladder starts. Plain cells have no price on record and show the model chance and break-even odds. After the game, every rung he reached is outlined in green. ':'No ladder prices on record, so these are the shooters with a ladder profile: 7.5 or more projected attempts and at least a 25% chance of 4+. Each cell is the model chance and the price it needs. After the game, every rung he reached is outlined in green. ')+'The 6+ column is for reference only: the model has run a little high there.</p>'+
     (L.length?'<div class="tw"><table class="t3"><thead><tr><th class="sk s0">Team</th><th class="sk s1">Player</th><th class="sk s2">Opp</th><th class="n">3PA</th><th class="n rate">Makes</th>'+(anyOdds?'<th class="n" title="His main over/under line. The orange bar between the rungs marks the same spot.">O/U line</th>':'')+[2,3,4,5,6].map(function(k){return '<th class="n">'+k+'+</th>'}).join("")+(anyOdds?'<th class="n" title="The edges of the highlighted rungs added together: expected profit from one unit on each">Ladder edge</th>':'')+(rows.some(function(r){return r.res})?'<th class="n">Made</th>':'')+'</tr></thead><tbody>'+
-      L.map(function(r){return '<tr><td class="sk s0">'+tmL(r.t)+'</td><td class="sk s1">'+nm(r.p)+(inTop[r.p]?' <span class="tag q">PICK</span>':'')+(r.pr.miss>=.15?' <span class="tag w">'+Math.round(r.pr.miss*100)+'% OUT</span>':'')+'</td><td class="sk s2">'+r.opp+'</td><td class="n">'+r.pr.att.toFixed(1)+'</td><td class="n rate"><b>'+r.pr.mu.toFixed(2)+'</b></td>'+(anyOdds?'<td class="n">'+(r.o&&r.o.line?'<b style="color:var(--accent)">'+r.o.line[1]+'</b>':'<span class="o">–</span>')+'</td>':'')+[2,3,4,5,6].map(function(k){return cell(r,k)}).join("")+
+      L.map(function(r){return '<tr><td class="sk s0">'+tmL(r.t)+'</td><td class="sk s1">'+nm(r.p)+(inTop[r.p]?' <span class="tag q">PICK</span>':'')+(r.pr.miss>=.15?' <span class="tag w">'+Math.round(r.pr.miss*100)+'% OUT</span>':'')+'</td><td class="sk s2">'+r.opp+'</td><td class="n">'+r.pr.att.toFixed(1)+'</td><td class="n rate"><b>'+r.pr.mu.toFixed(2)+'</b></td>'+(anyOdds?'<td class="n">'+(r.ln?'<b style="color:var(--accent)">'+r.ln[1]+'</b>':'<span class="o">–</span>')+'</td>':'')+[2,3,4,5,6].map(function(k){return cell(r,k)}).join("")+
         (anyOdds?'<td class="n">'+(r.lad.priced?'<span class="tag nu up">+'+Math.round(r.lad.score*100)+'%</span> <span class="o">'+r.lad.pos.length+' rungs</span>'+(r.lad.res!=null?' <span class="tag nu '+(r.lad.res>0?"up":"dn")+'" title="Result of one unit split as suggested">'+(r.lad.res>0?"+":"−")+Math.abs(r.lad.res).toFixed(2)+'U</span>':''):'<span class="o">profile only</span>')+'</td>':'')+(rows.some(function(q){return q.res})?'<td class="n">'+(r.res?'<b>'+r.res[2]+'</b> <span class="o">of '+r.res[1]+'</span>':'<span class="o">pending</span>')+'</td>':'')+'</tr>'}).join("")+'</tbody></table></div>'
       :'<p class="empty">'+(anyOdds?'Nobody has two rungs that beat their price tonight.':'Nobody on this slate has the volume for a ladder.')+'</p>')+'</section>'}
 
@@ -1197,10 +1214,11 @@ function betCount(){var tb=$("tab-bets");if(!tb||!D)return;var n=S.bets.filter(f
 function betWhat(b){return b.m==="fb"?"First basket":b.m==="u"?"Under "+(b.k-.5)+" threes":b.m==="r"?b.k+"+ threes":"Over "+(b.k-.5)+" threes"}
 function toast(t){var el=document.getElementById("toast")||document.body.appendChild(Object.assign(document.createElement("div"),{id:"toast"}));el.setAttribute("role","status");el.textContent=t;el.className="on";clearTimeout(toast.t);toast.t=setTimeout(function(){el.className=""},2600)}
 // a price that can be clicked to add the bet: m is fb (first basket), o (over the line), r (ladder rung) or u (under); k is the number of threes an over needs
-function bx(inner,p,d,t,opp,home,m,k,price,book){if(price==null||!p)return inner;
-  return '<span class="pxb" tabindex="0" role="button" title="Add to My bets" data-bet="'+esc([p,d,t,opp,home?1:0,m,k||0,price,String(book||"").replace(/\|/g,"/")].join("|"))+'">'+inner+'</span>'}
-function bxc(x,inner){var r=x.row,m=r.m;return bx(inner,r.p,m.g?m.g.d:m.d,r.t,r.opp,r.t===m.h,x.over?(/made/.test(x.lab)?"r":"o"):"u",x.k,x.price,x.book)}
-function addBet(key){var k=key.split("|"),p=+k[0],d=k[1],m=k[5],kk=+k[6],price=+k[7],book=k.slice(8).join("|")||"";
+function bx(inner,p,d,t,opp,home,m,k,price,book,all){if(price==null||!p)return inner;var ks=all?Object.keys(all):[];
+  return '<span class="pxb" tabindex="0" role="button" data-nm="'+esc(D.players[p]||"")+'" data-at="'+esc(book||"")+'" data-bk="'+esc((ks.length?ks.map(function(b){return b+":"+all[b]}):[(book||"Book")+":"+price]).join("|"))+'" data-bet="'+esc([p,d,t,opp,home?1:0,m,k||0,price,String(book||"").replace(/\|/g,"/")].join("|"))+'">'+inner+'</span>'}
+function bxc(x,inner){var r=x.row,m=r.m;return bx(inner,r.p,m.g?m.g.d:m.d,r.t,r.opp,r.t===m.h,x.over?(/made/.test(x.lab)?"r":"o"):"u",x.k,x.price,x.book,x.all)}
+function addBet(key,bk2,px2){var k=key.split("|"),p=+k[0],d=k[1],m=k[5],kk=+k[6],price=+k[7],book=k.slice(8).join("|")||"";
+  if(bk2!=null){book=bk2;price=px2;var bl=/^(.*) · (\d+(?:\.\d+)?)$/.exec(book);if(bl){book=bl[1];if(m==="o"||m==="u")kk=Math.floor(+bl[2])+1}} // a book hanging a different line is listed with its own line: the bet is on that line
   if(S.bets.some(function(x){return x.p===p&&x.d===d&&x.m===m&&x.k===kk&&x.book===book})){toast("Already in My bets. Change the units there to add to it.");return}
   var b={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString(),d:d,p:p,nm:D.players[p]||("#"+p),t:k[2],opp:k[3],home:+k[4],m:m,k:kk,price:price,price0:price,book:book,u:1,res:"auto"};
   S.bets.push(b);saveBets();betCount();toast("Added to My bets: "+b.nm+" · "+betWhat(b)+" "+fmtP(price)+(book?" · "+book:""));if(S.tab==="bets")render()}
@@ -1244,7 +1262,7 @@ function vBets(){
   var head='<section class="panel netp"><div class="netbig '+(T.u>0?"up":T.u<0?"dn":"")+'"><small>My bets · net units</small><b>'+(T.n?sg(T.u)+"u":"–")+'</b><span>'+(T.n?usd(T.u)+' at $'+S.unit+' a unit · '+T.w+'–'+T.l+(T.p?'–'+T.p:'')+' · '+(+T.stk.toFixed(2))+' units staked · ROI '+(T.u/T.stk>=0?"+":"−")+Math.abs(Math.round(100*T.u/T.stk))+'%':'Nothing settled yet')+(T.open?' · '+T.open+' open ('+(+T.ostk.toFixed(2))+'u at risk)':'')+'</span></div>'+
     '<div class="netparts">'+["fb","o","u"].map(function(k){var K=kinds[k];return '<div class="netpart"><small>'+K.l+'</small><b class="'+(K.u>0?"up":K.u<0?"dn":"")+'">'+(K.n?sg(K.u)+'u':"–")+'</b><span>'+(K.n?K.w+' of '+K.n+' won · ROI '+(K.u/K.stk>=0?"+":"−")+Math.abs(Math.round(100*K.u/K.stk))+'%':'nothing settled yet')+'</span></div>'}).join("")+'</div>'+
     (runs.length?'<div class="netdays"><small>Night by night</small>'+runs.slice().reverse().slice(0,14).map(function(x){return '<span class="netday '+(x.u>0?"up":x.u<0?"dn":"")+'" title="Running total '+sg(x.run)+'u">'+fmtD(x.d)+' <b>'+sg(x.u)+'u</b></span>'}).join("")+'</div>':'')+
-    '<p class="note" style="grid-column:1/-1">To add a bet, click any underlined price on Picks or Threes: pick cards, value tables, threes cards, the ladder and the slate. It lands here at one unit and the listed price; change the odds for a boost, or the units, in the table. Results fill in by themselves as games are played, and a player who does not play is voided. No price listed for what you bet? Use “Add a bet by hand” below. These bets are saved in this browser only, so use Export to back them up or move them to another device.</p></section>';
+    '<p class="note" style="grid-column:1/-1">To add a bet, click any underlined price on Picks or Threes (pick cards, value tables, threes cards, the ladder and the slate) and choose the book you bet it at. It lands here at one unit and that book\'s price; change the odds for a boost, or the units, in the table. Results fill in by themselves as games are played, and a player who does not play is voided. No price listed for what you bet? Use “Add a bet by hand” below. These bets are saved in this browser only, so use Export to back them up or move them to another device.</p></section>';
   var f=S.betF,rows=all.filter(function(x){return f==="all"||(f==="open"?x.g.pl==null&&x.g.st!=="void":x.g.pl!=null||x.g.st==="void")});
   var ST={won:["m","WON"],lost:["x","LOST"],void:["","VOID"],open:["","OPEN"],live:["live","LIVE"]};
   var cols=[
@@ -1307,7 +1325,10 @@ function render(){
 
 /* ---- events ---- */
 document.addEventListener("click",function(e){
-  var pb=e.target.closest(".pxb");if(pb){e.preventDefault();e.stopPropagation();return addBet(pb.dataset.bet)}
+  var ad=e.target.closest(".bktip [data-add]");if(ad){var ax=ad.dataset.add,ai=ax.lastIndexOf("|");addBet(TIP.bet,ax.slice(0,ai),+ax.slice(ai+1));return hideTip()}
+  if(e.target.closest(".bktip"))return;
+  var pb=e.target.closest(".pxb");if(pb){e.preventDefault();e.stopPropagation();if(pb.dataset.bk.indexOf("|")<0){hideTip();return addBet(pb.dataset.bet)}return showTip(pb,1)}
+  if(TIP.pin)hideTip();
   var bd=e.target.closest("[data-bdel]");if(bd){S.bets=S.bets.filter(function(b){return b.id!==bd.dataset.bdel});saveBets();return render()}
   if(e.target.id==="betExport")return betExport();
   if(e.target.id==="betImport"){var fi=$("betFile");if(fi)fi.click();return}
@@ -1333,7 +1354,9 @@ document.addEventListener("click",function(e){
   if(e.target.id==="dayPrev"||e.target.id==="dayNext"){var ds=S._days||[],i=ds.indexOf(S.day)+(e.target.id==="dayPrev"?1:-1);if(ds[i]){S.day=ds[i];render()}}
 });
 document.addEventListener("keydown",function(e){
-  if((e.key==="Enter"||e.key===" ")&&e.target.classList&&e.target.classList.contains("pxb")){e.preventDefault();e.stopPropagation();return addBet(e.target.dataset.bet)}
+  if((e.key==="Enter"||e.key===" ")&&e.target.classList&&e.target.classList.contains("pxb")){e.preventDefault();e.stopPropagation();if(e.target.dataset.bk.indexOf("|")<0)return addBet(e.target.dataset.bet);return showTip(e.target,1)}
+  if((e.key==="Enter"||e.key===" ")&&e.target.dataset&&e.target.dataset.add){e.preventDefault();var ax2=e.target.dataset.add,ai2=ax2.lastIndexOf("|");addBet(TIP.bet,ax2.slice(0,ai2),+ax2.slice(ai2+1));return hideTip()}
+  if(e.key==="Escape"&&TIP.pin)return hideTip();
   if(e.key==="Enter"&&e.target.closest&&e.target.closest("#betAdd")){e.preventDefault();return betManual()}
   if(e.target.closest&&e.target.closest(".bets input,#betAdd input")){if(e.key==="Enter")e.target.blur();return}
 if(e.key==="Escape"&&$("pm"))return closePlayer();
@@ -1346,6 +1369,19 @@ if(e.key!=="Enter"&&e.key!==" ")return;
 function sortBy(th){var p=th.dataset.sort.split("|"),cur=S.sort[p[0]];
   S.sort[p[0]]={k:p[1],dir:cur&&cur.k===p[1]?-cur.dir:(th.classList.contains("n")?-1:1)};
   if(!cur&&th.getAttribute("aria-sort"))S.sort[p[0]].dir=th.getAttribute("aria-sort")==="descending"?1:-1;render()}
+var TIP={el:null,at:null,pin:0};
+function showTip(h,pin){var el=TIP.el||(TIP.el=document.body.appendChild(Object.assign(document.createElement("div"),{className:"bktip"})));
+  var l=h.dataset.bk.split("|").map(function(x){var i=x.lastIndexOf(":");return[x.slice(0,i),+x.slice(i+1)]}).sort(function(a,b){return payOf(b[1])-payOf(a[1])}),best=l[0][1];pin=pin?1:0;
+  el.innerHTML='<div class="bkh">'+esc(h.dataset.nm)+' <span>'+l.length+(l.length>1?" books":" book")+'</span></div>'+l.map(function(x){return '<div class="bkr'+(x[1]===best?" top":"")+(x[0]===h.dataset.at?" at":"")+'"'+(pin?' data-add="'+esc(x[0]+"|"+x[1])+'" role="button" tabindex="0"':'')+'><span>'+esc(x[0])+'</span><b>'+fmtP(x[1])+'</b>'+(pin?'<i>+ add</i>':'')+'</div>'}).join("")+
+    '<div class="bkf">'+(pin?"Pick the book you bet it at. You can change the odds afterwards in My bets.":"Click the price to add it to My bets")+'</div>';
+  el.className="bktip"+(pin?" pin":"");TIP.pin=pin;TIP.bet=h.dataset.bet;
+  el.style.display="block";var r=h.getBoundingClientRect(),w=el.offsetWidth,ht=el.offsetHeight,x=Math.min(window.innerWidth-w-8,Math.max(8,r.left+r.width/2-w/2)),y=r.bottom+6+ht>window.innerHeight?r.top-ht-6:r.bottom+6;
+  el.style.left=x+"px";el.style.top=Math.max(8,y)+"px";TIP.at=h}
+function hideTip(){if(TIP.el)TIP.el.style.display="none";TIP.at=null;TIP.pin=0}
+document.addEventListener("mouseover",function(e){var h=e.target.closest&&e.target.closest(".pxb");if(TIP.pin)return;if(h){if(TIP.at!==h)showTip(h)}else if(TIP.at)hideTip()});
+document.addEventListener("focusin",function(e){var h=e.target.closest&&e.target.closest(".pxb");if(h&&!TIP.pin)showTip(h)});
+document.addEventListener("focusout",function(e){if(!TIP.pin&&e.target.closest&&e.target.closest(".pxb"))hideTip()});
+document.addEventListener("scroll",function(e){if(!(TIP.el&&e.target===TIP.el))hideTip()},true);
 function bformKeep(){if($("bfDay"))S.bform={d:$("bfDay").value,who:$("bfWho").value,m:$("bfType").value,ln:$("bfLine").value,odds:$("bfOdds").value,u:$("bfUnits").value,book:$("bfBook").value}}
 document.addEventListener("input",function(e){if(e.target.closest&&e.target.closest("#betAdd"))bformKeep()});
 document.addEventListener("change",function(e){var id=e.target.id,v=e.target.value,t=e.target;
@@ -1357,6 +1393,7 @@ document.addEventListener("change",function(e){var id=e.target.id,v=e.target.val
   if(id==="betFile")return betImport(t);
   if(id==="unitSize"){var un=parseFloat(String(v).replace(/[^0-9.]/g,""));if(un>0){S.unit=un;try{localStorage.setItem("tolUnit",un)}catch(_){}}return render()}
   if(t.closest&&t.closest("#betAdd")){bformKeep();return}
+  if(id==="selBook"){S.book=v;try{localStorage.setItem("tolBook",v)}catch(_){}return render()}
   if(id==="selA"){S.a=v;S.ja=null}else if(id==="selB"){S.b=v;S.jb=null}else if(id==="selJA")S.ja=+v;else if(id==="selJB")S.jb=+v;
   else if(id==="selShot")S.shotTeam=v;else if(id==="selLog"){S.logTeam=v;S.logN=40}else if(id==="minTips")S.minTips=+v;else if(id==="selDay")S.day=v;else if(id==="ldDays")S.ldDays=+v;else if(id==="ldScope")S.ldScope=+v;else if(id==="ldTeam")S.ldTeam=v;else if(id==="ldRank")S.sort.ld={k:v,dir:-1};else if(id==="selMargin")S.margin=+v;else if(id==="selLv")S.minLv=+v;else return;
   try{localStorage.setItem("tol",JSON.stringify({a:S.a,b:S.b,s:S.shotTeam}))}catch(_){}

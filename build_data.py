@@ -490,9 +490,10 @@ TEAM_NAMES = {"Atlanta Hawks": "ATL", "Boston Celtics": "BOS", "Brooklyn Nets": 
 
 
 def parse_first_basket(doc):
-    """Best first-basket price per player across books: [[player, american price, book], ...]."""
-    best = {}
+    """First-basket prices: [[player, best american price, best book, {book: price at every book}], ...]."""
+    best, every = {}, {}
     for bk in doc.get("bookmakers") or []:
+        name = bk.get("title") or bk.get("key") or ""
         for mk in bk.get("markets") or []:
             if mk.get("key") != "player_first_basket":
                 continue
@@ -501,18 +502,23 @@ def parse_first_basket(doc):
                 price = o.get("price")
                 if not who or who in ("Yes", "No") or str(o.get("name")) == "No" or not isinstance(price, (int, float)):
                     continue
+                price = int(price)
+                if price > every.setdefault(who, {}).get(name, -10 ** 9):
+                    every[who][name] = price
                 if who not in best or price > best[who][1]:
-                    best[who] = [who, int(price), bk.get("title") or bk.get("key") or ""]
-    return sorted(best.values(), key=lambda x: x[1])
+                    best[who] = [who, price, name]
+    return sorted(([w, p, bk, every[w]] for w, p, bk in best.values()), key=lambda x: x[1])
 
 
 def parse_threes(doc):
     """Made-threes prices from the over/under and alternate markets.
 
-    Returns (lines, ladder): lines is [[player, line, best over, book, best under, book], ...] at the line most books
-    post for him; ladder is [[player, k, best price for k or more, book], ...] from the alternates and every over.
+    Returns (lines, ladder).
+    lines is [[player, line, best over, book, best under, book, {book: [its line, its over, its under]}], ...] at the
+    line most books post for him; the last item keeps every book's own line and prices.
+    ladder is [[player, k, best price for k or more, book, {book: price}], ...] from the alternates and every over.
     """
-    by, ladder = {}, {}
+    by, ladder, lall, perbook = {}, {}, {}, {}
     for bk in doc.get("bookmakers") or []:
         name = bk.get("title") or bk.get("key") or ""
         for mk in bk.get("markets") or []:
@@ -527,18 +533,28 @@ def parse_threes(doc):
                     k = int(math.floor(pt)) + 1
                     if (who, k) not in ladder or price > ladder[(who, k)][0]:
                         ladder[(who, k)] = [price, name]
+                    if price > lall.setdefault((who, k), {}).get(name, -10 ** 9):
+                        lall[(who, k)][name] = price
                 if mk["key"] == "player_threes" and side in ("Over", "Under"):
                     by.setdefault(who, {}).setdefault(float(pt), {"n": set(), "Over": None, "Under": None})
                     e = by[who][float(pt)]
                     e["n"].add(name)
                     if e[side] is None or price > e[side][0]:
                         e[side] = [price, name]
+                    pb = perbook.setdefault(who, {}).setdefault(name, {}).setdefault(float(pt), [None, None])
+                    i = 0 if side == "Over" else 1
+                    if pb[i] is None or price > pb[i]:
+                        pb[i] = price
     lines = []
     for who, pts in by.items():
         pt, e = max(pts.items(), key=lambda kv: (len(kv[1]["n"]), -kv[0]))
         o, u = e["Over"] or [None, ""], e["Under"] or [None, ""]
-        lines.append([who, pt, o[0], o[1], u[0], u[1]])
-    return sorted(lines), [[who, k, v[0], v[1]] for (who, k), v in sorted(ladder.items())]
+        books = {}
+        for name, bl in perbook.get(who, {}).items():  # each book's own line: the common one if it posts it, else its fullest
+            bp = pt if pt in bl else max(bl, key=lambda q: (sum(v is not None for v in bl[q]), -abs(q - pt)))
+            books[name] = [bp, bl[bp][0], bl[bp][1]]
+        lines.append([who, pt, o[0], o[1], u[0], u[1], books])
+    return sorted(lines, key=lambda x: (x[0], x[1])), [[who, k, v[0], v[1], lall.get((who, k), {})] for (who, k), v in sorted(ladder.items())]
 
 
 def odds_get(url):
