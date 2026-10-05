@@ -726,14 +726,16 @@ function vLineups(){
     (cards?'<div class="lgrid">'+cards+'</div>':'')+'</section>'}
 /* ---- threes: projected made threes for every player on the night ----
    Backtested on both seasons, each projection made only from earlier games (27,000 player-games):
-     attempts = e^(0.568 + 0.096 if starting) x minutes^0.782 x (attempts per minute)^0.948 x opponent^0.991
+     attempts = e^(0.467 + 0.082 if starting + 0.25 x teammates out) x minutes^0.808 x (attempts per minute)^0.95 x opponent^1.0
      makes    = attempts x his accuracy, pulled toward the league's 35.9% by 250 phantom attempts
    minutes: his recent minutes in tonight's role (starter or bench), newest weighted most; attempts per minute: his last
    40 games of 8+ minutes, newest weighted most; opponent: threes that team has allowed per game against the league average.
+   teammates out: the share of the team's usual threes that belongs to regulars (in 3 of its last 5 games) who are absent
+   tonight, capped at 60%. The data supports a weight near 0.4; 0.25 is used because the larger weight overshot in 2025-26.
    The chance of each count comes from a negative binomial around the projected makes (size 10). The chances it gave
    matched what happened at every line from 1+ to 5+, and it beat a player's season hit rate and, by a wide margin,
    his last-10 hit rate. Bench players are a little less reliable than starters. */
-var T3={c:.568,st:.096,m:.782,r:.948,o:.991,size:10,prior:250};
+var T3={c:.467,st:.082,m:.808,r:.95,o:1.001,ms:.25,size:10,prior:250};
 function t3Index(){ if(D._t3)return D._t3;
   var L={},DEF={},LG={},ma=0,mm=0;
   D.games.forEach(function(g,i){ if(!g.b3)return; var st={};[g.h,g.a].forEach(function(t){(g.st[t]||[]).forEach(function(p){st[p]=1})});
@@ -744,7 +746,13 @@ function t3Index(){ if(D._t3)return D._t3;
 function t3Before(l,day){var lo=0,hi=l.length;while(lo<hi){var md=(lo+hi)>>1;if(l[md].d<day)lo=md+1;else hi=md}return lo} // logs are in date order
 function t3Opp(opp,day,s){var X=t3Index(),h=(X.DEF[opp]||[]).filter(function(x){return x.s===s&&x.d<day}).slice(-25),lg=(X.LG[s]||[]).filter(function(x){return x.d<day}).slice(-400);
   if(lg.length<60||!h.length)return 1;var a=0,b=0;h.forEach(function(x){a+=x.a});lg.forEach(function(x){b+=x.a});b/=lg.length;return ((a/h.length)*h.length+b*10)/(h.length+10)/b}
-function t3Proj(p,day,starter,opp,s){ // null when he has fewer than eight earlier games on record
+function t3Miss(t,day,s,isOut){ // share of the team's usual threes belonging to absent regulars
+  var X=t3Index(),prev=D.games.filter(function(q){return q.d<day&&q.s===s&&q.b3&&(q.h===t||q.a===t)}).slice(-5);if(prev.length<5)return{v:0,who:[]};
+  var cnt={};prev.forEach(function(q){(q.b3[t]||[]).forEach(function(x){if(x[3]>=50)cnt[x[0]]=(cnt[x[0]]||0)+1})});
+  var tot=0,ms=0,who=[];Object.keys(cnt).map(Number).forEach(function(p){if(cnt[p]<3)return;var l=X.L[p]||[],h=l.slice(Math.max(0,t3Before(l,day)-10),t3Before(l,day)),a=0;h.forEach(function(x){a+=x.a});a=h.length?a/h.length:0;
+    tot+=a;if(isOut(p)){ms+=a;who.push([p,a])}});
+  who.sort(function(a,b){return b[1]-a[1]});return{v:Math.min(.6,ms/(tot||1)),who:who}}
+function t3Proj(p,day,starter,opp,s,miss){ // null when he has fewer than eight earlier games on record
   var X=t3Index(),l=X.L[p];if(!l)return null;var n=t3Before(l,day);if(n<8)return null;var h=l.slice(Math.max(0,n-120),n),all=l.slice(0,n);
   function ew(v,hl){var w=0,t=0;v.forEach(function(x,i){var k=Math.pow(.5,(v.length-1-i)/hl);w+=k;t+=k*x});return t/w}
   var role=h.filter(function(x){return x.st===(starter?1:0)}),mins=(role.length>=4?role:h).slice(-15).map(function(x){return x.mn}),pmin=ew(mins,5);
@@ -752,9 +760,9 @@ function t3Proj(p,day,starter,opp,s){ // null when he has fewer than eight earli
   src.forEach(function(x,i){var k=Math.pow(.5,(src.length-1-i)/15);wa+=k*x.a;wm+=k*Math.max(x.mn,ok.length>=5?0:1)});
   var rate=wm?wa/wm:0,A=0,M=0;all.forEach(function(x){A+=x.a;M+=x.m});
   var acc=(M+X.lg*T3.prior)/(A+T3.prior),of=t3Opp(opp,day,s);
-  var att=Math.exp(T3.c+(starter?T3.st:0))*Math.pow(Math.max(pmin,1),T3.m)*Math.pow(Math.max(rate,.01),T3.r)*Math.pow(of,T3.o);
+  var att=Math.exp(T3.c+(starter?T3.st:0))*Math.pow(Math.max(pmin,1),T3.m)*Math.pow(Math.max(rate,.01),T3.r)*Math.pow(of,T3.o)*Math.exp(T3.ms*(miss||0));
   var l10=h.slice(-10),la=0,lm=0;l10.forEach(function(x){la+=x.a;lm+=x.m});
-  return{n:n,pmin:pmin,rate:rate,acc:acc,of:of,att:att,mu:att*acc,l10a:la/l10.length,l10m:lm/l10.length,raw:A?M/A:null,A:A,thin:role.length<4}}
+  return{n:n,miss:miss||0,pmin:pmin,rate:rate,acc:acc,of:of,att:att,mu:att*acc,l10a:la/l10.length,l10m:lm/l10.length,raw:A?M/A:null,A:A,thin:role.length<4}}
 function t3Dist(mu){ // chance of exactly 0..12 made threes
   var r=T3.size,q=mu/(r+mu),p=[Math.pow(r/(r+mu),r)];for(var k=0;k<12;k++)p.push(p[k]*(k+r)/(k+1)*q);return p}
 function t3AtLeast(d,k){var s=0;for(var i=0;i<k&&i<d.length;i++)s+=d[i];return Math.max(0,1-s)}
@@ -774,15 +782,17 @@ function vThrees(){
   var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
   var mo=+day.slice(5,7),sy=+day.slice(0,4)-(mo>=9?0:1),rows=[],plays=[];
   ms.forEach(function(m,mi){var g=m.g,c=ctxOf(m),od=t3Odds(m);
-    [m.a,m.h].forEach(function(t){var opp=t===m.h?m.a:m.h,pool={},conf=false;
-      if(g&&g.b3){(g.b3[t]||[]).forEach(function(x){pool[x[0]]={st:(g.st[t]||[]).indexOf(x[0])>=0,res:x}});conf=true}
+    [m.a,m.h].forEach(function(t){var opp=t===m.h?m.a:m.h,pool={},conf=false,mi;
+      if(g&&g.b3){(g.b3[t]||[]).forEach(function(x){pool[x[0]]={st:(g.st[t]||[]).indexOf(x[0])>=0,res:x}});conf=true;var here={};(g.b3[t]||[]).forEach(function(x){here[x[0]]=1});mi=t3Miss(t,day,sy,function(p){return !here[p]})}
       else{ // not played yet: the posted or expected five, plus anyone in three of the team's last five games who is not listed out
         var prev=all.filter(function(q){return q.d<day&&q.b3&&(q.h===t||q.a===t)}).slice(-5),cnt={},stc={};
         prev.forEach(function(q){(q.b3[t]||[]).forEach(function(x){if(x[3]>=50)cnt[x[0]]=(cnt[x[0]]||0)+1});(q.st[t]||[]).forEach(function(p){stc[p]=(stc[p]||0)+1})});
         var lu=c&&c.lu&&c.lu[t]&&c.lu[t].st.length>=5?c.lu[t]:null,ex=!lu&&m.ex&&m.ex[t]&&m.ex[t].st.length>=5?m.ex[t]:null,five=lu||ex;conf=!!lu;
         Object.keys(cnt).map(Number).forEach(function(p){var i=c&&injOf(c,t,p);if(cnt[p]>=3&&!(i&&/^out/i.test(i.st)))pool[p]={st:five?false:(stc[p]||0)>=3}});
-        if(five){five.st.forEach(function(x){pool[x[0]]={st:true}});(five.out||[]).forEach(function(x){delete pool[x[0]]})}}
-      Object.keys(pool).map(Number).forEach(function(p){var pr=t3Proj(p,day,pool[p].st,opp,sy);if(!pr)return;
+        if(five){five.st.forEach(function(x){pool[x[0]]={st:true}});(five.out||[]).forEach(function(x){delete pool[x[0]]})}
+        var gone={};if(five)(five.out||[]).forEach(function(x){gone[x[0]]=1});
+        mi=t3Miss(t,day,sy,function(p){var i=c&&injOf(c,t,p);return !!gone[p]||!!(i&&/^out/i.test(i.st))})}
+      Object.keys(pool).map(Number).forEach(function(p){var pr=t3Proj(p,day,pool[p].st,opp,sy,mi.v);if(!pr)return;pr.mwho=mi.who;
         var d=t3Dist(pr.mu),o=od&&od._t3[normName(D.players[p])],row={p:p,t:t,opp:opp,m:m,st:pool[p].st,conf:conf,pr:pr,d:d,res:pool[p].res||null,o:o&&o.n<=1?o:null,best:null};
         if(row.o){var cand=[];
           if(row.o.line){var ln=row.o.line,kk=Math.floor(ln[1])+1,po=t3AtLeast(d,kk);
@@ -806,7 +816,7 @@ function vThrees(){
   var mo2={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo2[k]=mo2[k]||[]).push(d)});
   Object.keys(mo2).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo2[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   var hd='<section class="panel"><div class="phead"><h2>Threes</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button></div></div>'+
-    '<p class="note">'+(ms.length?'':'No games on this day. ')+'Projected made threes for every player expected to play: his recent minutes in tonight\'s role, times how often he shoots a three per minute, times his accuracy, adjusted for how many threes the opponent allows. Each chance (1+, 2+, 3+ and so on) is what that projection implies. In the backtest those chances matched what happened at every line and beat both a player\'s season hit rate and his last-10 hit rate. '+
+    '<p class="note">'+(ms.length?'':'No games on this day. ')+'Projected made threes for every player expected to play: his recent minutes in tonight\'s role, times how often he shoots a three per minute, times his accuracy, adjusted for how many threes the opponent allows and for regular shooters on his own team who are out (the “% OUT” tag; for games not yet played it counts only players listed out, so it can change late). Each chance (1+, 2+, 3+ and so on) is what that projection implies. In the backtest those chances matched what happened at every line and beat both a player\'s season hit rate and his last-10 hit rate. '+
     (anyOdds?'Edges compare each chance with the best price on record and have not been tested against real prices yet.':'No made-threes prices are on record for this day, so there are no value plays; compare the break-even odds with your book by eye.')+'</p></section>';
   var picksTbl='<section class="panel"><div class="phead"><h2>Best plays</h2><span class="nightly">'+(nDone?'<span class="tag '+(nHit?"w":"")+'">'+nHit+' OF '+nDone+' HIT</span> <span class="tag nu '+(units>0?"up":units<0?"dn":"")+'">'+(units>0?"+":units<0?"−":"")+Math.abs(units).toFixed(1)+'U</span> ':'')+'<span class="tag">'+(top.length?top.length+' plays · one a player, best value first':'no plays')+'</span></span></div>'+
     (top.length?'<div class="tw"><table><thead><tr><th>#</th><th>Team</th><th>Player</th><th>Game</th><th>Bet</th><th class="n">Best price</th><th class="n">Projected makes</th><th class="n">Model chance</th><th class="n">Break-even odds</th><th class="n">Edge</th><th class="n rate">Value score</th>'+(anyRes?'<th>Result</th>':'')+'</tr></thead><tbody>'+
@@ -818,7 +828,7 @@ function vThrees(){
     '<div class="tw"><table><thead><tr><th>Team</th><th>Player</th><th>Opp</th><th class="n" title="Projected minutes in tonight\'s role">Min</th><th class="n" title="Projected three-point attempts">3PA</th><th class="n" title="His accuracy, pulled toward the league average">3P%</th><th class="n rate" title="Projected made threes">Makes</th><th class="n">1+</th><th class="n">2+</th><th class="n">3+</th><th class="n">4+</th><th class="n">5+</th>'+
       (anyOdds?'<th class="n">Line</th><th>Best bet</th><th class="n">Edge</th>':'<th class="n" title="The price at which a bet on 2+, 3+ and 4+ made threes breaks even">Break-even 2+ / 3+ / 4+</th>')+'<th class="n" title="Made and attempted threes a game over his last 10">Last 10</th>'+(anyRes?'<th class="n">Made</th>':'')+'</tr></thead><tbody>'+
     shown.map(function(r){var d=r.d,pr=r.pr,b=r.best;
-      return '<tr><td>'+tmL(r.t)+'</td><td>'+who(r)+'</td><td>'+r.opp+(pr.of>=1.05?' <span class="tag w" title="This opponent allows more threes than most: '+Math.round((pr.of-1)*100)+'% above average.">+'+Math.round((pr.of-1)*100)+'%</span>':pr.of<=.95?' <span class="tag l" title="This opponent allows fewer threes than most.">'+Math.round((pr.of-1)*100)+'%</span>':'')+'</td><td class="n">'+pr.pmin.toFixed(0)+'</td><td class="n">'+pr.att.toFixed(1)+'</td><td class="n">'+(pr.acc*100).toFixed(0)+'%</td><td class="n rate"><b>'+pr.mu.toFixed(2)+'</b></td>'+
+      return '<tr><td>'+tmL(r.t)+'</td><td>'+who(r)+(pr.miss>=.15?' <span class="tag w" title="Teammates out: '+esc(pr.mwho.slice(0,4).map(function(w){return (D.players[w[0]]||"#"+w[0])+" ("+w[1].toFixed(1)+" attempts a game)"}).join(", "))+'. That is '+Math.round(pr.miss*100)+'% of this team\'s usual three-point attempts, so his attempts are raised '+Math.round((Math.exp(T3.ms*pr.miss)-1)*100)+'%.">'+Math.round(pr.miss*100)+'% OUT</span>':'')+'</td><td>'+r.opp+(pr.of>=1.05?' <span class="tag w" title="This opponent allows more threes than most: '+Math.round((pr.of-1)*100)+'% above average.">+'+Math.round((pr.of-1)*100)+'%</span>':pr.of<=.95?' <span class="tag l" title="This opponent allows fewer threes than most.">'+Math.round((pr.of-1)*100)+'%</span>':'')+'</td><td class="n">'+pr.pmin.toFixed(0)+'</td><td class="n">'+pr.att.toFixed(1)+'</td><td class="n">'+(pr.acc*100).toFixed(0)+'%</td><td class="n rate"><b>'+pr.mu.toFixed(2)+'</b></td>'+
         [1,2,3,4,5].map(function(k){var v=t3AtLeast(d,k);return '<td class="n"'+heat(v)+' title="Breaks even at '+fairOdds(v)+'">'+pc(v)+'</td>'}).join("")+
         (anyOdds?'<td class="n">'+(r.o&&r.o.line?r.o.line[1]+' <span class="o">'+(r.o.line[2]!=null?fmtP(r.o.line[2]):"–")+' / '+(r.o.line[4]!=null?fmtP(r.o.line[4]):"–")+'</span>':'<span class="o">–</span>')+'</td><td>'+(b?esc(b.lab)+' <span class="o">'+fmtP(b.price)+'</span>':'<span class="o">–</span>')+'</td><td class="n">'+(b?'<span class="tag '+(b.ev>0?"w":"")+'">'+(b.ev>0?"+":"")+Math.round(b.ev*100)+'%</span>':'<span class="o">–</span>')+'</td>'
           :'<td class="n"><span class="o">'+[2,3,4].map(function(k){return fairOdds(t3AtLeast(d,k))}).join(" / ")+'</span></td>')+
