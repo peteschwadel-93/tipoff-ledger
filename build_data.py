@@ -32,7 +32,7 @@ standalone dashboard file, so you can just reopen it in your browser.
 --season is the year the season starts (2025 = 2025-26). Left out, it is the
 season in progress, falling back to the previous one until games are played.
 """
-import argparse, io, json, os, re, shutil, socket, subprocess, sys, tarfile, threading, time, urllib.error, urllib.request, webbrowser
+import argparse, io, json, math, os, re, shutil, socket, subprocess, sys, tarfile, threading, time, urllib.error, urllib.request, webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -306,6 +306,49 @@ def pid(v):
     return int(v) if pd.notna(v) and int(v) > 0 else None
 
 
+def threes_box(g, home, away):
+    """Per team, every player who appeared: [personId, threes attempted, threes made, minutes x10].
+
+    Minutes come from the substitutions: a player whose first event in a period is anything but coming on was on
+    the floor from its start, and anyone still on at the end played to the buzzer. Game totals land on 240 a side.
+    """
+    secs, team = {}, {}
+    for per, p in g.groupby("period", sort=True):
+        plen = 720.0 if per <= 4 else 300.0
+        on, seen = {}, set()
+        for who, tm, act, sub, clock in zip(p.personId, p.teamTricode, p.actionType, p.subType, p.clock):
+            if not who or who != who or who <= 0:
+                continue
+            who = int(who)
+            if isinstance(tm, str):
+                team[who] = tm
+            if act == "substitution":
+                left = clock_s(clock)
+                if sub == "out":
+                    start = on.pop(who, None)
+                    if start is None and who not in seen:
+                        start = plen
+                    if start is not None:
+                        secs[who] = secs.get(who, 0) + max(start - left, 0)
+                elif sub == "in":
+                    on[who] = left
+            elif who not in seen and who not in on:
+                on[who] = plen
+            seen.add(who)
+        for who, start in on.items():
+            secs[who] = secs.get(who, 0) + start
+    t3 = g[g.actionType == "3pt"]
+    att = t3.groupby("personId").size().to_dict()
+    made = t3[t3.shotResult == "Made"].groupby("personId").size().to_dict()
+    box = {home: [], away: []}
+    for who, sc in secs.items():
+        if team.get(who) in box and sc > 0:
+            box[team[who]].append([who, int(att.get(who, 0)), int(made.get(who, 0)), int(round(sc / 6))])
+    for t in box:
+        box[t].sort(key=lambda x: -x[3])
+    return box
+
+
 def build(df):
     for col in ("jumpBallWonPersonId", "jumpBallLostPersonId", "jumpBallRecoverdPersonId",
                 "shotDistance", "descriptor", "subType", "shotResult", "teamTricode", "playerNameI"):
@@ -408,7 +451,8 @@ def build(df):
             if first_fg and all(n >= N_SHOTS for n in nfg.values()) and el > max(x[-1][5] for x in shots.values()):
                 break
         games.append({"id": int(gid), "d": ts.strftime("%Y-%m-%d"), "t": ts.strftime("%I:%M %p ET").lstrip("0"), "po": int(g.po.iloc[0]), "s": int(g.ssn.iloc[0]),
-                      "h": home, "a": away, "tip": tip, "fs": shots, "st": starters, "fb": first_fg, "fp": first_pts})
+                      "h": home, "a": away, "tip": tip, "fs": shots, "st": starters, "fb": first_fg, "fp": first_pts,
+                      "b3": threes_box(g, home, away)})
         if "live" in g.columns and g.live.iloc[0] == 1:
             games[-1]["lv"] = 1
     used = set()
@@ -417,6 +461,7 @@ def build(df):
         used.update(p for p in (t.get("w"), t.get("l"), t.get("rec")) if p)
         used.update(p for lst in gm["st"].values() for p in lst)
         used.update(s[0] for lst in gm["fs"].values() for s in lst)
+        used.update(x[0] for lst in (gm.get("b3") or {}).values() for x in lst)
         for k in ("fb", "fp"):
             if gm[k]:
                 used.add(gm[k][0])
@@ -459,6 +504,41 @@ def parse_first_basket(doc):
                 if who not in best or price > best[who][1]:
                     best[who] = [who, int(price), bk.get("title") or bk.get("key") or ""]
     return sorted(best.values(), key=lambda x: x[1])
+
+
+def parse_threes(doc):
+    """Made-threes prices from the over/under and alternate markets.
+
+    Returns (lines, ladder): lines is [[player, line, best over, book, best under, book], ...] at the line most books
+    post for him; ladder is [[player, k, best price for k or more, book], ...] from the alternates and every over.
+    """
+    by, ladder = {}, {}
+    for bk in doc.get("bookmakers") or []:
+        name = bk.get("title") or bk.get("key") or ""
+        for mk in bk.get("markets") or []:
+            if mk.get("key") not in ("player_threes", "player_threes_alternate"):
+                continue
+            for o in mk.get("outcomes") or []:
+                who, side, pt, price = o.get("description"), str(o.get("name", "")), o.get("point"), o.get("price")
+                if not who or not isinstance(price, (int, float)) or not isinstance(pt, (int, float)):
+                    continue
+                price = int(price)
+                if side == "Over":
+                    k = int(math.floor(pt)) + 1
+                    if (who, k) not in ladder or price > ladder[(who, k)][0]:
+                        ladder[(who, k)] = [price, name]
+                if mk["key"] == "player_threes" and side in ("Over", "Under"):
+                    by.setdefault(who, {}).setdefault(float(pt), {"n": set(), "Over": None, "Under": None})
+                    e = by[who][float(pt)]
+                    e["n"].add(name)
+                    if e[side] is None or price > e[side][0]:
+                        e[side] = [price, name]
+    lines = []
+    for who, pts in by.items():
+        pt, e = max(pts.items(), key=lambda kv: (len(kv[1]["n"]), -kv[0]))
+        o, u = e["Over"] or [None, ""], e["Under"] or [None, ""]
+        lines.append([who, pt, o[0], o[1], u[0], u[1]])
+    return sorted(lines), [[who, k, v[0], v[1]] for (who, k), v in sorted(ladder.items())]
 
 
 def odds_get(url):
@@ -589,8 +669,9 @@ def remember_odds(sched, old):
     """First-basket prices for today's games from The Odds API, kept in odds.json so each game is asked for at most twice.
 
     Needs the key in the ODDS_API_KEY environment variable; without it this only returns what is already stored.
-    The free plan allows 500 requests a month and each game costs one, so a game is fetched once inside four hours
-    of tip and refreshed once inside the last hour. Fetching stops when fewer than 15 requests remain.
+    Each request covers three markets (first basket, made threes, alternate made threes) and costs three credits,
+    so a game is fetched once inside four hours of tip and refreshed once inside the last hour: about six credits a
+    game. Fetching stops when fewer than 300 credits remain on the key.
     """
     store = dict((old or {}).get("odds") or {})
     try:
@@ -612,7 +693,8 @@ def remember_odds(sched, old):
         rec = store.get(k) or {}
         # empty-handed tries are spaced half an hour apart, so a five-minute refresh does not use them all at once
         waited = not rec.get("tt") or (now - datetime.fromisoformat(rec["tt"]).replace(tzinfo=ET)).total_seconds() >= 30 * 60
-        if (not rec.get("p") and 0 < mins <= 240 and rec.get("tries", 0) < 6 and waited) or (rec.get("p") and rec.get("n", 1) < 2 and 0 < mins <= 60):
+        has = rec.get("p") or rec.get("t3") or rec.get("t3a")
+        if (not has and 0 < mins <= 240 and rec.get("tries", 0) < 6 and waited) or (has and rec.get("n", 1) < 2 and 0 < mins <= 60):
             want.append((k, u))
     if want:
         try:
@@ -622,18 +704,26 @@ def remember_odds(sched, old):
                 eid = ids.get((u["a"], u["h"]))
                 if not eid:
                     continue
-                req = urllib.request.Request(f"{ODDS_API}/events/{eid}/odds?apiKey={key}&regions=us&markets=player_first_basket&oddsFormat=american", headers={"Accept": "application/json"})
+                req = urllib.request.Request(f"{ODDS_API}/events/{eid}/odds?apiKey={key}&regions=us&markets=player_first_basket,player_threes,player_threes_alternate&oddsFormat=american", headers={"Accept": "application/json"})
                 with urllib.request.urlopen(req, timeout=60, context=CTX or ssl_context()) as r:
                     left = r.headers.get("x-requests-remaining")
-                    prices = parse_first_basket(json.loads(r.read()))
+                    doc = json.loads(r.read())
+                prices = parse_first_basket(doc)
+                t3, t3a = parse_threes(doc)
                 rec = store.get(k) or {}
-                if prices:
-                    rec.update({"p": prices, "n": rec.get("n", 0) + 1, "at": now.strftime("%Y-%m-%dT%H:%M")})
+                if prices or t3 or t3a:  # a market that comes back empty keeps whatever was fetched for it before
+                    if prices:
+                        rec["p"] = prices
+                    if t3:
+                        rec["t3"] = t3
+                    if t3a:
+                        rec["t3a"] = t3a
+                    rec.update({"n": rec.get("n", 0) + 1, "at": now.strftime("%Y-%m-%dT%H:%M")})
                 else:
                     rec["tries"] = rec.get("tries", 0) + 1
                     rec["tt"] = now.strftime("%Y-%m-%dT%H:%M")
                 store[k] = rec
-                if left is not None and float(left) < 15:
+                if left is not None and float(left) < 300:  # leave room on the key for anything else that uses it
                     print("odds: monthly request allowance nearly used; stopping", file=sys.stderr)
                     break
         except Exception as e:
