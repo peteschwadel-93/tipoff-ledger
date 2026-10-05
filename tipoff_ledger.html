@@ -84,6 +84,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,tr[tabindex]:focus
 .phead{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between}
 .note{color:var(--muted);font-size:13.5px;margin:0;line-height:1.6}
 .note b{color:var(--soft);font-weight:500}
+.model .panel{max-width:920px}.model h3{margin:18px 0 6px;color:var(--accent)}.model p,.model li{color:var(--soft);font-size:14px;line-height:1.65;margin:6px 0}.model ul{margin:4px 0 4px 18px;padding:0}.model b{color:var(--ink);font-weight:500}.model code{font:13px/1.5 ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:block;margin:8px 0;color:var(--ink);white-space:pre-wrap}
 .tw{overflow-x:auto;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 table{border-collapse:collapse;width:100%;font-size:14.5px}
 th,td{padding:11px 16px;text-align:left;white-space:nowrap}
@@ -233,6 +234,7 @@ h2.sep{margin-top:12px;color:var(--muted)}
       <button role="tab" data-tab="leaders" id="tab-leaders">Leaders</button>
       <button role="tab" data-tab="tracker" id="tab-tracker">Tracker</button>
       <button role="tab" data-tab="games" id="tab-games">Game log</button>
+      <button role="tab" data-tab="model" id="tab-model">Model</button>
     </div>
     <div class="filters">
       <label class="f" id="ssnWrap" hidden>Season
@@ -744,7 +746,8 @@ function t3Index(){ if(D._t3)return D._t3;
       (DEF[opp]=DEF[opp]||[]).push({d:g.d,s:g.s,a:tot});(LG[g.s]=LG[g.s]||[]).push({d:g.d,a:tot})})});
   return D._t3={L:L,DEF:DEF,LG:LG,lg:ma?mm/ma:.359}}
 function t3Before(l,day){var lo=0,hi=l.length;while(lo<hi){var md=(lo+hi)>>1;if(l[md].d<day)lo=md+1;else hi=md}return lo} // logs are in date order
-function t3Opp(opp,day,s){var X=t3Index(),h=(X.DEF[opp]||[]).filter(function(x){return x.s===s&&x.d<day}).slice(-25),lg=(X.LG[s]||[]).filter(function(x){return x.d<day}).slice(-400);
+function t3Opp(opp,day,s){var X=t3Index(),ck=opp+day+s;X.oc=X.oc||{};if(X.oc[ck])return X.oc[ck];return X.oc[ck]=t3Opp0(opp,day,s)}
+function t3Opp0(opp,day,s){var X=t3Index(),h=(X.DEF[opp]||[]).filter(function(x){return x.s===s&&x.d<day}).slice(-25),lg=(X.LG[s]||[]).filter(function(x){return x.d<day}).slice(-400);
   if(lg.length<60||!h.length)return 1;var a=0,b=0;h.forEach(function(x){a+=x.a});lg.forEach(function(x){b+=x.a});b/=lg.length;return ((a/h.length)*h.length+b*10)/(h.length+10)/b}
 function t3Miss(t,day,s,isOut){ // share of the team's usual threes belonging to absent regulars
   var X=t3Index(),prev=D.games.filter(function(q){return q.d<day&&q.s===s&&q.b3&&(q.h===t||q.a===t)}).slice(-5);if(prev.length<5)return{v:0,who:[]};
@@ -772,12 +775,7 @@ function t3Odds(m){var o=(D.odds||{})[(m.g?m.g.d:m.d)+"|"+m.a+"|"+m.h];if(!o||(!
     (o.t3a||[]).forEach(function(x){var e=o._t3[key(x[0])]=o._t3[key(x[0])]||{n:0,k:{}};e.k[x[1]]=[x[2],x[3]]})}
   return o}
 function payOf(v){return v>0?1+v/100:1+100/-v}
-function vThrees(){
-  var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},X=t3Index();
-  sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
-  var up=Object.keys(sd).sort(),past=Object.keys(pd).sort().reverse().filter(function(d){return !sd[d]}),days=up.slice().reverse().concat(past);
-  if(days.indexOf(S.day)<0)S.day=up.length?up[0]:days[0];
-  var day=S.day,at=days.indexOf(day);S._days=days;
+function t3Day(day){var all=D.games,sched=D.sched||[];
   var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g}});
   var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
   var mo=+day.slice(5,7),sy=+day.slice(0,4)-(mo>=9?0:1),rows=[],plays=[];
@@ -807,6 +805,52 @@ function vThrees(){
           if(row.best&&row.best.ev>0&&row.best.p>=.2&&pr.att>=2.5)plays.push(row.best)}
         rows.push(row)})})});
   rows.sort(function(a,b){return b.pr.mu-a.pr.mu});plays.sort(function(a,b){return b.vs-a.vs});
+  return{ms:ms,rows:rows,plays:plays}}
+function t3Calib(s){ // every regular-season projection of 2.5+ attempts against what the player did
+  D._t3c=D._t3c||{};if(D._t3c[s])return D._t3c[s];
+  var R={n:0,pa:0,aa:0,pm:0,am:0,line:{},bk:[]},cuts=[0,.2,.35,.5,.65,.8,1.01];
+  for(var k=1;k<=5;k++)R.line[k]={n:0,sp:0,h:0,n6:0,h6:0,s6:0};for(var i=0;i<6;i++)R.bk.push({n:0,sp:0,h:0});
+  D.games.forEach(function(g){if(g.s!==s||!g.b3||g.po)return;
+    [g.a,g.h].forEach(function(t){var opp=t===g.h?g.a:g.h,here={};(g.b3[t]||[]).forEach(function(x){here[x[0]]=1});
+      var mi=t3Miss(t,g.d,s,function(p){return !here[p]});
+      (g.b3[t]||[]).forEach(function(x){var pr=t3Proj(x[0],g.d,(g.st[t]||[]).indexOf(x[0])>=0,opp,s,mi.v);if(!pr||pr.att<2.5)return;
+        var d=t3Dist(pr.mu);R.n++;R.pa+=pr.att;R.aa+=x[1];R.pm+=pr.mu;R.am+=x[2];
+        for(var k=1;k<=5;k++){var p=t3AtLeast(d,k),hit=x[2]>=k?1:0,L=R.line[k];L.n++;L.sp+=p;L.h+=hit;if(p>=.6){L.n6++;L.h6+=hit;L.s6+=p}
+          for(var i=0;i<6;i++)if(p<cuts[i+1]){R.bk[i].n++;R.bk[i].sp+=p;R.bk[i].h+=hit;break}}})})});
+  return D._t3c[s]=R}
+function t3Record(){ // the Best plays shown on every finished day that has prices on record
+  if(D._t3r)return D._t3r;var days={},R={all:{n:0,h:0,u:0},by:{},list:[]};
+  Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&(o.t3||o.t3a))days[k.split("|")[0]]=1});
+  Object.keys(days).sort().forEach(function(day){t3Day(day).plays.slice(0,10).forEach(function(x){if(x.hit==null)return;
+    var ty=x.over?(/made/.test(x.lab)?"Ladder ("+x.k+"+ made)":"Over the line"):"Under the line",u=x.hit?x.pay-1:-1;
+    [R.all,R.by[ty]=R.by[ty]||{n:0,h:0,u:0}].forEach(function(a){a.n++;a.h+=x.hit?1:0;a.u+=u});R.list.push({d:day,x:x,u:u})})});
+  return D._t3r=R}
+function t3TrackHtml(){
+  var today=todayET(),sy=+today.slice(0,4)-(+today.slice(5,7)>=9?0:1),lab=function(y){return y+"-"+String(y+1).slice(2)},pc=function(v){return (v*100).toFixed(1)+"%"},R=t3Record(),out="";
+  function un(u){return '<span class="tag nu '+(u>0?"up":u<0?"dn":"")+'">'+(u>0?"+":u<0?"−":"")+Math.abs(u).toFixed(1)+'U</span>'}
+  out+='<section class="panel" style="margin-top:20px"><div class="phead"><h2>Threes · best plays record</h2><span class="tag">'+(R.all.n?R.all.n+' settled plays':'starts with the first prices')+'</span></div>'+
+    '<p class="note">Every play listed under Best plays on the Threes page (up to ten a night, one a player), settled at the price shown, one unit each. If the play rules change, this is recalculated with the new rules.</p>'+
+    (R.all.n?'<div class="tw"><table><thead><tr><th>Bet type</th><th class="n">Plays</th><th class="n">Hit</th><th class="n">Hit rate</th><th class="n">Net units</th><th class="n">Return</th></tr></thead><tbody>'+
+      [["All plays",R.all]].concat(Object.keys(R.by).sort().map(function(k){return [k,R.by[k]]})).map(function(r){var a=r[1];return '<tr><td>'+(r[0]==="All plays"?"<b>All plays</b>":esc(r[0]))+'</td><td class="n">'+a.n+'</td><td class="n">'+a.h+'</td><td class="n">'+pc(a.h/a.n)+'</td><td class="n">'+un(a.u)+'</td><td class="n">'+(a.u/a.n*100).toFixed(0)+'%</td></tr>'}).join("")+'</tbody></table></div>'+
+      '<h3 style="margin:16px 0 8px">Latest plays</h3><div class="tw"><table><thead><tr><th>Date</th><th>Player</th><th>Bet</th><th class="n">Price</th><th class="n">Model chance</th><th class="n">Made</th><th>Result</th><th class="n">Units</th></tr></thead><tbody>'+
+      R.list.slice(-30).reverse().map(function(e){var x=e.x,r=x.row;return '<tr><td>'+fmtD(e.d)+'</td><td>'+tmL(r.t)+' '+esc(D.players[r.p]||"")+'</td><td>'+esc(x.lab)+'</td><td class="n">'+fmtP(x.price)+'</td><td class="n">'+(x.p*100).toFixed(0)+'%</td><td class="n">'+r.res[2]+' of '+r.res[1]+'</td><td><span class="tag'+(x.hit?" w":"")+'">'+(x.hit?"HIT":"MISS")+'</span></td><td class="n">'+un(e.u)+'</td></tr>'}).join("")+'</tbody></table></div>'
+      :'<p class="empty">No made-threes prices are on record yet. Prices are saved within four hours of each tip from opening night, and this fills in as those games finish.</p>')+'</section>';
+  [sy,sy-1,sy-2].forEach(function(s){var C=t3Calib(s);if(!C.n)return;
+    out+='<section class="panel" style="margin-top:20px"><div class="phead"><h2>Threes model · '+lab(s)+' accuracy</h2><span class="tag">'+(s===sy?C.n+' projections so far':'back-test · '+C.n+' projections')+'</span></div>'+
+      '<p class="note">No prices involved: every regular-season player projected for 2.5 or more attempts, each projection made only from earlier games, against what he did. It knows who played and who started, as you will once lineups post. A good model\'s “said” and “happened” columns match.</p>'+
+      '<div class="kv" style="margin:12px 0"><span>Attempts a player: projected <b>'+(C.pa/C.n).toFixed(2)+'</b>, actual <b>'+(C.aa/C.n).toFixed(2)+'</b></span><span>Makes a player: projected <b>'+(C.pm/C.n).toFixed(2)+'</b>, actual <b>'+(C.am/C.n).toFixed(2)+'</b></span></div>'+
+      '<div class="grid2"><div class="tw"><table><thead><tr><th>Line</th><th class="n">Model said</th><th class="n">Happened</th><th class="n" title="Only the players the model gave a 60% chance or better">60%+ calls</th><th class="n">Said</th><th class="n rate">Hit</th></tr></thead><tbody>'+
+        [1,2,3,4,5].map(function(k){var L=C.line[k];return '<tr><td><b>'+k+'+ made</b></td><td class="n">'+pc(L.sp/L.n)+'</td><td class="n">'+pc(L.h/L.n)+'</td><td class="n">'+L.n6+'</td><td class="n">'+(L.n6?pc(L.s6/L.n6):"–")+'</td><td class="n rate"><b>'+(L.n6?pc(L.h6/L.n6):"–")+'</b></td></tr>'}).join("")+'</tbody></table></div>'+
+      '<div class="tw"><table><thead><tr><th>When the model said</th><th class="n">Calls</th><th class="n">Average said</th><th class="n rate">Happened</th></tr></thead><tbody>'+
+        ["Under 20%","20–35%","35–50%","50–65%","65–80%","80% or more"].map(function(nmx,i){var b=C.bk[i];return '<tr><td>'+nmx+'</td><td class="n">'+b.n+'</td><td class="n">'+(b.n?pc(b.sp/b.n):"–")+'</td><td class="n rate"><b>'+(b.n?pc(b.h/b.n):"–")+'</b></td></tr>'}).join("")+'</tbody></table></div></div></section>'});
+  return out}
+function vThrees(){
+  var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},X=t3Index();
+  sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
+  var up=Object.keys(sd).sort(),past=Object.keys(pd).sort().reverse().filter(function(d){return !sd[d]}),days=up.slice().reverse().concat(past);
+  if(days.indexOf(S.day)<0)S.day=up.length?up[0]:days[0];
+  var day=S.day,at=days.indexOf(day);S._days=days;
+  var T=t3Day(day),ms=T.ms,rows=T.rows,plays=T.plays;
   var anyOdds=rows.some(function(r){return r.o}),anyRes=rows.some(function(r){return r.res}),top=plays.slice(0,10);
   function pc(v){return (v*100).toFixed(0)+"%"}
   function heat(v){return ' style="background:rgba(99,210,180,'+(Math.max(0,v-.15)*.55).toFixed(2)+')"'}
@@ -830,7 +874,7 @@ function vThrees(){
     shown.map(function(r){var d=r.d,pr=r.pr,b=r.best;
       return '<tr><td>'+tmL(r.t)+'</td><td>'+who(r)+(pr.miss>=.15?' <span class="tag w" title="Teammates out: '+esc(pr.mwho.slice(0,4).map(function(w){return (D.players[w[0]]||"#"+w[0])+" ("+w[1].toFixed(1)+" attempts a game)"}).join(", "))+'. That is '+Math.round(pr.miss*100)+'% of this team\'s usual three-point attempts, so his attempts are raised '+Math.round((Math.exp(T3.ms*pr.miss)-1)*100)+'%.">'+Math.round(pr.miss*100)+'% OUT</span>':'')+'</td><td>'+r.opp+(pr.of>=1.05?' <span class="tag w" title="This opponent allows more threes than most: '+Math.round((pr.of-1)*100)+'% above average.">+'+Math.round((pr.of-1)*100)+'%</span>':pr.of<=.95?' <span class="tag l" title="This opponent allows fewer threes than most.">'+Math.round((pr.of-1)*100)+'%</span>':'')+'</td><td class="n">'+pr.pmin.toFixed(0)+'</td><td class="n">'+pr.att.toFixed(1)+'</td><td class="n">'+(pr.acc*100).toFixed(0)+'%</td><td class="n rate"><b>'+pr.mu.toFixed(2)+'</b></td>'+
         [1,2,3,4,5].map(function(k){var v=t3AtLeast(d,k);return '<td class="n"'+heat(v)+' title="Breaks even at '+fairOdds(v)+'">'+pc(v)+'</td>'}).join("")+
-        (anyOdds?'<td class="n">'+(r.o&&r.o.line?r.o.line[1]+' <span class="o">'+(r.o.line[2]!=null?fmtP(r.o.line[2]):"–")+' / '+(r.o.line[4]!=null?fmtP(r.o.line[4]):"–")+'</span>':'<span class="o">–</span>')+'</td><td>'+(b?esc(b.lab)+' <span class="o">'+fmtP(b.price)+'</span>':'<span class="o">–</span>')+'</td><td class="n">'+(b?'<span class="tag '+(b.ev>0?"w":"")+'">'+(b.ev>0?"+":"")+Math.round(b.ev*100)+'%</span>':'<span class="o">–</span>')+'</td>'
+        (anyOdds?'<td class="n">'+(r.o&&r.o.line?r.o.line[1]+' <span class="o">'+(r.o.line[2]!=null?fmtP(r.o.line[2]):"–")+' / '+(r.o.line[4]!=null?fmtP(r.o.line[4]):"–")+'</span>':'<span class="o">–</span>')+'</td><td'+(b?' title="'+esc(r.cand.map(function(x){return x.lab+" "+fmtP(x.price)+": model "+Math.round(x.p*100)+"%, edge "+(x.ev>0?"+":"")+Math.round(x.ev*100)+"%"}).join(" · "))+'"':'')+'>'+(b?esc(b.lab)+' <span class="o">'+fmtP(b.price)+'</span>':'<span class="o">–</span>')+'</td><td class="n">'+(b?'<span class="tag '+(b.ev>0?"w":"")+'">'+(b.ev>0?"+":"")+Math.round(b.ev*100)+'%</span>':'<span class="o">–</span>')+'</td>'
           :'<td class="n"><span class="o">'+[2,3,4].map(function(k){return fairOdds(t3AtLeast(d,k))}).join(" / ")+'</span></td>')+
         '<td class="n"><span class="o">'+pr.l10m.toFixed(1)+' of '+pr.l10a.toFixed(1)+'</span></td>'+(anyRes?'<td class="n">'+resCell(r)+'</td>':'')+'</tr>'}).join("")+'</tbody></table></div>'+
     (hidden>0||S.t3All?'<p class="note">'+(S.t3All?'Showing every player with a projection. ':'Players projected for fewer than 2.5 attempts are hidden unless they have a price ('+hidden+' more). ')+'<button class="more" id="t3More">'+(S.t3All?"Show fewer":"Show all")+'</button></p>':'')+'</section>':"";
@@ -970,8 +1014,9 @@ function vTracker(){
       log.slice(0,S.trkN).map(function(x){var g=x.g,fs=firstScore(g);function yn(v){return '<span class="tag'+(v?" w":"")+'">'+(v?"YES":"NO")+'</span>'}
         return '<tr><td>'+fmtD(g.d)+'</td><td><span class="tm">'+g.a+" @ "+g.h+'</span></td><td><span class="tm">'+x.t+'</span> '+x.pct+'% '+chev(x.lv,false,"sm")+'</td><td>'+nm(x.j)+(x.jr===false?' <span class="tag l">DID NOT JUMP</span>':'')+'</td><td><span class="tag '+(x.tip?"w":"l")+'">'+(x.tip?"WON":"LOST")+'</span></td><td>'+yn(x.any)+' <span class="o">'+x.fbaN+" of "+x.n+'</span></td><td>'+yn(x.fb)+' <span class="o">'+(fs?nm(fs[0])+" ("+fs[1]+")":"")+'</span></td><td>'+x.top.map(nm).join(", ")+'</td></tr>'}).join("")+
       '</tbody></table></div>'+(more?'<button class="more" id="trkMore">Show 30 more ('+(log.length-S.trkN)+' left)</button>':'')+'</section>':'')+
-    (prev.length?'<section class="panel" style="margin-top:20px"><div class="phead"><h2>For reference · '+lab(sy-1)+' with lineups known</h2><span class="tag">back-test, not live picks</span></div><p class="note">Last season run through today\'s rules as if every lineup had been posted before tip: the jumper and the three shooters are chosen from each night\'s actual starters. This is the fair comparison for the Lineup confirmed view above. It has no injury notes, and it cannot tell which starter the coach sent to the circle.</p>'+trackTable(prev)+'</section>':'');
+    (prev.length?'<section class="panel" style="margin-top:20px"><div class="phead"><h2>For reference · '+lab(sy-1)+' with lineups known</h2><span class="tag">back-test, not live picks</span></div><p class="note">Last season run through today\'s rules as if every lineup had been posted before tip: the jumper and the three shooters are chosen from each night\'s actual starters. This is the fair comparison for the Lineup confirmed view above. It has no injury notes, and it cannot tell which starter the coach sent to the circle.</p>'+trackTable(prev)+'</section>':'')+t3TrackHtml();
 }
+function vModel(){view.innerHTML="<div class=\"picks model\">\n<section class=\"panel\"><h2>How the first-basket picks are made<\/h2>\n<p class=\"note\">“First basket” here means first points: free throws count everywhere unless the Free throws switch is off.<\/p>\n<h3>1 · Who wins the tip<\/h3>\n<p>Each jumper gets a tip score from his opening tips on record, pulled toward 50% so a short record cannot look extreme. The gap between the two jumpers' scores becomes the chance of winning the tip.<\/p>\n<code>tip score = (tips won + 4) / (tips taken + 8)      needs 5 or more tips\ntip chance = 1 / (1 + e^(−4.17 × (his score − the other jumper's score)))<\/code>\n<p>Chevrons mark the tip chance: one at 55%, two at 60%, three at 65%, four at 75%. <b>A four-chevron game is a pick.<\/b> Games at 70–74% are flagged as near misses to check by hand.<\/p>\n<h3>2 · Which three shooters<\/h3>\n<p>On the team expected to win the tip, the expected starters are ranked by how often they take one of the team's first three shots when they start. The top three are the picks. Players listed out, or not in the posted lineup, are skipped.<\/p>\n<code>shooter rating = (games with a first-three attempt + 3) / (starts + 5)<\/code>\n<p>Attempts are used, not makes: nobody can make a player hit the shot, only pick the ones who take it.<\/p>\n<h3>3 · Value, once prices exist<\/h3>\n<p>Each starter's chance of scoring first is the team's chance of scoring first (which rises with the tip chance) times his share of the team's early shots. That chance sets a <b>break-even price<\/b>; the real price is coloured by how far it beats it.<\/p>\n<code>team scores first = 0.5 + 0.333 × (tip chance − 0.5)\nplayer's chance   = team scores first × his share of the top five's early-shot ratings\nvalue score       = (chance × payout − 1) / (payout − 1) × 100<\/code>\n<p>The value score rewards a real edge at a sensible price over a huge price on a long shot. The Slate value table ranks every starter on the night by it. The chances have matched results closely in the back-test; the value score itself is <b>untested<\/b> until real prices build up.<\/p>\n<h3>What the back-test showed<\/h3>\n<ul>\n<li>Four-chevron games with lineups known, 2025-26: favourite won the tip 82%, one of the three took an early attempt in 71%, one scored first in 51%. 2024-25 was 79%, about 63% and about 43%.<\/li>\n<li><b>Head to head flag:<\/b> when the two jumpers have met three or more times and the favourite trails, the favourite won 54% instead of 62%. It is a caution tag, not part of the rating.<\/li>\n<li>Tested and left out because they did not improve results on games the model had not seen: recent form (last 5 and last 15 tips), streaks, home court, rest, head-to-head as a rating input, a minimum-starts cutoff for shooters, and defence against a position.<\/li>\n<li>Near-miss games (70–74%) produced an early attempt 63% of the time and a first basket 42%.<\/li>\n<li>Parlays, round robins, and adding a high-chance player from another game did not beat straight one-unit bets.<\/li>\n<\/ul><\/section>\n<section class=\"panel\"><h2>How the threes model works<\/h2>\n<h3>1 · Projected makes<\/h3>\n<code>attempts = e^(0.467 + 0.082 if starting + 0.25 × teammates out)\n           × minutes^0.808 × (attempts per minute)^0.95 × opponent^1.0\nmakes    = attempts × accuracy<\/code>\n<ul>\n<li><b>Minutes:<\/b> his last 15 games in tonight's role (starter or bench), newest counting most.<\/li>\n<li><b>Attempts per minute:<\/b> his last 40 games of 8 or more minutes, newest counting most.<\/li>\n<li><b>Opponent:<\/b> threes that team has allowed a game over its last 25, against the league average.<\/li>\n<li><b>Teammates out:<\/b> the share of the team's usual three-point attempts belonging to regulars who are absent, capped at 60%. Before tip it only knows players listed out.<\/li>\n<li><b>Accuracy:<\/b> his career-on-record percentage pulled toward the league average by 250 attempts, so a hot month barely moves it.<\/li>\n<\/ul>\n<h3>2 · Chances at each line<\/h3>\n<p>Made threes are streakier than a coin-flip model allows, so the chance of 1+, 2+, 3+ and so on comes from a wider spread (a negative binomial, size 10) around the projection. In the back-test those chances matched what happened at every line; the Tracker page shows this for each season.<\/p>\n<h3>3 · Best plays and ladders<\/h3>\n<p>For each player every bet on record is priced the same way: the over, the under, and each rung of the ladder (2+, 3+, 4+…).<\/p>\n<code>edge = model chance × payout − 1\nvalue score = (chance × payout − 1) / (payout − 1) × 100<\/code>\n<p>His <b>best bet<\/b> is the one with the highest value score. It becomes a Best play when the edge is positive, the model chance is 20% or better, and he projects for 2.5 or more attempts. One play a player, top ten of the night by value score.<\/p>\n<p><b>How the ladder rung gets chosen:<\/b> the value score divides the edge by the payout, so a 3+ at +150 with a 10% edge outranks a 5+ at +900 with a 15% edge. A higher rung only wins when its price is generous enough to overcome that. Hover a player's Best bet in the Full slate table to see every rung with its edge. Rungs under a 20% chance are never plays: that is where the model has the least evidence and books take the most margin.<\/p>\n<h3>What is and is not proven<\/h3>\n<ul>\n<li><b>Proven on two seasons:<\/b> the chances are accurate, and better than a player's season hit rate or his last-10 hit rate.<\/li>\n<li><b>Not proven:<\/b> that the edges beat real prices. Books know most of this too. The Tracker page keeps the record of every Best play from opening night, split by over, under and ladder, so this gets answered with real results.<\/li>\n<li>Tested and left out: opponent three-point percentage allowed, pace, back-to-backs, hot streaks, this season's accuracy against career, and the previous game's attempts.<\/li>\n<\/ul><\/section><\/div>\n"}
 function vGames(){
   var gs=G.filter(function(g){return !S.logTeam||g.h===S.logTeam||g.a===S.logTeam}).slice().reverse(),shown=gs.slice(0,S.logN);
   function fsCell(g,t){var s=att(g,t)[0];return s?'<span class="tm">'+t+'</span> '+nm(s[0])+' · '+method(s)+' '+result(s):"–"}
@@ -990,7 +1035,7 @@ function render(){
   [].forEach.call(document.querySelectorAll("#seg-ft button"),function(b){b.setAttribute("aria-pressed",+b.dataset.v===S.ft)});
   if(!G.length){view.innerHTML='<p class="empty">No games match these filters.</p>';return}
   var keep=document.activeElement&&document.activeElement.id,pos=keep==="q"?document.activeElement.selectionStart:null;
-  ({picks:vPicks,lineups:vLineups,threes:vThrees,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,games:vGames})[S.tab]();
+  ({picks:vPicks,lineups:vLineups,threes:vThrees,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,games:vGames,model:vModel})[S.tab]();
   if(keep&&$(keep)){$(keep).focus();if(pos!=null)$(keep).setSelectionRange(pos,pos)}
 }
 
