@@ -57,7 +57,7 @@ if (ms.length) {
      places go to the best plays from games still to start; a player whose game has started can no longer become one. */
   const kept = (prev.t3 || []).filter(gone).map(k => Object.assign(k, { lk: 1 }));
   const taken = new Set(kept.map(k => k.p));
-  const open = T.plays.filter(x => !started(x.row.m) && !taken.has(x.row.p)).slice(0, Math.max(0, T.cap - kept.length)).map(api.t3PickOut);
+  const open = api.t3Fill(T.plays.filter(x => !started(x.row.m) && !taken.has(x.row.p)), T.cap - kept.length, kept.map(k => k.a + "@" + k.h)).map(api.t3PickOut);   // no more than two from one game
   const picks = kept.concat(open).sort((a, b) => b.vs - a.vs);
 
   /* Every pick as it was first listed, and the last price on that same bet before its game started. */
