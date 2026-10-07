@@ -49,16 +49,22 @@ jobs:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: python build_data.py --source nba --html tipoff_ledger.html --out data.json
 
-      # Keep what was flagged before each game (flags.json) and the prices fetched (odds.json) in the repository.
-      - name: Save pre-tip flags and prices
+      # Work out tonight's threes picks with the page's own model and lock each game's picks and numbers when it tips off.
+      - name: Lock picks
+        id: lock
+        continue-on-error: true
+        run: node lock_picks.js tipoff_ledger.html picks.json
+
+      # Keep what was flagged before each game (flags.json), the prices fetched (odds.json) and the locked picks (picks.json) in the repository.
+      - name: Save pre-tip flags, prices and picks
         id: save
         continue-on-error: true
         run: |
-          if [ -n "$(git status --porcelain flags.json odds.json)" ]; then
+          if [ -n "$(git status --porcelain flags.json odds.json picks.json)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add flags.json odds.json 2>/dev/null || git add flags.json || git add odds.json
-            git commit -m "Record pre-tip flags and prices"
+            for f in flags.json odds.json picks.json; do [ -f "$f" ] && git add "$f"; done
+            git commit -m "Record pre-tip flags, prices and picks"
             # the refreshed page is still modified in the working copy, so a plain pull would refuse to run
             git push || (git pull --rebase --autostash && git push)
           fi
@@ -80,7 +86,13 @@ jobs:
       - name: Report a failed save
         if: steps.save.outcome == 'failure'
         run: |
-          echo "Saving flags.json / odds.json to the repository failed; prices and flags from this run were not kept." >> "$GITHUB_STEP_SUMMARY"
+          echo "Saving flags.json / odds.json / picks.json to the repository failed; prices, flags and locked picks from this run were not kept." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Report a failed lock
+        if: steps.lock.outcome == 'failure'
+        run: |
+          echo "Locking picks failed; the page was published without tonight's locks." >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
       - name: Report a failed refresh
