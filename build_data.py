@@ -479,6 +479,7 @@ def label(yr):
 
 FLAGS = "flags.json"
 ODDS = "odds.json"
+PICKS = "picks.json"
 ODDS_API = "https://api.the-odds-api.com/v4/sports/basketball_nba"
 TEAM_NAMES = {"Atlanta Hawks": "ATL", "Boston Celtics": "BOS", "Brooklyn Nets": "BKN", "Charlotte Hornets": "CHA", "Chicago Bulls": "CHI",
               "Cleveland Cavaliers": "CLE", "Dallas Mavericks": "DAL", "Denver Nuggets": "DEN", "Detroit Pistons": "DET",
@@ -744,6 +745,22 @@ def remember_odds(sched, old):
                     break
         except Exception as e:
             print(f"odds unavailable: {str(e).replace(key, '***')}", file=sys.stderr)
+    # Keep the price store small: after three days a game keeps only its best prices (the book-by-book prices go),
+    # and after two weeks its ladder prices go too. Picks and ladders themselves are kept in picks.json.
+    today = now.date()
+    for k, rec in store.items():
+        try:
+            age = (today - datetime.strptime(k[:10], "%Y-%m-%d").date()).days
+        except ValueError:
+            continue
+        if age > 3 and rec.get("thin", 0) < 1:
+            rec["p"] = [x[:3] for x in rec.get("p") or []]
+            rec["t3"] = [x[:6] for x in rec.get("t3") or []]
+            rec["t3a"] = [x[:4] for x in rec.get("t3a") or []]
+            rec["thin"] = 1
+        if age > 14 and rec.get("thin", 0) < 2:
+            rec.pop("t3a", None)
+            rec["thin"] = 2
     if json.dumps(store, sort_keys=True) != before:
         with open(ODDS, "w", encoding="utf-8") as f:
             json.dump(store, f, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
@@ -890,6 +907,12 @@ def make(source, season, prev=False, html=None):
             out["inj"] = inj
         out["flags"] = remember_flags(sched, inj, old, games)
         out["odds"] = remember_odds(sched, old)
+        try:  # picks and game numbers locked at tip by lock_picks.js; carried along so the page has them even if that step is skipped
+            with open(PICKS, encoding="utf-8") as f:
+                out["locks"] = json.load(f)
+        except Exception:
+            if (old or {}).get("locks"):
+                out["locks"] = old["locks"]
     if notes:
         out["note"] = "; ".join(notes)
     return out

@@ -1,0 +1,104 @@
+#!/usr/bin/env node
+/* Locks each night's threes picks, ladders and game numbers.
+
+   Run after build_data.py:   node lock_picks.js [tipoff_ledger.html] [picks.json]
+
+   It runs the page's own model (the script inside the page) on the data embedded in it, works out tonight's Best plays
+   and Ladder watch exactly as the page would, and keeps them in picks.json. Everything about a game is frozen at the
+   last run before it tips off; until then it can still change on each run. A pick that drops off the list before its
+   game starts is remembered with its first and last price. The store is written back into the page's data as "locks",
+   which is what the page and its Tracker read. */
+const fs = require("fs");
+const [html = "tipoff_ledger.html", storePath = "picks.json"] = process.argv.slice(2);
+
+const page = fs.readFileSync(html, "utf8");
+const TAG = '<script id="tipoff-data" type="application/json">';
+const i0 = page.indexOf(TAG), i1 = page.indexOf("</script>", i0);
+if (i0 < 0 || i1 < 0) { console.error("lock_picks: no data block in " + html); process.exit(0); }
+const raw = page.slice(i0 + TAG.length, i1);
+const scripts = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+const app = scripts.sort((a, b) => b.length - a.length)[0];
+
+/* a stand-in for the browser: enough for the page's script to start and expose its model */
+const els = {};
+const el = () => new Proxy({ hidden: false, textContent: "", innerHTML: "", value: "", dataset: {}, style: {}, files: [],
+  classList: { add() {}, remove() {}, contains: () => false } }, { get: (t, k) => (k in t ? t[k] : () => null), set: (t, k, v) => { t[k] = v; return true; } });
+let api = null;
+global.window = { __TL_HOOK: a => { api = a; }, scrollTo() {}, scrollY: 0, innerWidth: 1400, innerHeight: 900, addEventListener() {} };
+global.document = { getElementById: id => els[id] || (els[id] = el()), addEventListener() {}, querySelectorAll: () => [], querySelector: () => null,
+  createElement: () => el(), body: el(), activeElement: null, hidden: true };
+els["tipoff-data"] = { textContent: raw };
+global.location = { protocol: "node:", hostname: "", hash: "", pathname: "" };
+global.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+global.history = { replaceState() {} };
+global.fetch = () => new Promise(() => {});
+global.setInterval = () => 0;
+global.setTimeout = () => 0;
+try { (0, eval)(app); } catch (e) { console.error("lock_picks: the page script failed to start: " + e.message); process.exit(0); }
+if (!api || !api.data()) { console.error("lock_picks: the page did not expose its model; nothing locked"); process.exit(0); }
+
+const D = api.data(), S = api.S;
+S.book = ""; S.lockOff = 1;                       // work from best-of-all-books prices, ignoring earlier locks
+let store = {};
+try { store = JSON.parse(fs.readFileSync(storePath, "utf8")); } catch (_) {}
+
+const now = process.env.LOCK_NOW ? Date.parse(process.env.LOCK_NOW) : Date.now();
+if (process.env.LOCK_NOW) Date.now = () => now;   // testing: pretend it is another time
+const day = process.env.LOCK_DAY || api.todayET();
+const T = api.t3Day(day), ms = T.ms;
+const started = m => api.t3Started(m);
+const gameOf = k => ms.find(m => m.a === k.a && m.h === k.h);
+const gone = k => { const m = gameOf(k); return !m || started(m); };
+
+if (ms.length) {
+  const stamp = new Date(now).toISOString(), prev = store[day] || {};
+
+  /* Best plays. A pick whose game has started is kept exactly as saved and holds its place for good; the remaining
+     places go to the best plays from games still to start; a player whose game has started can no longer become one. */
+  const kept = (prev.t3 || []).filter(gone).map(k => Object.assign(k, { lk: 1 }));
+  const taken = new Set(kept.map(k => k.p));
+  const open = T.plays.filter(x => !started(x.row.m) && !taken.has(x.row.p)).slice(0, Math.max(0, T.cap - kept.length)).map(api.t3PickOut);
+  const picks = kept.concat(open).sort((a, b) => b.vs - a.vs);
+
+  /* Every pick as it was first listed, and the last price on that same bet before its game started. */
+  const seen = prev.seen || {};
+  picks.forEach(k => {
+    const id = k.p + "|" + k.lab;
+    if (!seen[id]) seen[id] = { p: k.p, n: k.n, t: k.t, o: k.o, a: k.a, h: k.h, ts: k.ts, lab: k.lab, k: k.k, over: k.over, price0: k.price, book0: k.book, at0: stamp };
+    if (!k.lk) seen[id].last = stamp;
+  });
+  Object.values(seen).forEach(e => {
+    const m = gameOf(e);
+    if (!m || started(m)) return;
+    const row = T.rows.find(r => r.p === e.p && r.m === m), c = row && (row.cand || []).find(x => x.lab === e.lab);
+    e.close = c ? c.price : null; e.closeBook = c ? c.book : null;
+  });
+
+  /* Ladder watch: each ladder's rungs, prices and stake split as of the last run before his game starts. */
+  const lw = (prev.lw || []).filter(gone);
+  api.t3LadderList(T.rows.filter(r => !started(r.m))).filter(r => r.lad.priced).slice(0, Math.max(0, 8 - lw.length))
+    .forEach(r => lw.push(Object.assign(api.t3LadOut(r), { at: stamp })));
+
+  /* Game numbers: every player's projection as of the last run before his game starts. Games still to start are
+     rewritten each run; a started game keeps what it had, so the slate does not move while a game is on. */
+  const fz = Object.assign({}, prev.fz || {});
+  ms.filter(m => !started(m)).forEach(m => {
+    fz[day + "|" + m.a + "|" + m.h] = { at: stamp, r: T.rows.filter(r => r.m === m && (r.pr.att >= 1 || r.o)).map(api.t3Freeze) };
+  });
+
+  const any = ms.some(started), all = ms.every(started);
+  store[day] = { at: (prev.at && all) ? prev.at : stamp, locked: any ? 1 : 0, done: all ? 1 : 0, t3: picks, seen, lw, fz };
+}
+/* frozen game numbers are only needed for a little while; the picks and ladders themselves are kept for the season */
+Object.keys(store).forEach(k => { if (store[k] && store[k].fz && Math.round((Date.parse(day) - Date.parse(k)) / 864e5) > 10) delete store[k].fz; });
+store = Object.fromEntries(Object.keys(store).sort().slice(-300).map(k => [k, store[k]]));
+fs.writeFileSync(storePath, JSON.stringify(store));
+
+const doc = JSON.parse(raw);
+doc.locks = store;
+fs.writeFileSync(html, page.slice(0, i0 + TAG.length) + JSON.stringify(doc).replace(/<\//g, "<\\/") + page.slice(i1));
+
+const t = store[day];
+console.log(`lock_picks: ${day} ${t ? (t.done ? "all locked" : t.locked ? "partly locked" : "open") + ", " + t.t3.length + " threes picks: " +
+  t.t3.map(x => x.n + " " + x.lab + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ") + "; " + t.lw.length + " ladders; " +
+  Object.keys(t.seen).length + " listed today" : "no games"}`);
