@@ -92,6 +92,20 @@ function lockStat(sk) {
   rec[C.lk] = picks; rec[C.seen] = seen; rec[C.lw] = lw; rec[C.fz] = fz;
 }
 ["t3", "rb", "as"].forEach(sk => api.inSK(sk, () => lockStat(sk)));
+/* First team basket picks lock the same way: kept once their game starts, the rest refilled from games still to start. */
+(function lockFtb() {
+  const fms = api.ftMs(day);
+  if (!fms.length) return;
+  const rows = api.ftDay(day), gameOf = k => fms.find(m => m.a === k.a && m.h === k.h), gone = k => { const m = gameOf(k); return !m || started(m); };
+  const kept = (prev.ft || []).filter(gone).map(k => Object.assign(k, { lk: 1 }));
+  const held = kept.map(k => k.a + "@" + k.h + "|" + k.t), taken = new Set(kept.map(k => k.p));
+  const open = api.ftFill(rows.filter(r => !started(r.m) && !taken.has(r.p)), 4 - kept.length, held).map(api.ftOut);
+  const picks = kept.concat(open).sort((a, b) => b.vs - a.vs), seen = prev.ftseen || {};
+  picks.forEach(k => { if (!seen[k.p]) seen[k.p] = { p: k.p, n: k.n, t: k.t, a: k.a, h: k.h, ts: k.ts, price0: k.price, book0: k.book, at0: stamp }; if (!k.lk) seen[k.p].last = stamp; });
+  Object.values(seen).forEach(e => { const m = gameOf(e); if (!m || started(m)) return; const r = rows.find(q => q.p === e.p && q.m.a === e.a && q.m.h === e.h); e.close = r && r.price != null ? r.price : null; });
+  rec.ft = picks; rec.ftseen = seen;
+  if (!ms.length) ms = fms;
+})();
 if (ms.length) {
   const any = ms.some(started), all = ms.every(started);
   rec.at = (prev.at && all) ? prev.at : stamp; rec.locked = any ? 1 : 0; rec.done = all ? 1 : 0;
@@ -107,5 +121,5 @@ doc.locks = store;
 fs.writeFileSync(html, page.slice(0, i0 + TAG.length) + JSON.stringify(doc).replace(/<\//g, "<\\/") + page.slice(i1));
 
 const t = store[day], show = l => (l || []).map(x => x.n + " " + x.lab + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ");
-console.log(`lock_picks: ${day} ${t ? (t.done ? "all locked" : t.locked ? "partly locked" : "open") + "; threes picks: " + show(t.t3) + "; rebound picks: " + show(t.rb) + "; assist picks: " + show(t.as) +
+console.log(`lock_picks: ${day} ${t ? (t.done ? "all locked" : t.locked ? "partly locked" : "open") + "; threes picks: " + show(t.t3) + "; rebound picks: " + show(t.rb) + "; assist picks: " + show(t.as) + "; first team basket: " + (t.ft || []).map(x => x.n + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ") +
   "; ladders " + (t.lw || []).length + " threes, " + (t.rlw || []).length + " rebounds, " + (t.alw || []).length + " assists" : "no games"}`);
