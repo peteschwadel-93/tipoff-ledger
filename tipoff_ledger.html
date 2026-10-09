@@ -1327,7 +1327,8 @@ function showWhy0(x){var r=x.row,pr=r.pr,d=r.d,col=TEAM_COL[r.t]||"#3a2617",name
    Without prices: the volume profile a ladder needs (7.5+ projected attempts and a 25% model chance of 4+).
    For shooters projected at 7.5+ attempts the model's 3+, 4+ and 5+ chances matched two seasons of results (58/60, 39/41, 24/22);
    its 6+ chance ran high (13% said, 11% happened), so 6+ is shown but never counts toward the tag. */
-function ladKs(row){if(SK!=="rb")return[2,3,4,5];var b=row.ln?Math.floor(row.ln[1])+1:Math.max(2,Math.round(row.pr.mu));return[b,b+1,b+2,b+3,b+4]}
+function ladKs(row){if(!CNT())return[2,3,4,5]; // threes: fixed rungs; rebounds and assists: from his line (or projection) up
+  var b=row.ln?Math.floor(row.ln[1])+1:Math.max(2,Math.round(row.pr.mu));return[b,b+1,b+2,b+3,b+4]}
 function ladCols(row){return CNT()?ladKs(row):[2,3,4,5,6]}
 function ladProf(row){var pr=row.pr,d=row.d,C=SC();return CNT()?(pr.mu>=C.profMu&&t3AtLeast(d,C.profK)>=.25?t3AtLeast(d,C.profK):0):(pr.att>=7.5&&t3AtLeast(d,4)>=.25?t3AtLeast(d,4):0)}
 function t3LadderOf(row){var pr=row.pr,d=row.d,KS=ladKs(row);
