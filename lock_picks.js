@@ -7,9 +7,13 @@
    and Ladder watch, for threes, rebounds and assists, exactly as the page would, and keeps them in picks.json. Everything about a game is frozen at the
    last run before it tips off; until then it can still change on each run. A pick that drops off the list before its
    game starts is remembered with its first and last price. The store is written back into the page's data as "locks",
-   which is what the page and its Tracker read. */
+   which is what the page and its Tracker read.
+
+   It also keeps the Movers log (movers.json): every run compares each player in a game still to start with the run
+   before, in every market, and records what moved and why. The last snapshot and three days of log are kept; the log is
+   written into the page's data as "movers". */
 const fs = require("fs");
-const [html = "tipoff_ledger.html", storePath = "picks.json"] = process.argv.slice(2);
+const [html = "tipoff_ledger.html", storePath = "picks.json", moversPath = "movers.json"] = process.argv.slice(2);
 
 const page = fs.readFileSync(html, "utf8");
 const TAG = '<script id="tipoff-data" type="application/json">';
@@ -43,7 +47,7 @@ let store = {};
 try { store = JSON.parse(fs.readFileSync(storePath, "utf8")); } catch (_) {}
 
 const now = process.env.LOCK_NOW ? Date.parse(process.env.LOCK_NOW) : Date.now();
-if (process.env.LOCK_NOW) Date.now = () => now;   // testing: pretend it is another time
+if (process.env.LOCK_NOW) { const RD = Date; global.Date = class extends RD { constructor(...a) { super(...(a.length ? a : [now])); } static now() { return now; } }; }   // testing: pretend it is another time
 const day = process.env.LOCK_DAY || api.todayET();
 let ms = [];
 const started = m => api.t3Started(m);
@@ -116,10 +120,20 @@ Object.keys(store).forEach(k => { if (store[k] && Math.round((Date.parse(day) - 
 store = Object.fromEntries(Object.keys(store).sort().slice(-300).map(k => [k, store[k]]));
 fs.writeFileSync(storePath, JSON.stringify(store));
 
+/* Movers: what changed since the last run, for games still to start. */
+let movers = {};
+try { movers = JSON.parse(fs.readFileSync(moversPath, "utf8")); } catch (_) {}
+try {
+  movers = api.mvRecord(movers, stamp, process.env.LOCK_DAY || undefined);
+  fs.writeFileSync(moversPath, JSON.stringify(movers));
+} catch (e) { console.error("movers: " + e.message); }
+
 const doc = JSON.parse(raw);
 doc.locks = store;
+doc.movers = movers.log || {};
 fs.writeFileSync(html, page.slice(0, i0 + TAG.length) + JSON.stringify(doc).replace(/<\//g, "<\\/") + page.slice(i1));
 
 const t = store[day], show = l => (l || []).map(x => x.n + " " + x.lab + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ");
-console.log(`lock_picks: ${day} ${t ? (t.done ? "all locked" : t.locked ? "partly locked" : "open") + "; threes picks: " + show(t.t3) + "; rebound picks: " + show(t.rb) + "; assist picks: " + show(t.as) + "; first team basket: " + (t.ft || []).map(x => x.n + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ") +
+const nMv = ((movers.log || {})[day] || []).length;
+console.log(`lock_picks: ${day} · movers logged today ${nMv} · ${t ? (t.done ? "all locked" : t.locked ? "partly locked" : "open") + "; threes picks: " + show(t.t3) + "; rebound picks: " + show(t.rb) + "; assist picks: " + show(t.as) + "; first team basket: " + (t.ft || []).map(x => x.n + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ") +
   "; ladders " + (t.lw || []).length + " threes, " + (t.rlw || []).length + " rebounds, " + (t.alw || []).length + " assists" : "no games"}`);

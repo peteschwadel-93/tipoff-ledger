@@ -128,6 +128,11 @@ button:focus-visible,select:focus-visible,input:focus-visible,tr[tabindex]:focus
 .t3n{font:600 20px/1.15 var(--body);text-transform:uppercase;letter-spacing:.03em;color:var(--ink)}.t3b{display:flex;flex-direction:column;gap:9px;font-size:13.5px}.t3b.sep{border-top:1px solid var(--line);padding-top:13px}.t3b b{font-weight:600;color:var(--ink)}.t3b .big{font-size:22px}.t3c .o{color:var(--muted);font-size:12.5px}
 .pl{cursor:pointer;border-bottom:1px dotted transparent}.pl:hover,.pl:focus-visible{color:var(--accent);border-bottom-color:var(--accent);outline:0}
 .gp{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}.gp button{font:500 12.5px var(--body);color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 13px;cursor:pointer}.gp button:hover{color:var(--ink)}.gp button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.mvbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 6px}.mvbar .gp{margin:0}
+.mvc{display:inline-block;margin-right:14px;white-space:nowrap}.mvc b{font-weight:600;color:var(--ink)}td.mvw,th.mvw{min-width:240px;white-space:normal!important;color:var(--soft)}
+.mvl{border:1px solid var(--line);border-radius:12px;margin-top:8px;max-height:300px;overflow:auto}.mvi{display:grid;grid-template-columns:70px auto 1fr auto;gap:6px 14px;align-items:baseline;padding:10px 14px;border-top:1px solid var(--line);font-size:13.5px;color:var(--soft)}.mvi:first-child{border-top:0}
+.mvt{color:var(--muted);font-variant-numeric:tabular-nums}.mvcs{min-width:0}.mvn{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:flex-end;font-variant-numeric:tabular-nums}
+@media (max-width:700px){.mvi{grid-template-columns:auto 1fr}.mvcs,.mvn{grid-column:1/-1;justify-content:flex-start}}
 .t3 th.sk,.t3 td.sk{position:sticky;z-index:2}.t3 th.sk{background:var(--bg)}.t3 tbody td.sk{background:var(--bg)}.t3 tbody tr:nth-child(odd) td.sk{background:#181513}
 .t3 .s0{left:0;min-width:96px;width:96px}.t3 .s1{left:96px;min-width:215px;width:215px}.t3 .s2{left:311px;min-width:104px;width:104px;box-shadow:inset -1px 0 0 var(--line)}
 @media(max-width:760px){.t3 .s0,.t3 .s2{position:static;min-width:0;width:auto;box-shadow:none}.t3 .s1{left:0;min-width:150px;width:150px;box-shadow:inset -1px 0 0 var(--line);white-space:normal}}
@@ -295,6 +300,7 @@ h2.sep{margin-top:12px;color:var(--muted)}
       <button role="tab" data-tab="rebounds" id="tab-rebounds">Rebounds</button>
       <button role="tab" data-tab="assists" id="tab-assists">Assists</button>
       <button role="tab" data-tab="parlays" id="tab-parlays">Parlays</button>
+      <button role="tab" data-tab="movers" id="tab-movers">Movers</button>
       <button role="tab" data-tab="matchup" id="tab-matchup">Matchup</button>
       <button role="tab" data-tab="tips" id="tab-tips">Tip-offs</button>
       <button role="tab" data-tab="shots" id="tab-shots">First shots</button>
@@ -1261,7 +1267,7 @@ function showPlayer(p,all){
   m.innerHTML='<div class="pc"><div class="ph" style="background:linear-gradient(120deg,'+col+' 0%,color-mix(in srgb,'+col+' 55%,#000) 100%)"><button class="x" id="pmX" aria-label="Close">×</button>'+(team?'<div class="big">'+lg(team)+'</div>':'')+
     '<div class="shot"><img alt="" src="https://cdn.nba.com/headshots/nba/latest/260x190/'+p+'.png" onerror="this.parentNode.innerHTML=\'&lt;div class=&quot;ini&quot;&gt;'+esc(ini)+'&lt;/div&gt;\'"></div>'+
     '<div class="who"><h2>'+esc(name)+'</h2><p>'+(team?lg(team)+'<b>'+team+'</b>':'')+(pos?'<span>· '+pos+'</span>':'')+(lab?'<span>· '+lab+' season</span>':'')+'</p></div></div>'+
-    '<div class="pb">'+(tiles?'<div class="tiles" style="--tc:'+Math.ceil((tiles.split('class="tile"').length-1)/2)+'">'+tiles+'</div>':'')+next+tbl+'</div></div>';
+    '<div class="pb">'+(tiles?'<div class="tiles" style="--tc:'+Math.ceil((tiles.split('class="tile"').length-1)/2)+'">'+tiles+'</div>':'')+next+mvPlayerHtml(p,TN&&TN.d)+tbl+'</div></div>';
   document.body.style.overflow="hidden";m.scrollTop=0;
   var mb=$("plMore");if(mb)mb.onclick=function(){showPlayer(p,true)};$("pmX").focus()}
 
@@ -1479,7 +1485,7 @@ function ftDay(day){D._ftd=D._ftd||{};var ck=day+"|"+S.book+"|"+(S.bookOff?1:0)+
 function ftHtml(day){var rows=ftDay(day);if(!rows.length)return "";var priced=rows.some(function(r){return r.price!=null}),played=rows.some(function(r){return r.res!=null}),vals=rows.filter(function(r){return r.val});
   var shown=priced?rows.filter(function(r){return r.price!=null}).slice(0,S.ftAll?999:14):rows.slice(0,S.ftAll?999:12);
   return '<section class="panel"><div class="phead"><h2>First team basket</h2><span class="tag">'+(priced?vals.length+' value play'+(vals.length===1?'':'s')+' · best value first':'no prices yet · likeliest first')+'</span></div>'+
-    '<p class="note" style="margin-bottom:14px">Which starter scores his own team\'s first points, whoever wins the tip. His chance is his share of the team\'s early shots among its five likeliest starters, the same share used across this page; each rate is eased toward the league's 50% as if he had 20 more starts, so a few hot starts count for less than a long record; in the back-test it matched what happened (said 22%, happened 21.3%; said 25%, happened 25.8%). '+(priced?'<b>VALUE</b> marks a price at least 3 points above what it needs, on a starter with a 15% chance or better; the best of them, one per team and four a night, are the picks above. ':'Prices appear here once first-team-basket prices are on record; until then compare the fair price with your book. ')+'Not part of the parlay finder.</p>'+
+    '<p class="note" style="margin-bottom:14px">Which starter scores his own team\'s first points, whoever wins the tip. His chance is his share of the team\'s early shots among its five likeliest starters, the same share used across this page; each rate is eased toward the league\'s 50% as if he had 20 more starts, so a few hot starts count for less than a long record; in the back-test it matched what happened (said 22%, happened 21.3%; said 25%, happened 25.8%). '+(priced?'<b>VALUE</b> marks a price at least 3 points above what it needs, on a starter with a 15% chance or better; the best of them, one per team and four a night, are the picks above. ':'Prices appear here once first-team-basket prices are on record; until then compare the fair price with your book. ')+'Not part of the parlay finder.</p>'+
     '<div class="tw"><table><thead><tr><th>Team</th><th>Player</th><th>Game</th><th class="n" title="Starts in which he took one of the team\'s first three shots">Early-shot starts</th><th class="n rate">Chance</th><th class="n">Fair price</th>'+(priced?'<th class="n">Best price</th><th class="n">Edge</th><th class="n">Value score</th>':'')+(played?'<th>Result</th>':'')+'</tr></thead><tbody>'+
     shown.map(function(r){var m=r.m;return '<tr'+(r.val?' class="on"':'')+'><td>'+tmL(r.t)+'</td><td>'+nm(r.p)+(r.val?' <span class="tag w">VALUE</span>':'')+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n">'+(r.x.gs?Math.round(100*r.x.gc/r.x.gs)+'% <span class="o">'+r.x.gc+' of '+r.x.gs+'</span>':'–')+'</td><td class="n rate"><b>'+(r.p2*100).toFixed(1)+'%</b></td><td class="n">'+fairOdds(r.p2)+'</td>'+
       (priced?(r.price!=null?'<td class="n">'+bx(fmtP(r.price),r.p,day,r.t,r.opp,r.t===m.h,"ftb",0,r.price,r.book,r.all)+' <span class="o">'+esc(r.book)+'</span></td><td class="n"><span class="tag '+(r.ev>0?"w":"")+'">'+(r.ev>0?"+":"")+Math.round(r.ev*100)+'%</span></td><td class="n"><b>'+(r.vs>0?"+":"")+r.vs.toFixed(1)+'</b></td>':'<td class="n"><span class="o">–</span></td><td></td><td></td>'):'')+
@@ -1585,7 +1591,7 @@ function render(){
   [].forEach.call(document.querySelectorAll("#seg-ft button"),function(b){b.setAttribute("aria-pressed",+b.dataset.v===S.ft)});
   if(!G.length){view.innerHTML='<p class="empty">No games match these filters.</p>';return}
   var keep=document.activeElement&&document.activeElement.id,pos=keep==="q"?document.activeElement.selectionStart:null;
-  ({picks:vPicks,lineups:vLineups,threes:vThrees,rebounds:function(){inSK("rb",vThrees)},assists:function(){inSK("as",vThrees)},parlays:vParlays,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,bets:vBets,games:vGames,model:vModel})[S.tab]();
+  ({picks:vPicks,lineups:vLineups,threes:vThrees,rebounds:function(){inSK("rb",vThrees)},assists:function(){inSK("as",vThrees)},parlays:vParlays,movers:vMovers,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,bets:vBets,games:vGames,model:vModel})[S.tab]();
   if(keep&&$(keep)){$(keep).focus();if(pos!=null)$(keep).setSelectionRange(pos,pos)}
   if(S.tab!=="bets")betCount();
 }
@@ -1607,6 +1613,9 @@ document.addEventListener("click",function(e){
   if(e.target.id==="pm"||e.target.closest("#pmX"))return closePlayer();
   var tc=e.target.closest(".t3c");if(tc&&S._t3top&&S._t3top[+tc.dataset.i])return showWhy(S._t3top[+tc.dataset.i]);
   var gb=e.target.closest("#t3Games button");if(gb){S.t3Game=gb.dataset.g||null;return render()}
+  var mk=e.target.closest("[data-mvk]");if(mk){S.mvMk=mk.dataset.mvk;return render()}
+  var mr=e.target.closest("[data-mvr]");if(mr){S.mvRows=mr.dataset.mvr;return render()}
+  if(e.target.id==="mvMore"){S.mvAll=!S.mvAll;return render()}
   var t=e.target.closest("[data-tab]");if(t){S.tab=t.dataset.tab;try{history.replaceState(null,"","#"+S.tab)}catch(_){}return render()}
   var b=e.target.closest("#seg-po button");if(b){S.po=b.dataset.v;return render()}
   b=e.target.closest("#seg-n button");if(b){S.n=+b.dataset.v;return render()}
@@ -1665,7 +1674,7 @@ document.addEventListener("change",function(e){var id=e.target.id,v=e.target.val
   if(t.closest&&t.closest("#betAdd")){bformKeep();return}
   if(id==="selBook"){S.book=v;try{localStorage.setItem("tolBook",v)}catch(_){}return render()}
   if(id==="selA"){S.a=v;S.ja=null}else if(id==="selB"){S.b=v;S.jb=null}else if(id==="selJA")S.ja=+v;else if(id==="selJB")S.jb=+v;
-  else if(id==="selShot")S.shotTeam=v;else if(id==="selLog"){S.logTeam=v;S.logN=40}else if(id==="minTips")S.minTips=+v;else if(id==="selDay")S.day=v;else if(id==="ldDays")S.ldDays=+v;else if(id==="ldScope")S.ldScope=+v;else if(id==="ldTeam")S.ldTeam=v;else if(id==="ldRank")S.sort.ld={k:v,dir:-1};else if(id==="selMargin")S.margin=+v;else if(id==="selLv")S.minLv=+v;else return;
+  else if(id==="selShot")S.shotTeam=v;else if(id==="selLog"){S.logTeam=v;S.logN=40}else if(id==="minTips")S.minTips=+v;else if(id==="selDay")S.day=v;else if(id==="mvDay")S.mvDay=v;else if(id==="ldDays")S.ldDays=+v;else if(id==="ldScope")S.ldScope=+v;else if(id==="ldTeam")S.ldTeam=v;else if(id==="ldRank")S.sort.ld={k:v,dir:-1};else if(id==="selMargin")S.margin=+v;else if(id==="selLv")S.minLv=+v;else return;
   try{localStorage.setItem("tol",JSON.stringify({a:S.a,b:S.b,s:S.shotTeam}))}catch(_){}
   render()});
 document.addEventListener("input",function(e){if(e.target.id==="q"){S.q=e.target.value;render()}});
@@ -1682,7 +1691,7 @@ function start(d){
     if(S.ssn!=="all"&&ss.map(String).indexOf(S.ssn)<0)S.ssn="all";
     if(!S.booted)S.ssn=nCur>=150?cur:"all"}else S.ssn="all";
   if(!S.booted&&(d.sched||[]).some(function(x){return x.d>=todayET()}))S.tab="picks";
-  if(!S.booted&&["picks","lineups","threes","rebounds","assists","parlays","matchup","tips","shots","leaders","tracker","bets","games","model"].indexOf(h)>=0)S.tab=h;S.booted=1;
+  if(!S.booted&&["picks","lineups","threes","rebounds","assists","parlays","movers","matchup","tips","shots","leaders","tracker","bets","games","model"].indexOf(h)>=0)S.tab=h;S.booted=1;
   var top=jumperTable().sort(function(a,b){return b.tips-a.tips})[0];S.jumper=top?top.p:null;
   $("subline").textContent=d.season+" season · opening tips, jumper head-to-heads and first attempts, from NBA play-by-play.";
   $("fresh").innerHTML=d.games.length+" games through "+fmtD(d.through)+", "+d.through.slice(0,4)+"<br>data built "+esc(d.built.replace("T"," ").replace("Z"," UTC"));
@@ -1730,7 +1739,113 @@ if(served){
       fetch(hosts[i]+"/liveData/scoreboard/todaysScoreboard_00.json",{cache:"no-store"}).then(function(r){if(r.ok)return r.json().then(function(j){if(j&&j.scoreboard)ok.push(i?"backup":"main")})}).catch(function(){}).then(function(){t(i+1)})}
     t(0)})();
 }else if(location.protocol==="file:"){say("This copy does not update itself. Run python3 build_data.py --install once, then use http://localhost:8765")}
-if(typeof window!=="undefined"&&window.__TL_HOOK)window.__TL_HOOK({data:function(){return D},S:S,todayET:todayET,t3Day:t3Day,t3Started:t3Started,t3Freeze:t3Freeze,t3PickOut:t3PickOut,t3LadOut:t3LadOut,t3LadderList:t3LadderList,t3Fill:t3Fill,inSK:inSK,STAT:STAT,t3AtLeast:t3AtLeast,ftDay:ftDay,ftFill:ftFill,ftOut:ftOut,ftMs:ftMs});
+/* ---- movers: what changed between refreshes ----
+   lock_picks.js calls mvRecord on every refresh. It takes a snapshot of every market for every player in a game still to
+   start (chance, projection, line, best prices, value score, and the inputs behind them: status, lineup, starting role,
+   teammates out, tip jumpers), compares it with the snapshot from the refresh before, and logs each player whose numbers
+   or inputs changed, with the causes. The first prices of the day are not a move, so they are not logged. The log covers
+   today and the two days before and is carried in the data as "movers". */
+var MVK={fb:"First basket",ftb:"First team basket",t3:"Threes",rb:"Rebounds",as:"Assists"},MVS={fb:"1B",ftb:"FTB",t3:"3PM",rb:"REB",as:"AST"};
+function mvR(v,n){return v==null||isNaN(v)?null:+(+v).toFixed(n)}
+function mvNm(p){var n=String(D.players[p]||("#"+p)).split(" ");return n.length>1?n[0].charAt(0)+". "+n.slice(1).join(" "):n[0]}
+function mvSnap(day){var out={};
+  function stat(m,t,p){var c=ctxOf(m),i=c&&injOf(c,t,p),lu=c&&c.lu&&c.lu[t]&&c.lu[t].st&&c.lu[t].st.length>=5;return{s:i?String(i.st||""):"",cf:lu?1:0}}
+  function put(mk,m,t,p,o){if(t3Started(m)||!p)return;out[mk+"|"+p+"|"+m.a+"|"+m.h]=Object.assign({mk:mk,p:p,t:t,o:t===m.h?m.a:m.h,a:m.a,h:m.h},stat(m,t,p),o)}
+  // first basket: every expected starter's chance as the Picks page has it
+  var kd=S.day;S.day=day;try{vPicks()}catch(err){if(typeof console!=="undefined")console.error("movers: first basket snapshot failed: "+(err&&err.message))}var cf=S._conf;S.day=kd;
+  if(cf&&cf.day===day){var five={};cf.list.forEach(function(s){var k=s.r.m.a+s.r.m.h+s.t;(five[k]=five[k]||[]).push(s.e.x.p)});
+    cf.list.forEach(function(s){var r=s.r,m=r.m,e=s.e;put("fb",m,s.t,e.x.p,{q:mvR(e.p,4),pr:s.price==null?null:s.price,bk:s.book||"",v:mvR(s.vs,2),j:(s.t===m.h?r.jh:r.ja)||0,jo:(s.t===m.h?r.ja:r.jh)||0,
+      w:five[m.a+m.h+s.t].slice().sort(function(a,b){return a-b}),n:e.x.st})})}
+  ftDay(day).forEach(function(r){put("ftb",r.m,r.t,r.p,{q:mvR(r.p2,4),pr:r.price==null?null:r.price,bk:r.book||"",v:mvR(r.vs,2),n:r.x.gs})});
+  ["t3","rb","as"].forEach(function(sk){inSK(sk,function(){t3Day(day).rows.forEach(function(r){var pr=r.pr;if(pr.att<STAT[sk].volShow&&!r.o)return; // the deep bench only when he has a price
+    var c=r.cand||[],ov=c.filter(function(x){return /^Over /.test(x.lab)})[0],un=c.filter(function(x){return /^Under /.test(x.lab)})[0],b=c[0];
+    put(sk,r.m,r.t,r.p,{q:ov?mvR(ov.p,4):null,mu:mvR(pr.mu,2),ln:r.ln?r.ln[1]:null,po:ov?ov.price:null,pu:un?un.price:null,bk:ov?ov.book:"",v:b?mvR(b.vs,2):null,vl:b?b.lab:"",st:pr.st?1:0,
+      w:(pr.mwho||[]).map(function(x){return x[0]}).sort(function(a,b){return a-b}),n:pr.n})})})});
+  return out}
+function mvCauses(b,f){var c=[],P=function(x){return x==null?"–":fmtP(x)};
+  if((b.s||"")!==(f.s||""))c.push([f.s&&/^out/i.test(f.s)?"Ruled out":"Status",b.s||"not listed",f.s||"off the report"]);
+  if(!b.cf&&f.cf)c.push(["Lineup posted",f.mk==="fb"||f.mk==="ftb"||f.st==null?"":f.st?"starting":"bench",""]);
+  else if(b.st!=null&&b.st!==f.st)c.push([f.st?"Now starting":"Now off the bench","",""]);
+  var bw=b.w||[],fw=f.w||[],inn=fw.filter(function(x){return bw.indexOf(x)<0}),gone=bw.filter(function(x){return fw.indexOf(x)<0});
+  if(f.mk==="fb"){inn.forEach(function(x){if(x!==f.p)c.push(["Starter in",mvNm(x),""])});gone.forEach(function(x){if(x!==f.p)c.push(["Starter out",mvNm(x),""])})}
+  else{inn.forEach(function(x){c.push(["Teammate out",mvNm(x),""])});gone.forEach(function(x){c.push(["Teammate back",mvNm(x),""])})}
+  if(f.mk==="fb"){if(b.j!==f.j)c.push(["Jumper",b.j?mvNm(b.j):"none",f.j?mvNm(f.j):"none"]);if(b.jo!==f.jo)c.push(["Opposing jumper",b.jo?mvNm(b.jo):"none",f.jo?mvNm(f.jo):"none"])}
+  if(b.n!=null&&f.n!=null&&b.n!==f.n)c.push(["Game added to his record","",""]);
+  if(b.ln!=null&&b.ln!==f.ln)c.push(["Line",String(b.ln),f.ln==null?"off the board":String(f.ln)]);
+  if(b.po!=null&&b.po!==f.po)c.push(["Best over price",P(b.po),P(f.po)]);
+  if(b.pu!=null&&b.pu!==f.pu)c.push(["Best under price",P(b.pu),P(f.pu)]);
+  if(b.pr!=null&&b.pr!==f.pr)c.push(["Best price",P(b.pr),P(f.pr)]);
+  return c}
+function mvDayAdd(d,n){var x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
+function mvRecord(st,stamp,day0){st=st||{};st.snap=st.snap||{};st.log=st.log||{};var today=day0||todayET(),days=[today],nx=null;
+  (D.sched||[]).forEach(function(x){if(x.d>today&&(!nx||x.d<nx))nx=x.d});if(nx&&nx<=mvDayAdd(today,1))days.push(nx);
+  days.forEach(function(day){var cur=mvSnap(day),old=st.snap[day]||{},log=st.log[day]=st.log[day]||[];
+    Object.keys(cur).forEach(function(k){var f=cur[k],b=old[k];if(!b)return;var c=mvCauses(b,f);
+      var moved=(f.q!=null&&b.q!=null&&Math.abs(f.q-b.q)>=.003)||(f.mu!=null&&b.mu!=null&&Math.abs(f.mu-b.mu)>=.05)||(f.v!=null&&b.v!=null&&Math.abs(f.v-b.v)>=.5);
+      if(!c.length&&!moved)return;
+      if(!c.length)c.push(["Model update","",""]); // the opponent's numbers or the league's moved with games elsewhere
+      var e={at:stamp,mk:f.mk,p:f.p,t:f.t,o:f.o,a:f.a,h:f.h,c:c,b:[b.q,b.mu,b.v],f:[f.q,f.mu,f.v],pr:f.mk==="fb"||f.mk==="ftb"?f.pr:f.po,bk:f.bk||""};
+      if(f.ln!=null)e.ln=f.ln;if(f.vl)e.vl=f.vl;log.push(e)});
+    st.snap[day]=cur;if(!log.length)delete st.log[day]});
+  var keep=mvDayAdd(today,-2);Object.keys(st.log).forEach(function(d){if(d<keep)delete st.log[d]});Object.keys(st.snap).forEach(function(d){if(days.indexOf(d)<0)delete st.snap[d]});
+  return st}
+
+/* ---- the Movers tab ---- */
+S.mvMk="all";S.mvRows="one";S.mvDay=null;
+function mvClock(s){try{return new Date(s).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})}catch(_){return ""}}
+function mvPct(q){return q==null?'<span class="o">–</span>':(q*100).toFixed(1)+"%"}
+function mvUnit(mk,v){return (v>0?"+":v<0?"−":"")+Math.abs(v).toFixed(1)+" "+(mk==="t3"?"3PM":mk==="rb"?"reb":"ast")}
+function mvCauseHtml(c){return c.map(function(x){return '<span class="mvc"><b>'+esc(x[0])+'</b>'+(x[1]?' '+esc(x[1]):'')+(x[2]?' → '+esc(x[2]):'')+'</span>'}).join("")}
+function mvRowsOf(L,one){if(!one)return L.map(function(e){return{e:e,b:e.b,f:e.f,at:e.at,c:e.c,n:1}});
+  var by={},out=[];L.forEach(function(e){var k=e.mk+"|"+e.p+"|"+e.a+"|"+e.h,x=by[k];
+    if(!x){x=by[k]={e:e,b:e.b.slice(),f:e.f,at:e.at,c:[],n:0};out.push(x)}
+    x.n++;x.at=e.at;x.f=e.f;x.e=Object.assign({},x.e,{pr:e.pr,bk:e.bk,ln:e.ln,vl:e.vl}); // the log runs oldest first: the first before, the latest after
+    e.c.forEach(function(c){var nmd=/^(Teammate|Starter) /.test(c[0]),i=-1;x.c.forEach(function(y,j){if(y[0]===c[0]&&(!nmd||y[1]===c[1]))i=j});
+      if(i<0)x.c.push(c.slice());else if(c[2])x.c[i][2]=c[2]})}); // a cause seen twice keeps where it started and where it ended
+  return out}
+function mvMove(r){var b=r.b,f=r.f;if(b[0]!=null&&f[0]!=null)return (f[0]-b[0])*100;if(b[1]!=null&&f[1]!=null)return (f[1]-b[1])*5;return null} // chance points; with no price yet, the projection (one made three, rebound or assist ≈ 5 points)
+function vMovers(){var M=D.movers||{},today=todayET(),days=Object.keys(M).sort().reverse();
+  var day=S.mvDay&&M[S.mvDay]?S.mvDay:(M[today]?today:days[0]);
+  if(!day){view.innerHTML='<section class="panel"><div class="phead"><h2>Movers</h2></div><p class="note">Nothing has moved yet. Every refresh compares each player with the refresh before, for games still to start, and logs what changed: an injury, a posted lineup, a teammate ruled out, a new jumper, a line or a price. The log starts with the next refresh that finds a change and covers today and the two days before.</p></section>';return}
+  var all=M[day]||[],mk=S.mvMk,L=all.filter(function(e){return mk==="all"||e.mk===mk}),one=S.mvRows==="one",R=mvRowsOf(L,one);
+  var up=0,dn=0,pl={};R.forEach(function(r){var v=mvMove(r);if(v>0)up++;else if(v<0)dn++;pl[r.e.p]=1});
+  var cnt={};all.forEach(function(e){cnt[e.mk]=(cnt[e.mk]||0)+1});
+  var cols=[{k:"team",l:"Team",v:function(r){return r.e.t},s:"s0"},{k:"name",l:"Player",v:function(r){return (D.players[r.e.p]||"").replace(/^\S+\s/,"")},s:"s1"},{k:"opp",l:"Opp",v:function(r){return r.e.o},s:"s2"},
+    {k:"mk",l:"Market",v:function(r){return MVK[r.e.mk]},txt:1},{k:"at",l:one?"Last change":"Time",v:function(r){return r.at},txt:1},{k:"why",l:"What changed",v:function(r){return r.c.length},txt:1,c:" mvw"},
+    {k:"pb",l:"Proj before",v:function(r){return r.b[1]}},{k:"pa",l:"Proj after",v:function(r){return r.f[1]}},
+    {k:"qb",l:"Chance before",v:function(r){return r.b[0]}},{k:"qa",l:"Chance after",v:function(r){return r.f[0]}},{k:"mv",l:"Moved",v:mvMove},
+    {k:"px",l:"Best price",v:function(r){return r.e.pr==null?null:payOf(r.e.pr)}},{k:"ev",l:"Edge now",v:function(r){return r.f[0]!=null&&r.e.pr!=null?r.f[0]*payOf(r.e.pr)-1:null}},
+    {k:"vb",l:"Value before",v:function(r){return r.b[2]}},{k:"va",l:"Value after",v:function(r){return r.f[2]}},{k:"vm",l:"Value moved",v:function(r){return r.b[2]!=null&&r.f[2]!=null?r.f[2]-r.b[2]:null}}];
+  var so=S.sort.mv||{k:"mv",dir:-1},sc=cols.filter(function(c){return c.k===so.k})[0]||cols[10];
+  R.sort(function(a,b){var x=sc.v(a),y=sc.v(b);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return (x<y?-1:x>y?1:0)*so.dir});
+  function th(c,i){return '<th class="'+(i>2&&!c.txt?"n":"")+(c.c||"")+(c.s?" sk "+c.s:"")+'" tabindex="0" data-sort="mv|'+c.k+'"'+(so.k===c.k?' aria-sort="'+(so.dir>0?"ascending":"descending")+'"':'')+'>'+c.l+'</th>'}
+  function sg(v,txt){return v==null?'<span class="o">–</span>':'<span class="'+(v>0?"bup":v<0?"bdn":"")+'">'+(v>0?"▲ ":v<0?"▼ ":"")+txt+'</span>'}
+  var body=R.slice(0,S.mvAll?9999:150).map(function(r){var e=r.e,mvv=mvMove(r),chg=r.b[0]!=null&&r.f[0]!=null,ev=cols[12].v(r),vm=cols[15].v(r),prj=r.b[1]!=null&&r.f[1]!=null?r.f[1]-r.b[1]:null;
+    return '<tr><td class="sk s0">'+tmL(e.t)+'</td><td class="sk s1">'+nm(e.p)+'</td><td class="sk s2">'+(e.t===e.h?"vs ":"@ ")+e.o+'</td><td><span class="tag">'+MVS[e.mk]+'</span>'+(e.ln!=null?' <span class="o">'+e.ln+'</span>':'')+'</td><td class="o">'+mvClock(r.at)+(one&&r.n>1?' · '+r.n+'×':'')+'</td><td class="mvw">'+mvCauseHtml(r.c)+'</td>'+
+      '<td class="n o">'+(r.b[1]!=null?r.b[1].toFixed(2):'–')+'</td><td class="n">'+(r.f[1]!=null?'<b>'+r.f[1].toFixed(2)+'</b>':'<span class="o">–</span>')+'</td>'+
+      '<td class="n o">'+mvPct(r.b[0])+'</td><td class="n"><b>'+mvPct(r.f[0])+'</b></td><td class="n">'+(chg?sg(mvv,(mvv>0?"+":mvv<0?"−":"")+Math.abs(mvv).toFixed(1)+" pts"):prj!=null?sg(prj,mvUnit(e.mk,prj)):'<span class="o">–</span>')+'</td>'+
+      '<td class="n">'+(e.pr!=null?'<b>'+fmtP(e.pr)+'</b> <span class="o">'+esc(e.bk||"")+'</span>':'<span class="o">–</span>')+'</td><td class="n">'+(ev!=null?'<span class="tag '+(ev>0?"w":"")+'">'+(ev>0?"+":"")+Math.round(ev*100)+'%</span>':'<span class="o">–</span>')+'</td>'+
+      '<td class="n o">'+(r.b[2]!=null?(r.b[2]>0?"+":"")+r.b[2].toFixed(1):'–')+'</td><td class="n">'+(r.f[2]!=null?'<b>'+(r.f[2]>0?"+":"")+r.f[2].toFixed(1)+'</b>'+(e.vl&&e.mk!=="fb"&&e.mk!=="ftb"?' <span class="o">'+esc(e.vl)+'</span>':''):'<span class="o">–</span>')+'</td><td class="n">'+(vm!=null?sg(vm,(vm>0?"+":vm<0?"−":"")+Math.abs(vm).toFixed(1)):'<span class="o">–</span>')+'</td></tr>'}).join("");
+  var pills='<div class="gp" id="mvMk">'+[["all","All markets"],["fb","First basket"],["ftb","First team basket"],["t3","Threes"],["rb","Rebounds"],["as","Assists"]].map(function(x){return '<button data-mvk="'+x[0]+'" aria-pressed="'+(mk===x[0])+'">'+x[1]+(x[0]!=="all"&&cnt[x[0]]?' <span class="o">'+cnt[x[0]]+'</span>':'')+'</button>'}).join("")+'</div>';
+  var rowsSw='<div class="gp" id="mvRows"><button data-mvr="one" aria-pressed="'+one+'">One a player</button><button data-mvr="every" aria-pressed="'+!one+'">Every change</button></div>';
+  view.innerHTML='<section class="panel"><div class="phead"><h2>Movers · '+fmtD(day)+'</h2><div class="pickers"><label class="f">Day <select id="mvDay">'+days.map(function(d){return '<option value="'+d+'"'+(d===day?" selected":"")+'>'+fmtD(d)+', '+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</select></label></div></div>'+
+    '<div class="mvbar">'+pills+rowsSw+'<span class="tag">'+Object.keys(pl).length+' players</span> <span class="tag nu up">'+up+' up</span> <span class="tag nu dn">'+dn+' down</span></div>'+
+    '<p class="note">Every refresh compares each player with the refresh before, for games still to start, and records what changed. <b>Chance</b> is the pick chance the cards use: for first basket and first team basket the model\'s chance; for threes, rebounds and assists the chance of the over at the main line, the model and the market averaged. <b>Proj</b> is the model\'s projected made threes, rebounds or assists. <b>Moved</b> is the change in chance in points, or the change in projection while there is no price yet. <b>Value</b> is the value score of his best bet in that market, before and after. '+
+    '<b>One a player</b> nets the whole day into one row, from the first refresh to now; <b>Every change</b> lists each refresh on its own row. A cause with little or no move is real: one input can cancel another. Prices are fetched three times before each game (about four hours, two hours and 25 minutes out, the last after lineups are posted), so most moves between those come from news. The log covers today and the two days before; nothing is recorded once a game has started. Select a column to sort.</p>'+
+    (R.length?'<div class="tw"><table class="t3 mv" id="mvTbl"><thead><tr>'+cols.map(th).join("")+'</tr></thead><tbody>'+body+'</tbody></table></div>'+(R.length>150?'<button class="more" id="mvMore">'+(S.mvAll?"Show the top 150":"Show all "+R.length)+'</button>':''):'<p class="empty">No moves in this market on this day.</p>')+'</section>'}
+/* a player's changes on the night, for his pop-up */
+function mvPlayerHtml(p,day0){var M=D.movers||{},cand=[day0,S.day,todayET()].concat(Object.keys(M).sort().reverse()),day=null;
+  cand.some(function(d){if(d&&(M[d]||[]).some(function(e){return e.p===p})){day=d;return true}return false});if(!day)return "";
+  var L=M[day].filter(function(e){return e.p===p}).sort(function(a,b){return a.at<b.at?1:a.at>b.at?-1:0});
+  return '<div><h3>Changes on '+fmtD(day)+' <span class="o" style="text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px">'+L.length+' between refreshes, newest first</span></h3><div class="mvl">'+L.slice(0,40).map(function(e){
+    var q=e.b[0]!=null&&e.f[0]!=null,dq=q?(e.f[0]-e.b[0])*100:null,dm=e.b[1]!=null&&e.f[1]!=null?e.f[1]-e.b[1]:null,dv=e.b[2]!=null&&e.f[2]!=null?e.f[2]-e.b[2]:null;
+    function cl(v){return v>0?"bup":v<0?"bdn":"o"}
+    return '<div class="mvi"><span class="mvt">'+mvClock(e.at)+'</span><span class="tag">'+MVS[e.mk]+'</span><span class="mvcs">'+mvCauseHtml(e.c)+'</span><span class="mvn">'+
+      (dm!=null&&Math.abs(dm)>=.01?'<span class="'+cl(dm)+'">proj '+e.b[1].toFixed(2)+' → '+e.f[1].toFixed(2)+'</span>':'')+
+      (q&&Math.abs(dq)>=.05?'<span class="'+cl(dq)+'">chance '+(e.b[0]*100).toFixed(1)+'% → '+(e.f[0]*100).toFixed(1)+'%</span>':'')+
+      (dv!=null&&Math.abs(dv)>=.05?'<span class="'+cl(dv)+'">value '+(e.b[2]>0?"+":"")+e.b[2].toFixed(1)+' → '+(e.f[2]>0?"+":"")+e.f[2].toFixed(1)+'</span>':'')+'</span></div>'}).join("")+'</div></div>'}
+
+if(typeof window!=="undefined"&&window.__TL_HOOK)window.__TL_HOOK({mvRecord:mvRecord,mvSnap:mvSnap,data:function(){return D},S:S,todayET:todayET,t3Day:t3Day,t3Started:t3Started,t3Freeze:t3Freeze,t3PickOut:t3PickOut,t3LadOut:t3LadOut,t3LadderList:t3LadderList,t3Fill:t3Fill,inSK:inSK,STAT:STAT,t3AtLeast:t3AtLeast,ftDay:ftDay,ftFill:ftFill,ftOut:ftOut,ftMs:ftMs});
 var emb=$("tipoff-data"),inline=null;
 try{if(emb&&emb.textContent.trim())inline=JSON.parse(emb.textContent)}catch(_){}
 if(inline)start(inline);

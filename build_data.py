@@ -688,12 +688,12 @@ def backfill_odds(season, html, max_credits=0, reserve=300):
 
 
 def remember_odds(sched, old):
-    """First-basket prices for today's games from The Odds API, kept in odds.json so each game is asked for at most twice.
+    """First-basket prices for today's games from The Odds API, kept in odds.json so each game is asked for at most three times.
 
     Needs the key in the ODDS_API_KEY environment variable; without it this only returns what is already stored.
     Each request covers eight markets (first basket, first team basket, and made threes, rebounds and assists with
-    their alternates) and costs eight credits; a game is fetched once inside four hours of tip and refreshed once
-    inside the last hour: about sixteen credits a game. Fetching stops when fewer than 300 credits remain on the key.
+    their alternates) and costs eight credits; a game is fetched once inside four hours of tip, again inside two hours, and a last
+    time inside 25 minutes, after the lineups are posted: about twenty-four credits a game. Fetching stops when fewer than 300 credits remain on the key.
     """
     store = dict((old or {}).get("odds") or {})
     try:
@@ -716,7 +716,11 @@ def remember_odds(sched, old):
         # empty-handed tries are spaced half an hour apart, so a five-minute refresh does not use them all at once
         waited = not rec.get("tt") or (now - datetime.fromisoformat(rec["tt"]).replace(tzinfo=ET)).total_seconds() >= 30 * 60
         has = any(rec.get(x) for x in ("p", "t3", "t3a", "rb", "rba", "as", "asa", "ft"))
-        if (not has and 0 < mins <= 240 and rec.get("tries", 0) < 6 and waited) or (has and rec.get("n", 1) < 2 and 0 < mins <= 60):
+        n = rec.get("n", 1)
+        since = (now - datetime.fromisoformat(rec["at"]).replace(tzinfo=ET)).total_seconds() / 60 if rec.get("at") else 999
+        # second look inside two hours (at least 45 minutes after the first), last look inside 25 minutes, once lineups are out
+        again = has and 0 < mins and ((n < 2 and mins <= 120 and since >= 45) or (n < 3 and mins <= 25 and since >= 15))
+        if (not has and 0 < mins <= 240 and rec.get("tries", 0) < 6 and waited) or again:
             want.append((k, u))
     if want:
         try:
