@@ -4,7 +4,7 @@
    Run after build_data.py:   node lock_picks.js [tipoff_ledger.html] [picks.json]
 
    It runs the page's own model (the script inside the page) on the data embedded in it, works out tonight's Best plays
-   and Ladder watch, for threes and for rebounds, exactly as the page would, and keeps them in picks.json. Everything about a game is frozen at the
+   and Ladder watch, for threes, rebounds and assists, exactly as the page would, and keeps them in picks.json. Everything about a game is frozen at the
    last run before it tips off; until then it can still change on each run. A pick that drops off the list before its
    game starts is remembered with its first and last price. The store is written back into the page's data as "locks",
    which is what the page and its Tracker read. */
@@ -91,14 +91,14 @@ function lockStat(sk) {
   });
   rec[C.lk] = picks; rec[C.seen] = seen; rec[C.lw] = lw; rec[C.fz] = fz;
 }
-["t3", "rb"].forEach(sk => api.inSK(sk, () => lockStat(sk)));
+["t3", "rb", "as"].forEach(sk => api.inSK(sk, () => lockStat(sk)));
 if (ms.length) {
   const any = ms.some(started), all = ms.every(started);
   rec.at = (prev.at && all) ? prev.at : stamp; rec.locked = any ? 1 : 0; rec.done = all ? 1 : 0;
   store[day] = rec;
 }
 /* frozen game numbers are only needed for a little while; the picks and ladders themselves are kept for the season */
-Object.keys(store).forEach(k => { if (store[k] && Math.round((Date.parse(day) - Date.parse(k)) / 864e5) > 10) { delete store[k].fz; delete store[k].rfz; } });
+Object.keys(store).forEach(k => { if (store[k] && Math.round((Date.parse(day) - Date.parse(k)) / 864e5) > 10) { delete store[k].fz; delete store[k].rfz; delete store[k].afz; } });
 store = Object.fromEntries(Object.keys(store).sort().slice(-300).map(k => [k, store[k]]));
 fs.writeFileSync(storePath, JSON.stringify(store));
 
@@ -107,5 +107,5 @@ doc.locks = store;
 fs.writeFileSync(html, page.slice(0, i0 + TAG.length) + JSON.stringify(doc).replace(/<\//g, "<\\/") + page.slice(i1));
 
 const t = store[day], show = l => (l || []).map(x => x.n + " " + x.lab + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ");
-console.log(`lock_picks: ${day} ${t ? (t.done ? "all locked" : t.locked ? "partly locked" : "open") + "; threes picks: " + show(t.t3) + "; rebound picks: " + show(t.rb) +
-  "; ladders " + (t.lw || []).length + " threes, " + (t.rlw || []).length + " rebounds" : "no games"}`);
+console.log(`lock_picks: ${day} ${t ? (t.done ? "all locked" : t.locked ? "partly locked" : "open") + "; threes picks: " + show(t.t3) + "; rebound picks: " + show(t.rb) + "; assist picks: " + show(t.as) +
+  "; ladders " + (t.lw || []).length + " threes, " + (t.rlw || []).length + " rebounds, " + (t.alw || []).length + " assists" : "no games"}`);

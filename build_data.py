@@ -54,7 +54,7 @@ ESPN_ABBR = {"GS": "GSW", "NY": "NYK", "SA": "SAS", "NO": "NOP", "UTAH": "UTA", 
 UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.nba.com/", "Accept": "application/json"}
 COLS = {"gameId", "orderNumber", "period", "clock", "timeActual", "actionType", "subType", "descriptor",
         "personId", "playerNameI", "teamTricode", "shotResult", "shotDistance", "scoreHome",
-        "jumpBallWonPersonId", "jumpBallLostPersonId", "jumpBallRecoverdPersonId"}
+        "jumpBallWonPersonId", "jumpBallLostPersonId", "jumpBallRecoverdPersonId", "assistPersonId"}
 N_SHOTS = 5            # attempts are kept per team until it has N field-goal attempts
 TIP_WINDOW = 690       # opening tip must be logged with >= 11:30 on the Q1 clock
 ET = ZoneInfo("America/New_York")
@@ -307,7 +307,7 @@ def pid(v):
 
 
 def threes_box(g, home, away):
-    """Per team, every player who appeared: [personId, threes attempted, threes made, minutes x10, rebounds].
+    """Per team, every player who appeared: [personId, threes attempted, threes made, minutes x10, rebounds, assists].
 
     Minutes come from the substitutions: a player whose first event in a period is anything but coming on was on
     the floor from its start, and anyone still on at the end played to the buzzer. Game totals land on 240 a side.
@@ -341,10 +341,14 @@ def threes_box(g, home, away):
     att = t3.groupby("personId").size().to_dict()
     made = t3[t3.shotResult == "Made"].groupby("personId").size().to_dict()
     reb = g[g.actionType == "rebound"].groupby("personId").size().to_dict()   # team rebounds carry no player and drop out below
+    ast = {}
+    if "assistPersonId" in g.columns:  # the passer is named on the made shot
+        ap = pd.to_numeric(g["assistPersonId"], errors="coerce")
+        ast = ap[ap > 0].astype(int).value_counts().to_dict()
     box = {home: [], away: []}
     for who, sc in secs.items():
         if team.get(who) in box and sc > 0:
-            box[team[who]].append([who, int(att.get(who, 0)), int(made.get(who, 0)), int(round(sc / 6)), int(reb.get(who, 0))])
+            box[team[who]].append([who, int(att.get(who, 0)), int(made.get(who, 0)), int(round(sc / 6)), int(reb.get(who, 0)), int(ast.get(who, 0))])
     for t in box:
         box[t].sort(key=lambda x: -x[3])
     return box
@@ -491,13 +495,13 @@ TEAM_NAMES = {"Atlanta Hawks": "ATL", "Boston Celtics": "BOS", "Brooklyn Nets": 
               "Sacramento Kings": "SAC", "San Antonio Spurs": "SAS", "Toronto Raptors": "TOR", "Utah Jazz": "UTA", "Washington Wizards": "WAS"}
 
 
-def parse_first_basket(doc):
-    """First-basket prices: [[player, best american price, best book, {book: price at every book}], ...]."""
+def parse_first_basket(doc, market="player_first_basket"):
+    """First-basket prices (or first team basket, with that market key): [[player, best price, best book, {book: price}], ...]."""
     best, every = {}, {}
     for bk in doc.get("bookmakers") or []:
         name = bk.get("title") or bk.get("key") or ""
         for mk in bk.get("markets") or []:
-            if mk.get("key") != "player_first_basket":
+            if mk.get("key") != market:
                 continue
             for o in mk.get("outcomes") or []:
                 who = o.get("description") or o.get("name")
@@ -687,9 +691,9 @@ def remember_odds(sched, old):
     """First-basket prices for today's games from The Odds API, kept in odds.json so each game is asked for at most twice.
 
     Needs the key in the ODDS_API_KEY environment variable; without it this only returns what is already stored.
-    Each request covers five markets (first basket, made threes and their alternates, rebounds and their alternates)
-    and costs five credits; a game is fetched once inside four hours of tip and refreshed once inside the last hour:
-    about ten credits a game. Fetching stops when fewer than 300 credits remain on the key.
+    Each request covers eight markets (first basket, first team basket, and made threes, rebounds and assists with
+    their alternates) and costs eight credits; a game is fetched once inside four hours of tip and refreshed once
+    inside the last hour: about sixteen credits a game. Fetching stops when fewer than 300 credits remain on the key.
     """
     store = dict((old or {}).get("odds") or {})
     try:
@@ -711,7 +715,7 @@ def remember_odds(sched, old):
         rec = store.get(k) or {}
         # empty-handed tries are spaced half an hour apart, so a five-minute refresh does not use them all at once
         waited = not rec.get("tt") or (now - datetime.fromisoformat(rec["tt"]).replace(tzinfo=ET)).total_seconds() >= 30 * 60
-        has = rec.get("p") or rec.get("t3") or rec.get("t3a") or rec.get("rb") or rec.get("rba")
+        has = any(rec.get(x) for x in ("p", "t3", "t3a", "rb", "rba", "as", "asa", "ft"))
         if (not has and 0 < mins <= 240 and rec.get("tries", 0) < 6 and waited) or (has and rec.get("n", 1) < 2 and 0 < mins <= 60):
             want.append((k, u))
     if want:
@@ -722,15 +726,17 @@ def remember_odds(sched, old):
                 eid = ids.get((u["a"], u["h"]))
                 if not eid:
                     continue
-                req = urllib.request.Request(f"{ODDS_API}/events/{eid}/odds?apiKey={key}&regions=us&markets=player_first_basket,player_threes,player_threes_alternate,player_rebounds,player_rebounds_alternate&oddsFormat=american", headers={"Accept": "application/json"})
+                req = urllib.request.Request(f"{ODDS_API}/events/{eid}/odds?apiKey={key}&regions=us&markets=player_first_basket,player_first_team_basket,player_threes,player_threes_alternate,player_rebounds,player_rebounds_alternate,player_assists,player_assists_alternate&oddsFormat=american", headers={"Accept": "application/json"})
                 with urllib.request.urlopen(req, timeout=60, context=CTX or ssl_context()) as r:
                     left = r.headers.get("x-requests-remaining")
                     doc = json.loads(r.read())
                 prices = parse_first_basket(doc)
                 t3, t3a = parse_threes(doc)
                 rb, rba = parse_threes(doc, "player_rebounds", "player_rebounds_alternate")
+                ast, asa = parse_threes(doc, "player_assists", "player_assists_alternate")
+                ftb = parse_first_basket(doc, "player_first_team_basket")
                 rec = store.get(k) or {}
-                if prices or t3 or t3a or rb or rba:  # a market that comes back empty keeps whatever was fetched for it before
+                if prices or t3 or t3a or rb or rba or ast or asa or ftb:  # a market that comes back empty keeps whatever was fetched for it before
                     if prices:
                         rec["p"] = prices
                     if t3:
@@ -741,6 +747,12 @@ def remember_odds(sched, old):
                         rec["rb"] = rb
                     if rba:
                         rec["rba"] = rba
+                    if ast:
+                        rec["as"] = ast
+                    if asa:
+                        rec["asa"] = asa
+                    if ftb:
+                        rec["ft"] = ftb
                     rec.update({"n": rec.get("n", 0) + 1, "at": now.strftime("%Y-%m-%dT%H:%M")})
                 else:
                     rec["tries"] = rec.get("tries", 0) + 1
@@ -763,13 +775,14 @@ def remember_odds(sched, old):
             rec["p"] = [x[:3] for x in rec.get("p") or []]
             rec["t3"] = [x[:6] for x in rec.get("t3") or []]
             rec["t3a"] = [x[:4] for x in rec.get("t3a") or []]
-            for kk, n in (("rb", 6), ("rba", 4)):
+            for kk, n in (("rb", 6), ("rba", 4), ("as", 6), ("asa", 4), ("ft", 3)):
                 if rec.get(kk):
                     rec[kk] = [x[:n] for x in rec[kk]]
             rec["thin"] = 1
         if age > 14 and rec.get("thin", 0) < 2:
             rec.pop("t3a", None)
             rec.pop("rba", None)
+            rec.pop("asa", None)
             rec["thin"] = 2
     if json.dumps(store, sort_keys=True) != before:
         with open(ODDS, "w", encoding="utf-8") as f:
