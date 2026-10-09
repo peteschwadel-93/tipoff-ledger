@@ -49,7 +49,8 @@ jobs:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: python build_data.py --source nba --html tipoff_ledger.html --out data.json
 
-      # Work out tonight's threes picks with the page's own model and lock each game's picks and numbers when it tips off.
+      # Work out tonight's picks (threes, rebounds, assists, first team basket) with the page's own model
+      # and lock each game's picks and numbers when it tips off.
       - name: Lock picks
         id: lock
         continue-on-error: true
