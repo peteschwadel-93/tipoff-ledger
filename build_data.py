@@ -692,7 +692,7 @@ def remember_odds(sched, old):
 
     Needs the key in the ODDS_API_KEY environment variable; without it this only returns what is already stored.
     Each request covers eight markets (first basket, first team basket, and made threes, rebounds and assists with
-    their alternates) and costs eight credits; a game is fetched once inside four hours of tip, again inside two hours, and a last
+    their alternates) and costs eight credits; a game is fetched once inside eight hours of tip, again inside two hours, and a last
     time inside 25 minutes, after the lineups are posted: about twenty-four credits a game. Fetching stops when fewer than 300 credits remain on the key.
     """
     store = dict((old or {}).get("odds") or {})
@@ -713,14 +713,15 @@ def remember_odds(sched, old):
         mins = (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60
         k = f"{u['d']}|{u['a']}|{u['h']}"
         rec = store.get(k) or {}
-        # empty-handed tries are spaced half an hour apart, so a five-minute refresh does not use them all at once
+        # empty-handed tries (markets not posted yet) are spaced half an hour apart, so a five-minute refresh does not use them all at once;
+        # ten of them cover the five hours from eight hours out
         waited = not rec.get("tt") or (now - datetime.fromisoformat(rec["tt"]).replace(tzinfo=ET)).total_seconds() >= 30 * 60
         has = any(rec.get(x) for x in ("p", "t3", "t3a", "rb", "rba", "as", "asa", "ft"))
         n = rec.get("n", 1)
         since = (now - datetime.fromisoformat(rec["at"]).replace(tzinfo=ET)).total_seconds() / 60 if rec.get("at") else 999
         # second look inside two hours (at least 45 minutes after the first), last look inside 25 minutes, once lineups are out
         again = has and 0 < mins and ((n < 2 and mins <= 120 and since >= 45) or (n < 3 and mins <= 25 and since >= 15))
-        if (not has and 0 < mins <= 240 and rec.get("tries", 0) < 6 and waited) or again:
+        if (not has and 0 < mins <= 480 and rec.get("tries", 0) < 10 and waited) or again:
             want.append((k, u))
     if want:
         try:
