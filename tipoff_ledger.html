@@ -169,7 +169,7 @@ tbody tr+tr td{border-top:1px solid var(--line)}
 tbody tr:nth-child(odd) td{background:color-mix(in srgb,var(--surface) 55%,transparent)}
 th[tabindex]{cursor:pointer}
 th[tabindex]:hover{color:var(--ink)}
-th[aria-sort]{color:var(--accent)}
+table.dsort thead th{cursor:pointer}th[aria-sort]{color:var(--accent)}
 th[aria-sort]:after{content:" ▾"}
 th[aria-sort="ascending"]:after{content:" ▴"}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
@@ -638,6 +638,16 @@ function confRows(r,t,all){ // chance each expected starter scores the game's fi
 function priceTable(t,v,at,m){if(!v.length)return "";
   return '<h3>'+t+' value table · first-basket prices'+(at?' · fetched '+esc(at.replace("T"," "))+' ET':'')+'</h3><div class="tw"><table style="width:auto"><thead><tr><th>Player</th><th class="n">Best price</th><th>Book</th><th class="n">Break-even</th><th class="n">Model</th><th class="n">Edge</th><th class="n" title="Edge weighted by how likely he is to score. Rows are sorted by this.">Value score</th><th class="n">Per start</th></tr></thead><tbody>'+
     v.map(function(e){return '<tr><td>'+esc(e.x.name)+'</td><td class="n">'+(m?bx(fmtP(e.price),e.x.p,m.g?m.g.d:m.d,t,t===m.h?m.a:m.h,t===m.h,"fb",0,e.price,e.book,e.all):fmtP(e.price))+'</td><td>'+esc(e.book)+'</td><td class="n">'+(e.be*100).toFixed(1)+'%</td><td class="n">'+(e.p*100).toFixed(1)+'%</td><td class="n"><span class="tag '+(e.ev>0?"w":"")+'">'+(e.ev>0?"+":"")+Math.round(e.ev*100)+'%</span></td><td class="n"><b>'+(e.vs>0?"+":"")+e.vs.toFixed(1)+'</b></td><td class="n">'+(e.x.st?(e.x.c/e.x.st).toFixed(2):"–")+'</td></tr>'}).join("")+'</tbody></table></div>'}
+/* ---- sortable tables on the Picks page: click a header; sorting a table that shows only its top rows opens the full list ---- */
+S.dsort={};S.pkGame="";
+function pkOn(m){return !S.pkGame||(m.a+"@"+m.h)===S.pkGame}
+function dsVal(td,num){var v=td.getAttribute("data-v");if(v!=null)return v===""?null:+v;var t=(td.textContent||"").replace(/\u2212/g,"-").replace(/,/g,"").trim();if(!num)return t?t.toLowerCase():null;var m=t.match(/[+-]?\d+(\.\d+)?/);return m?parseFloat(m[0]):null}
+function dsApplyAll(){[].forEach.call(view.querySelectorAll("table"),function(tb,i){if(tb.classList.contains("nosort")||!tb.tHead||!tb.tHead.rows.length)return;if(!tb.id)tb.id="pkT"+i;tb.classList.add("dsort");
+  var st=S.dsort[tb.id],ths=tb.tHead.rows[tb.tHead.rows.length-1].cells;[].forEach.call(ths,function(th,j){th.setAttribute("tabindex","0");th.removeAttribute("aria-sort");if(st&&st.c===j)th.setAttribute("aria-sort",st.d>0?"ascending":"descending")});
+  var body=tb.tBodies[0];if(!st||!body||!ths[st.c])return;var rows=[].slice.call(body.rows),c0=rows[0]&&rows[0].cells[st.c],num=/\bn\b/.test(ths[st.c].className)||!!(c0&&/^\s*\d+\s*$/.test(c0.textContent));
+  rows.sort(function(a,b){var x=a.cells[st.c],y=b.cells[st.c];x=x?dsVal(x,num):null;y=y?dsVal(y,num):null;if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return (x<y?-1:x>y?1:0)*st.d});
+  rows.forEach(function(r){body.appendChild(r)})})}
+function dsClick(th){var tb=th.closest("table"),j=th.cellIndex,cur=S.dsort[tb.id],num=/\bn\b/.test(th.className);S.dsort[tb.id]={c:j,d:cur&&cur.c===j?-cur.d:(num?-1:1)};var al=tb.getAttribute("data-all");if(al)S[al]=true;render()}
 function vPicks(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={},IX=pickIndex();
   sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
@@ -647,6 +657,7 @@ function vPicks(){
   // games already played (or under way) that day, plus any still to tip
   var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g}});
   var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
+  if(S.pkGame&&!ms.some(function(m){return m.a+"@"+m.h===S.pkGame}))S.pkGame="";
   var H=all.filter(function(g){return g.d<day}); // only what was known before tip-off
   function met(a,b){var x=0,y=0;H.forEach(function(g){var t=g.tip;if(!t)return;if(t.w===a&&t.l===b)x++;else if(t.w===b&&t.l===a)y++});return[x,y]}
   var rows=ms.map(function(m){var o;
@@ -671,7 +682,7 @@ function vPicks(){
   var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
   Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   var hd='<section class="panel"><div class="phead"><h2>Picks</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+bookPicker(day)+
-    '<label class="f">Minimum rating <select id="selLv">'+[[-1,"All games"],[1,"One chevron · 55%+"],[2,"Two chevrons · 60%+"],[3,"Three chevrons · 65%+"],[4,"Four chevrons · 75%+"]].map(function(n){return '<option value="'+n[0]+'"'+(n[0]===S.minLv?' selected':'')+'>'+n[1]+'</option>'}).join("")+'</select></label></div></div>'+
+    (ms.length>1?'<label class="f">Game <select id="pkGame"><option value="">All games</option>'+ms.map(function(m){var k=m.a+"@"+m.h;return '<option value="'+k+'"'+(S.pkGame===k?' selected':'')+'>'+m.a+' @ '+m.h+'</option>'}).join("")+'</select></label>':'')+'<label class="f">Minimum rating <select id="selLv">'+[[-1,"All games"],[1,"One chevron · 55%+"],[2,"Two chevrons · 60%+"],[3,"Three chevrons · 65%+"],[4,"Four chevrons · 75%+"]].map(function(n){return '<option value="'+n[0]+'"'+(n[0]===S.minLv?' selected':'')+'>'+n[1]+'</option>'}).join("")+'</select></label></div></div>'+
     '<p class="note">'+(ms.length?(S.minLv<0?"Showing all "+ms.length+" matchups, whatever the rating; an unrated game is shown from the home side. ":picks.length+" of "+ms.length+" matchups reach the rating. "):"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips. The rating is the favoured jumper\'s estimated chance of winning the tip, from both jumpers\' full records in this data: one chevron at 55%, two at 60%, three at 65%, four at 75%.'+
     (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are ranked by first-three attempts per start this season, among players expected to start: the posted lineup once there is one, otherwise recent starters not listed out. Whatever was flagged before tip stays on the card after the game.":"")+(D.odds&&Object.keys(D.odds).length?" First-basket prices are the best available across US books, fetched once a few hours before tip and once in the last hour. Best value is the starter with the highest value score: the edge on his price, weighted by how likely he is to score. It has not been backtested.":"")+
     (up.length?"":" This data has no upcoming schedule, so past game days are shown as they looked before tip-off. Run python3 build_data.py --install once and today\'s games load on their own.")+'</p>'+
@@ -693,8 +704,8 @@ function vPicks(){
       (r.ok?'<span class="edge">'+(r.lv?r.fav+" ":"Even ")+r.abs+'%</span>':'<span class="tag">NO RATING</span>')+'</span></div>'+
       '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,r.fav&&isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
       what(m)+injReport(m)+body+'</section>'}
-  var cards=picks.map(function(r,i){return card(r,"pick-"+i)}).join("");
-  var others=rest.length?'<h2 class="sep">Other games · below the rating</h2>'+rest.map(function(r,i){return card(r,"game-"+i)}).join(""):"";
+  var cards=picks.map(function(r,i){var h=card(r,"pick-"+i);return pkOn(r.m)?h:""}).join(""); // every card is built (the round-up and slate read from them); only the chosen game is shown
+  var others=rest.length?'<h2 class="sep">Other games · below the rating</h2>'+rest.map(function(r,i){var h=card(r,"game-"+i);return pkOn(r.m)?h:""}).join(""):"";
   // the night so far: of the picked players whose game has had its first basket, how many scored it or shot before it, and the units at one per pick
   var nt={n:0,hit:0,att:0,games:0,ghit:0,pend:0,u:0,priced:0};
   picks.forEach(function(r){var g=r.m.g,fb=g&&firstScore(g),top=(r.top||[]).slice(0,3); // same rule as the cards: first points, free throws included unless switched off
@@ -743,12 +754,12 @@ function vPicks(){
   var nPriced=confL.filter(function(s){return s.vs!=null}).length,cOdds=nPriced>0;
   S._conf={day:day,list:confL};
   confL.sort(function(a,b){return (b.vs!=null)-(a.vs!=null)||(cOdds&&a.vs!=null?b.vs-a.vs:0)||b.e.p-a.e.p});
-  var cPlayed=confL.some(function(s){return s.r.m.g}),cShown=confL.slice(0,20),nPos=confL.filter(function(s){return s.ev>0}).length;
+  var cPlayed=confL.some(function(s){return s.r.m.g}),cShown=confL.filter(function(s){return pkOn(s.r.m)}).slice(0,S.pkGame||S.confAll?999:20),nPos=confL.filter(function(s){return s.ev>0}).length;
   var confTbl=confL.length?'<section class="panel"><div class="phead"><h2>Slate value</h2><span class="tag">'+(cOdds?nPos+' of '+nPriced+' priced starters show a positive edge':'no prices yet · ranked by confidence')+'</span></div>'+
     '<p class="note">Every expected starter on the night in one list. Confidence is his estimated chance of scoring the game\'s first basket: his team\'s chance of scoring first, from the tip rating, times his share of the team\'s early shots. Break-even odds is the price he would need for a bet to pay on that chance. '+
     (cOdds?'With prices on record the list is ranked by value score: the edge weighted by how likely he is, so a likely scorer at a fair price sits above a long shot with a bigger percentage edge. ':'Until first-basket prices are on record the list is ranked by confidence; compare the break-even odds with your book by eye. ')+
     'The confidence score matched results in the backtest, but the edge and value score have not been tested against real prices. Rows marked Check · near miss are non-picks whose team is 70 to 74% to win the tip. Select a row to jump to its game.</p>'+
-    '<div class="tw"><table><thead><tr><th>#</th><th>Team</th><th>Player</th><th>Game</th><th class="n">Team wins tip</th><th class="n">Per start</th><th class="n">Confidence</th><th class="n" title="The price at which a bet on this chance breaks even.">Break-even odds</th>'+(cOdds?'<th class="n">Best price</th><th class="n">Edge</th><th class="n rate" title="Edge weighted by how likely he is to score.">Value score</th>':'')+(cPlayed?'<th>Attempt before 1st basket</th><th>First basket</th>':'')+'</tr></thead><tbody>'+
+    '<div class="tw"><table id="pkSlate" data-all="confAll"><thead><tr><th>#</th><th>Team</th><th>Player</th><th>Game</th><th class="n">Team wins tip</th><th class="n">Per start</th><th class="n">Confidence</th><th class="n" title="The price at which a bet on this chance breaks even.">Break-even odds</th>'+(cOdds?'<th class="n">Best price</th><th class="n">Edge</th><th class="n rate" title="Edge weighted by how likely he is to score.">Value score</th>':'')+(cPlayed?'<th>Attempt before 1st basket</th><th>First basket</th>':'')+'</tr></thead><tbody>'+
     cShown.map(function(s,i){var e=s.e,r=s.r,m=r.m,g=m.g,pick=s.t===r.fav&&r.lv>=S.minLv&&(r.top||[]).slice(0,3).some(function(x){return x.p===e.x.p}),fs=g&&firstScore(g),fo=Infinity;
       if(g)[g.h,g.a].forEach(function(t){att(g,t).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
       var tried=g&&att(g,s.t).some(function(x){return x[0]===e.x.p&&x[6]<=fo}),lv=e.p>=.16?4:e.p>=.14?3:e.p>=.12?2:e.p>=.105?1:0,vl=s.vs==null?0:s.vs>=3?4:s.vs>=2?3:s.vs>=1?2:s.vs>0?1:0;
@@ -757,7 +768,7 @@ function vPicks(){
         '<td class="n'+(cOdds?'':' rate')+' rlv'+lv+'"><b>'+(e.p*100).toFixed(1)+'%</b></td><td class="n">'+fairOdds(e.p)+'</td>'+
         (cOdds?(s.price!=null?'<td class="n" title="'+esc(s.book)+'">'+bx(fmtP(s.price),e.x.p,m.g?m.g.d:m.d,s.t,s.t===m.h?m.a:m.h,s.t===m.h,"fb",0,s.price,s.book,s.all)+' <span class="o">'+esc(s.book)+'</span></td><td class="n"><span class="tag '+(s.ev>0?"w":"")+'">'+(s.ev>0?"+":"")+Math.round(s.ev*100)+'%</span></td><td class="n rate rlv'+vl+'"><b>'+(s.vs>0?"+":"")+s.vs.toFixed(1)+'</b></td>':'<td class="n"><span class="o">–</span></td><td class="n"><span class="o">–</span></td><td class="n rate"><span class="o">no price</span></td>'):'')+
         (cPlayed?(g?'<td><span class="tag'+(tried?" w":"")+'">'+(tried?"YES":"NO")+'</span></td><td>'+(fs&&fs[0]===e.x.p?'<span class="tag w">HIT</span>':'<span class="o">no</span>')+'</td>':'<td><span class="o">pending</span></td><td><span class="o">pending</span></td>'):'')+'</tr>'}).join("")+'</tbody></table></div>'+
-    (confL.length>cShown.length?'<p class="note">Showing the top '+cShown.length+' of '+confL.length+'. Each game\'s card below has both teams\' full value tables once prices are in.</p>':'')+'</section>':"";
+    (!S.pkGame&&confL.length>cShown.length?'<p class="note">Showing the top '+cShown.length+' of '+confL.length+'. Each game\'s card below has both teams\' full value tables once prices are in.</p>':'')+'</section>':"";
   view.innerHTML='<div class="picks">'+hd+round+confTbl+ftPicksHtml(day)+ftHtml(day)+mfPicksHtml(day)+mfHtml(day)+cards+other+others+'</div>';
 }
 /* ---- daily lineups: posted starters when the NBA has them, otherwise the likeliest five from recent games ---- */
@@ -1540,22 +1551,22 @@ function mfDay(day){D._mfd=D._mfd||{};var ck=day+"|"+S.book+"|"+(S.bookOff?1:0);
       if(f&&g&&!g.lv)r.res=(mt===res&&(!r.p||r.p===who))?1:0;rows.push(r)});
     out.push({m:m,cs:cs,P:P,ft:1,rows:rows.sort(function(a,b){return b.vs-a.vs}),res:res,who:who,priced:mf.length>0})});
   return D._mfd[ck]=out}
-function mfHtml(day){var L=mfDay(day);if(!L.length)return "";var priced=L.some(function(x){return x.priced}),ks=MFC,LG=mfLeague(day);
+function mfHtml(day){var L=mfDay(day).filter(function(x){return pkOn(x.m)});if(!L.length)return "";var priced=L.some(function(x){return x.priced}),ks=MFC,LG=mfLeague(day);
   // one row a player: his first-basket chance split by how it goes in, with the book's player-and-method price where there is one
   var P=[];L.forEach(function(x){var m=x.m,by={};x.rows.forEach(function(r){if(r.p)by[r.p+"|"+r.mt]=r});
     (x.cs||[]).forEach(function(s){var p=s.e.x.p,mx=mfMix(p,day,LG),c={},best=null,top=0;
       ks.forEach(function(k){var q=s.e.p*mx[k],r=by[p+"|"+k]||null;c[k]={q:q,r:r};if(q>top)top=q;if(r&&(!best||r.vs>best.vs))best=r});
       P.push({p:p,t:s.t,m:m,x:x,fb:s.e.p,c:c,best:best,top:top,n:mx.n,hit:x.res&&x.who===p?x.res:null})})});
   P.sort(function(a,b){return (b.best?1:0)-(a.best?1:0)||(a.best&&b.best?b.best.vs-a.best.vs:0)||b.top-a.top});
-  var shown=P.slice(0,S.mfAll?999:24),played=L.some(function(x){return x.res});
+  var shown=P.slice(0,S.mfAll||S.pkGame?999:24),played=L.some(function(x){return x.res});
   function cell(R,k){var c=R.c[k],r=c.r,m=R.m,hit=R.hit===k;
     return '<td class="n'+(hit?' mfhit':'')+'">'+(c.q<.005&&!r?'<span class="o">&lt;0.5%</span>':'<b>'+(c.q*100).toFixed(1)+'%</b> <span class="o">'+fairOdds(c.q)+'</span>')+(r?'<br>'+bx(fmtP(r.price),R.p,m.g?m.g.d:m.d,R.t,R.t===m.h?m.a:m.h,R.t===m.h,"mf",MFC.indexOf(k),r.price,r.book,r.all)+' <span class="o">'+esc(bkAbbr(r.book))+'</span> '+(r.val?'<span class="tag w">VALUE</span>':'<span class="tag '+(r.ev>0?"w":"")+'">'+(r.ev>0?"+":"")+Math.round(r.ev*100)+'%</span>'):'')+'</td>'}
-  var tbl='<div class="tw"><table><thead><tr><th>Team</th><th>Player</th><th>Game</th><th class="n" title="His chance of scoring the game\'s first basket, any way">First basket</th>'+ks.map(function(k){return '<th class="n">'+MFN[k]+'</th>'}).join("")+'<th class="n" title="His made early shots on record, the sample behind his mix">Early makes</th>'+(played?'<th>First basket</th>':'')+'</tr></thead><tbody>'+
+  var tbl='<div class="tw"><table id="pkMf" data-all="mfAll"><thead><tr><th>Team</th><th>Player</th><th>Game</th><th class="n" title="His chance of scoring the game\'s first basket, any way">First basket</th>'+ks.map(function(k){return '<th class="n">'+MFN[k]+'</th>'}).join("")+'<th class="n" title="His made early shots on record, the sample behind his mix">Early makes</th>'+(played?'<th>First basket</th>':'')+'</tr></thead><tbody>'+
     shown.map(function(R){var m=R.m;return '<tr><td>'+tmL(R.t)+'</td><td>'+nm(R.p)+(R.best&&R.best.val?' <span class="tag w">VALUE</span>':'')+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n"><b>'+(R.fb*100).toFixed(1)+'%</b></td>'+ks.map(function(k){return cell(R,k)}).join("")+'<td class="n o">'+R.n+'</td>'+
       (played?'<td>'+(R.x.res?(R.x.who===R.p?'<span class="tag w">'+MFN[R.x.res].toUpperCase()+'</span>':'<span class="o">no</span>'):'<span class="o">pending</span>')+'</td>':'')+'</tr>'}).join("")+'</tbody></table></div>'+
     (P.length>24?'<button class="more" id="mfMore">'+(S.mfAll?"Show the top 24":"Show all "+P.length+" starters")+'</button>':'');
   // the whole game, any player: behind a button
-  var gt=!S.mfGame?'':'<div class="tw" style="margin-top:12px"><table><thead><tr><th>Game</th>'+ks.map(function(k){return '<th class="n">'+MFN[k]+'</th>'}).join("")+'<th>First basket</th></tr></thead><tbody>'+
+  var gt=!S.mfGame?'':'<div class="tw" style="margin-top:12px"><table id="pkMfG"><thead><tr><th>Game</th>'+ks.map(function(k){return '<th class="n">'+MFN[k]+'</th>'}).join("")+'<th>First basket</th></tr></thead><tbody>'+
     L.map(function(x){var m=x.m,best={};x.rows.forEach(function(r){if(!r.p&&(!best[r.mt]||r.vs>best[r.mt].vs))best[r.mt]=r});
       function gc(k){var q=x.P[k],r=best[k];if(!q&&!r)return '<td class="n"><span class="o">–</span></td>';
         return '<td class="n'+(x.res===k?' mfhit':'')+'"><b>'+(q*100).toFixed(1)+'%</b> <span class="o">'+fairOdds(q)+'</span>'+(r?'<br>'+bx(fmtP(r.price),-1,m.g?m.g.d:m.d,m.h,m.a,1,"mf",MFC.indexOf(k),r.price,r.book,r.all)+' <span class="o">'+esc(bkAbbr(r.book))+'</span> '+(r.val?'<span class="tag w">VALUE</span>':'<span class="tag '+(r.ev>0?"w":"")+'">'+(r.ev>0?"+":"")+Math.round(r.ev*100)+'%</span>'):'')+'</td>'}
@@ -1612,11 +1623,11 @@ function mfPickRecord(){if(D._mfpr)return D._mfpr;var R={n:0,w:0,u:0},kb=S.book;
   Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&o.mf&&o.mf.length)days[k.slice(0,10)]=1});Object.keys(D.locks||{}).forEach(function(d){if((D.locks[d]||{}).mf)days[d]=1});
   Object.keys(days).sort().forEach(function(d){mfPicks(d).top.forEach(function(r){if(r.res!==1&&r.res!==0)return;R.n++;if(r.res){R.w++;R.u+=MFP.u*(r.pay-1)}else R.u-=MFP.u})});
   S.book=kb;return D._mfpr=R}
-function ftHtml(day){var rows=ftDay(day);if(!rows.length)return "";var priced=rows.some(function(r){return r.price!=null}),played=rows.some(function(r){return r.res!=null}),vals=rows.filter(function(r){return r.val});
-  var shown=priced?rows.filter(function(r){return r.price!=null}).slice(0,S.ftAll?999:14):rows.slice(0,S.ftAll?999:12);
+function ftHtml(day){var rows=ftDay(day).filter(function(r){return pkOn(r.m)});if(!rows.length)return "";var priced=rows.some(function(r){return r.price!=null}),played=rows.some(function(r){return r.res!=null}),vals=rows.filter(function(r){return r.val});
+  var shown=priced?rows.filter(function(r){return r.price!=null}).slice(0,S.ftAll||S.pkGame?999:14):rows.slice(0,S.ftAll||S.pkGame?999:12);
   return '<section class="panel"><div class="phead"><h2>First team basket</h2><span class="tag">'+(priced?vals.length+' value play'+(vals.length===1?'':'s')+' · best value first':'no prices yet · likeliest first')+'</span></div>'+
     '<p class="note" style="margin-bottom:14px">Which starter scores his own team\'s first points, whoever wins the tip. His chance is his share of the team\'s early shots among its five likeliest starters, the same share used across this page; each rate is eased toward the league\'s 50% as if he had 20 more starts, so a few hot starts count for less than a long record; in the back-test it matched what happened (said 22%, happened 21.3%; said 25%, happened 25.8%). '+(priced?'<b>VALUE</b> marks a price at least 3 points above what it needs, on a starter with a 15% chance or better; the best of them, one per team and four a night, are the picks above. ':'Prices appear here once first-team-basket prices are on record; until then compare the fair price with your book. ')+'Not part of the parlay finder.</p>'+
-    '<div class="tw"><table><thead><tr><th>Team</th><th>Player</th><th>Game</th><th class="n" title="Starts in which he took one of the team\'s first three shots">Early-shot starts</th><th class="n rate">Chance</th><th class="n">Fair price</th>'+(priced?'<th class="n">Best price</th><th class="n">Edge</th><th class="n">Value score</th>':'')+(played?'<th>Result</th>':'')+'</tr></thead><tbody>'+
+    '<div class="tw"><table id="pkFtb" data-all="ftAll"><thead><tr><th>Team</th><th>Player</th><th>Game</th><th class="n" title="Starts in which he took one of the team\'s first three shots">Early-shot starts</th><th class="n rate">Chance</th><th class="n">Fair price</th>'+(priced?'<th class="n">Best price</th><th class="n">Edge</th><th class="n">Value score</th>':'')+(played?'<th>Result</th>':'')+'</tr></thead><tbody>'+
     shown.map(function(r){var m=r.m;return '<tr'+(r.val?' class="on"':'')+'><td>'+tmL(r.t)+'</td><td>'+nm(r.p)+(r.val?' <span class="tag w">VALUE</span>':'')+'</td><td>'+m.a+' @ '+m.h+'</td><td class="n">'+(r.x.gs?Math.round(100*r.x.gc/r.x.gs)+'% <span class="o">'+r.x.gc+' of '+r.x.gs+'</span>':'–')+'</td><td class="n rate"><b>'+(r.p2*100).toFixed(1)+'%</b></td><td class="n">'+fairOdds(r.p2)+'</td>'+
       (priced?(r.price!=null?'<td class="n">'+bx(fmtP(r.price),r.p,day,r.t,r.opp,r.t===m.h,"ftb",0,r.price,r.book,r.all)+' <span class="o">'+esc(r.book)+'</span></td><td class="n"><span class="tag '+(r.ev>0?"w":"")+'">'+(r.ev>0?"+":"")+Math.round(r.ev*100)+'%</span></td><td class="n"><b>'+(r.vs>0?"+":"")+r.vs.toFixed(1)+'</b></td>':'<td class="n"><span class="o">–</span></td><td></td><td></td>'):'')+
       (played?'<td>'+(r.res===1?'<span class="tag w">SCORED FIRST</span>':r.res===0?'<span class="o">no</span>':r.res==="dnp"?'<span class="tag">DID NOT PLAY</span>':'<span class="o">'+(m.g&&m.g.lv?"live":"–")+'</span>')+'</td>':'')+'</tr>'}).join("")+'</tbody></table></div>'+
@@ -1786,6 +1797,7 @@ function render(){
   if(!G.length){view.innerHTML='<p class="empty">No games match these filters.</p>';return}
   var keep=document.activeElement&&document.activeElement.id,pos=keep==="q"?document.activeElement.selectionStart:null;
   ({picks:vPicks,lineups:vLineups,threes:vThrees,rebounds:function(){inSK("rb",vThrees)},assists:function(){inSK("as",vThrees)},parlays:vParlays,movers:vMovers,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,bets:vBets,games:vGames,model:vModel})[S.tab]();
+  if(S.tab==="picks")dsApplyAll();
   if(keep&&$(keep)){$(keep).focus();if(pos!=null)$(keep).setSelectionRange(pos,pos)}
   if(S.tab!=="bets")betCount();
 }
@@ -1826,6 +1838,7 @@ document.addEventListener("click",function(e){
   if(e.target.id==="mfMore"){S.mfAll=!S.mfAll;return render()}
   if(e.target.id==="mfGame"){S.mfGame=!S.mfGame;return render()}
   b=e.target.closest("#seg-ft button");if(b){S.ft=+b.dataset.v;return render()}
+  var dth=e.target.closest("table.dsort thead th");if(dth&&!dth.dataset.sort)return dsClick(dth);
   var th=e.target.closest("th[data-sort]");if(th)return sortBy(th);
   var r=e.target.closest("tr[data-jumper]");if(r){S.jumper=+r.dataset.jumper;return render()}
   if(e.target.id==="more"){S.logN+=40;render()}
@@ -1843,6 +1856,7 @@ if(e.key==="Escape"&&$("pm"))return closePlayer();
   if((e.key==="Enter"||e.key===" ")&&e.target.classList&&e.target.classList.contains("t3c")&&S._t3top){e.preventDefault();return showWhy(S._t3top[+e.target.dataset.i])}
   if((e.key==="Enter"||e.key===" ")&&e.target.dataset&&e.target.dataset.pl){e.preventDefault();return showPlayer(+e.target.dataset.pl)}
 if(e.key!=="Enter"&&e.key!==" ")return;
+  var dth2=e.target.closest("table.dsort thead th");if(dth2&&!dth2.dataset.sort){e.preventDefault();return dsClick(dth2)}
   var th=e.target.closest("th[data-sort]");if(th){e.preventDefault();return sortBy(th)}
   var go=e.target.closest("[data-goto]");if(go){e.preventDefault();var el=$(go.dataset.goto);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});return}
   var r=e.target.closest("tr[data-jumper]");if(r){e.preventDefault();S.jumper=+r.dataset.jumper;render()}});
@@ -1876,7 +1890,7 @@ document.addEventListener("change",function(e){var id=e.target.id,v=e.target.val
   if(t.closest&&t.closest("#betAdd")){bformKeep();return}
   if(id==="selBook"){S.book=v;try{localStorage.setItem("tolBook",v)}catch(_){}return render()}
   if(id==="selA"){S.a=v;S.ja=null}else if(id==="selB"){S.b=v;S.jb=null}else if(id==="selJA")S.ja=+v;else if(id==="selJB")S.jb=+v;
-  else if(id==="selShot")S.shotTeam=v;else if(id==="selLog"){S.logTeam=v;S.logN=40}else if(id==="minTips")S.minTips=+v;else if(id==="selDay")S.day=v;else if(id==="mvDay")S.mvDay=v;else if(id==="ldDays")S.ldDays=+v;else if(id==="ldScope")S.ldScope=+v;else if(id==="ldTeam")S.ldTeam=v;else if(id==="ldRank")S.sort.ld={k:v,dir:-1};else if(id==="selMargin")S.margin=+v;else if(id==="selLv")S.minLv=+v;else return;
+  else if(id==="selShot")S.shotTeam=v;else if(id==="selLog"){S.logTeam=v;S.logN=40}else if(id==="minTips")S.minTips=+v;else if(id==="selDay")S.day=v;else if(id==="pkGame")S.pkGame=v;else if(id==="mvDay")S.mvDay=v;else if(id==="ldDays")S.ldDays=+v;else if(id==="ldScope")S.ldScope=+v;else if(id==="ldTeam")S.ldTeam=v;else if(id==="ldRank")S.sort.ld={k:v,dir:-1};else if(id==="selMargin")S.margin=+v;else if(id==="selLv")S.minLv=+v;else return;
   try{localStorage.setItem("tol",JSON.stringify({a:S.a,b:S.b,s:S.shotTeam}))}catch(_){}
   render()});
 document.addEventListener("input",function(e){if(e.target.id==="q"){S.q=e.target.value;render()}});
