@@ -110,6 +110,22 @@ function lockStat(sk) {
   rec.ft = picks; rec.ftseen = seen;
   if (!ms.length) ms = fms;
 })();
+/* Method picks: three player-and-method prices a night, kept once their game starts, the rest refilled from games still to start. */
+(function lockMf() {
+  if (!api.mfRows) return;
+  try {
+    const fms = api.ftMs(day);
+    if (!fms.length) return;
+    const rows = api.mfRows(day), gameOf = k => fms.find(m => m.a === k.a && m.h === k.h), gone = k => { const m = gameOf(k); return !m || started(m); };
+    const kept = (prev.mf || []).filter(gone).map(k => Object.assign(k, { lk: 1 }));
+    const held = kept.map(k => k.a + "@" + k.h), taken = new Set(kept.map(k => k.p));
+    const open = api.mfFill(rows.filter(r => !started(r.m) && !taken.has(r.p)), 3 - kept.length, held).map(api.mfOut);
+    const picks = kept.concat(open).sort((a, b) => b.vs - a.vs), seen = prev.mfseen || {};
+    picks.forEach(k => { const id = k.p + "|" + k.mt; if (!seen[id]) seen[id] = { p: k.p, n: k.n, t: k.t, a: k.a, h: k.h, ts: k.ts, mt: k.mt, price0: k.price, book0: k.book, at0: stamp }; if (!k.lk) seen[id].last = stamp; });
+    Object.values(seen).forEach(e => { const m = gameOf(e); if (!m || started(m)) return; const r = rows.find(q => q.p === e.p && q.mt === e.mt && q.m.a === e.a && q.m.h === e.h); e.close = r ? r.price : null; });
+    rec.mf = picks; rec.mfseen = seen;
+  } catch (e) { console.error("method picks: " + e.message); }
+})();
 /* Parlay ideas: an idea is kept as saved once its first game starts; the rest are worked out again from games still to start. */
 (function lockPz() {
   if (!api.pzPick) return;
@@ -144,4 +160,4 @@ fs.writeFileSync(html, page.slice(0, i0 + TAG.length) + JSON.stringify(doc).repl
 const t = store[day], show = l => (l || []).map(x => x.n + " " + x.lab + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ");
 const nMv = ((movers.log || {})[day] || []).length;
 console.log(`lock_picks: ${day} · movers logged today ${nMv} · ${t ? (t.done ? "all locked" : t.locked ? "partly locked" : "open") + "; threes picks: " + show(t.t3) + "; rebound picks: " + show(t.rb) + "; assist picks: " + show(t.as) + "; first team basket: " + (t.ft || []).map(x => x.n + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ") +
-  "; parlay ideas: " + (t.pz || []).map(z => z.legs.length + " legs " + (z.price > 0 ? "+" : "") + z.price + " " + z.book + (z.lk ? " [locked]" : "")).join(", ") + "; ladders " + (t.lw || []).length + " threes, " + (t.rlw || []).length + " rebounds, " + (t.alw || []).length + " assists" : "no games"}`);
+  "; method picks: " + (t.mf || []).map(x => x.n + " " + x.mt + " " + (x.price > 0 ? "+" : "") + x.price + (x.lk ? " [locked]" : "")).join(", ") + "; parlay ideas: " + (t.pz || []).map(z => z.legs.length + " legs " + (z.price > 0 ? "+" : "") + z.price + " " + z.book + (z.lk ? " [locked]" : "")).join(", ") + "; ladders " + (t.lw || []).length + " threes, " + (t.rlw || []).length + " rebounds, " + (t.alw || []).length + " assists" : "no games"}`);
