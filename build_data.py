@@ -516,6 +516,29 @@ def parse_first_basket(doc, market="player_first_basket"):
     return sorted(([w, p, bk, every[w]] for w, p, bk in best.values()), key=lambda x: x[1])
 
 
+def parse_method(doc, market="player_method_of_first_basket"):
+    """Method-of-first-basket prices, kept as the books word them: [[label, best price, best book, {book: price}], ...].
+    The label is the outcome's name, with the player in front ("Player · Dunk") when the book prices player-and-method
+    combinations; the page reads the method and the player from it."""
+    best, every = {}, {}
+    for bk in doc.get("bookmakers") or []:
+        name = bk.get("title") or bk.get("key") or ""
+        for mk in bk.get("markets") or []:
+            if mk.get("key") != market:
+                continue
+            for o in mk.get("outcomes") or []:
+                price, nm, who = o.get("price"), str(o.get("name") or ""), str(o.get("description") or "")
+                if not nm or nm in ("No",) or not isinstance(price, (int, float)):
+                    continue
+                lab = (who + " · " + nm) if who and who != nm else nm
+                price = int(price)
+                if price > every.setdefault(lab, {}).get(name, -10 ** 9):
+                    every[lab][name] = price
+                if lab not in best or price > best[lab][1]:
+                    best[lab] = [lab, price, name]
+    return sorted(([w, p, bk, every[w]] for w, p, bk in best.values()), key=lambda x: x[1])
+
+
 def parse_threes(doc, main="player_threes", alt="player_threes_alternate"):
     """Made-threes prices from the over/under and alternate markets (rebounds use the same shape: pass their market keys).
 
@@ -691,9 +714,9 @@ def remember_odds(sched, old):
     """First-basket prices for today's games from The Odds API, kept in odds.json so each game is asked for at most three times.
 
     Needs the key in the ODDS_API_KEY environment variable; without it this only returns what is already stored.
-    Each request covers eight markets (first basket, first team basket, and made threes, rebounds and assists with
-    their alternates) and costs eight credits; a game is fetched once inside eight hours of tip, again inside two hours, and a last
-    time inside 25 minutes, after the lineups are posted: about twenty-four credits a game. Fetching stops when fewer than 300 credits remain on the key.
+    Each request covers nine markets (first basket, first team basket, method of first basket, and made threes,
+    rebounds and assists with their alternates) and costs up to nine credits; a game is fetched once inside eight hours of tip, again inside two hours, and a last
+    time inside 25 minutes, after the lineups are posted: about twenty-seven credits a game. Fetching stops when fewer than 300 credits remain on the key.
     """
     store = dict((old or {}).get("odds") or {})
     try:
@@ -716,7 +739,7 @@ def remember_odds(sched, old):
         # empty-handed tries (markets not posted yet) are spaced half an hour apart, so a five-minute refresh does not use them all at once;
         # ten of them cover the five hours from eight hours out
         waited = not rec.get("tt") or (now - datetime.fromisoformat(rec["tt"]).replace(tzinfo=ET)).total_seconds() >= 30 * 60
-        has = any(rec.get(x) for x in ("p", "t3", "t3a", "rb", "rba", "as", "asa", "ft"))
+        has = any(rec.get(x) for x in ("p", "t3", "t3a", "rb", "rba", "as", "asa", "ft", "mf"))
         n = rec.get("n", 1)
         since = (now - datetime.fromisoformat(rec["at"]).replace(tzinfo=ET)).total_seconds() / 60 if rec.get("at") else 999
         # second look inside two hours (at least 45 minutes after the first), last look inside 25 minutes, once lineups are out
@@ -731,7 +754,7 @@ def remember_odds(sched, old):
                 eid = ids.get((u["a"], u["h"]))
                 if not eid:
                     continue
-                req = urllib.request.Request(f"{ODDS_API}/events/{eid}/odds?apiKey={key}&regions=us&markets=player_first_basket,player_first_team_basket,player_threes,player_threes_alternate,player_rebounds,player_rebounds_alternate,player_assists,player_assists_alternate&oddsFormat=american", headers={"Accept": "application/json"})
+                req = urllib.request.Request(f"{ODDS_API}/events/{eid}/odds?apiKey={key}&regions=us&markets=player_first_basket,player_first_team_basket,player_threes,player_threes_alternate,player_rebounds,player_rebounds_alternate,player_assists,player_assists_alternate,player_method_of_first_basket&oddsFormat=american", headers={"Accept": "application/json"})
                 with urllib.request.urlopen(req, timeout=60, context=CTX or ssl_context()) as r:
                     left = r.headers.get("x-requests-remaining")
                     doc = json.loads(r.read())
@@ -740,8 +763,9 @@ def remember_odds(sched, old):
                 rb, rba = parse_threes(doc, "player_rebounds", "player_rebounds_alternate")
                 ast, asa = parse_threes(doc, "player_assists", "player_assists_alternate")
                 ftb = parse_first_basket(doc, "player_first_team_basket")
+                mfb = parse_method(doc)
                 rec = store.get(k) or {}
-                if prices or t3 or t3a or rb or rba or ast or asa or ftb:  # a market that comes back empty keeps whatever was fetched for it before
+                if prices or t3 or t3a or rb or rba or ast or asa or ftb or mfb:  # a market that comes back empty keeps whatever was fetched for it before
                     if prices:
                         rec["p"] = prices
                     if t3:
@@ -758,6 +782,8 @@ def remember_odds(sched, old):
                         rec["asa"] = asa
                     if ftb:
                         rec["ft"] = ftb
+                    if mfb:
+                        rec["mf"] = mfb
                     rec.update({"n": rec.get("n", 0) + 1, "at": now.strftime("%Y-%m-%dT%H:%M")})
                 else:
                     rec["tries"] = rec.get("tries", 0) + 1
@@ -780,7 +806,7 @@ def remember_odds(sched, old):
             rec["p"] = [x[:3] for x in rec.get("p") or []]
             rec["t3"] = [x[:6] for x in rec.get("t3") or []]
             rec["t3a"] = [x[:4] for x in rec.get("t3a") or []]
-            for kk, n in (("rb", 6), ("rba", 4), ("as", 6), ("asa", 4), ("ft", 3)):
+            for kk, n in (("rb", 6), ("rba", 4), ("as", 6), ("asa", 4), ("ft", 3), ("mf", 3)):
                 if rec.get(kk):
                     rec[kk] = [x[:n] for x in rec[kk]]
             rec["thin"] = 1
