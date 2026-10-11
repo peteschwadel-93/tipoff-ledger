@@ -678,7 +678,7 @@ function vPicks(){
   var picks=rows.filter(function(r){return r.lv>=S.minLv}),rest=rows.filter(function(r){return r.lv<S.minLv});
   // track record of this margin over every past game in the data
   var tr={n:0,tip:0,shot:0,score:0};
-  all.forEach(function(g){var e=IX.g[g.id],o={m:g,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh};
+  all.forEach(function(g){if(!winOK(g.d))return;var e=IX.g[g.id],o={m:g,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh};
     if(D.flags&&D.flags[g.d+"|"+g.a+"|"+g.h])adjust(o,{h:g.h,a:g.a,g:g},g.d);grade(o);if(o.lv<Math.max(S.minLv,0)||!g.tip)return;
     var fa=firstAtt(g),fs=firstScore(g);tr.n++;if(g.tip.pos===o.fav)tr.tip++;if(fa&&fa.t===o.fav)tr.shot++;if(fs&&fs[1]===o.fav)tr.score++});
   function rec(r){return r.n?r.w+"–"+(r.n-r.w):"no tips"}
@@ -697,7 +697,7 @@ function vPicks(){
     '<p class="note">'+(ms.length?(S.minLv<0?"Showing all "+ms.length+" matchups, whatever the rating; an unrated game is shown from the home side. ":picks.length+" of "+ms.length+" matchups reach the rating. "):"No games on this day. ")+'Each team\'s jumper is whoever took most of its last 10 opening tips. The rating is the favoured jumper\'s estimated chance of winning the tip, from both jumpers\' full records in this data: one chevron at 55%, two at 60%, three at 65%, four at 75%.'+
     (D.inj?" For games still to be played, injury designations come from ESPN and starting lineups appear about half an hour before tip, once the NBA posts them. When a team\'s usual jumper is listed out, the rating uses its next most frequent jumper; once a lineup is posted, it uses a confirmed starter, so a pick can change or drop off close to tip. Shooters are ranked by first-three attempts per start this season, among players expected to start: the posted lineup once there is one, otherwise recent starters not listed out. Whatever was flagged before tip stays on the card after the game.":"")+(D.odds&&Object.keys(D.odds).length?" First-basket prices are the best available across US books, fetched once a few hours before tip and once in the last hour. Best value is the starter with the highest value score: the edge on his price, weighted by how likely he is to score. It has not been backtested.":"")+
     (up.length?"":" This data has no upcoming schedule, so past game days are shown as they looked before tip-off. Run python3 build_data.py --install once and today\'s games load on their own.")+'</p>'+
-    '<div class="kv"><span><b>Track record '+(S.minLv<1?"across every rated game":"at "+["","one chevron","two chevrons","three chevrons","four chevrons"][S.minLv]+" or more")+'</b> · '+tr.n+' past matchups</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
+    (inWin(day)?'':'<div style="margin:10px 0 0"><span class="tag q" title="Your betting window is Nov 1 to two weeks before the regular season ends, no playoffs. Picks still show; the Tracker leaves this night out unless All dates is chosen.">OUTSIDE YOUR BETTING WINDOW</span></div>')+'<div class="kv"><span><b>Track record '+(S.minLv<1?"across every rated game":"at "+["","one chevron","two chevrons","three chevrons","four chevrons"][S.minLv]+" or more")+'</b> · '+tr.n+' past matchups'+(S.win?' in your betting window':'')+'</span><span>Favoured team won the tip <b>'+pct(tr.tip,tr.n)+'</b></span><span>took the first shot <b>'+pct(tr.shot,tr.n)+'</b></span><span>scored first <b>'+pct(tr.score,tr.n)+'</b></span></div></section>';
   var slate=[],confL=[]; // every priced starter on the night, and every expected starter's confidence, gathered as each game's card is built
   function card(r,id){ // full detail for one game: the favoured side's shooters, or both sides when nothing is favoured
     var m=r.m,sides=r.fav&&r.lv>0?[r.fav]:(r.fav?[r.fav,r.fav===m.h?m.a:m.h]:[m.a,m.h]),body=""; // the side the card is built on always comes first
@@ -1013,7 +1013,7 @@ function t3Calib(s){ // every regular-season projection against what the player 
 function t3Record(){ // the Best plays shown on every finished day that has prices on record
   var C=SC();D._t3r=D._t3r||{};if(D._t3r[SK])return D._t3r[SK];var days={},R={all:{n:0,h:0,u:0},by:{},list:[]};
   Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&(o[C.li]||o[C.al]))days[k.split("|")[0]]=1});
-  Object.keys(days).sort().forEach(function(day){var kb=S.bookOff;S.bookOff=1;var tp=t3Day(day).top;S.bookOff=kb;tp.forEach(function(x){if(x.hit==null)return;
+  Object.keys(days).sort().forEach(function(day){if(!winOK(day))return;var kb=S.bookOff;S.bookOff=1;var tp=t3Day(day).top;S.bookOff=kb;tp.forEach(function(x){if(x.hit==null)return;
     var ty=x.over?(x.rg?"Ladder ("+x.k+"+)":"Over the line"):"Under the line",u=x.hit?x.pay-1:-1;
     [R.all,R.by[ty]=R.by[ty]||{n:0,h:0,u:0}].forEach(function(a){a.n++;a.h+=x.hit?1:0;a.u+=u});R.list.push({d:day,x:x,u:u})})});
   return D._t3r[SK]=R}
@@ -1187,10 +1187,20 @@ function vLeaders(){
    Each finished regular-season game is re-read as it stood before tip: jumpers and rating from the games before
    that day, adjusted by the injury designations and lineup saved before tip, and the favoured side's three
    shooters. Nothing is entered by hand; if the pick rules change later, the whole table is recalculated. */
+/* ---- your betting window: Nov 1 to two weeks before the regular season ends, no playoffs. The Tracker's records count only
+   these dates unless "All dates" is chosen; picks still show every night, marked when they fall outside it. ---- */
+S.win=true;try{if(localStorage.getItem("tolWin")==="0")S.win=false}catch(_){}
+function seasonOf(d){var y=+d.slice(0,4),m=+d.slice(5,7);return m>=9?y:y-1}
+function winEnd(s){D._we=D._we||{};if(D._we[s])return D._we[s];var last=null,po=false;D.games.forEach(function(g){if(g.s!==s)return;if(g.po)po=true;else if(!last||g.d>last)last=g.d});
+  var end=po&&last?last:(s+1)+"-04-12",x=new Date(end+"T12:00:00Z");x.setUTCDate(x.getUTCDate()-14);return D._we[s]=x.toISOString().slice(0,10)} // a season still under way is taken to end about April 12
+function inWin(d){var s=seasonOf(d);return d>=s+"-11-01"&&d<=winEnd(s)&&!D.games.some(function(g){return g.d===d&&g.po})}
+function winOK(d){return !S.win||inWin(d)}
+function winSet(on){S.win=on;try{localStorage.setItem("tolWin",on?"1":"0")}catch(_){}["_trk","_t3r","_ftr","_pzr","_mfr","_mfpr","_parr"].forEach(function(k){delete D[k]});render()}
+function winSeg(){var s=seasonOf(todayET());return '<span class="seg" id="seg-win" title="Your betting window: Nov 1 to two weeks before the regular season ends ('+fmtD(winEnd(s))+' this season), no playoffs"><button data-v="1" aria-pressed="'+S.win+'">Betting window</button><button data-v="0" aria-pressed="'+!S.win+'">All dates</button></span>'}
 function trackGames(season,sim){
-  var key=season+"|"+S.ft+"|"+(sim?1:0);D._trk=D._trk||{};if(D._trk[key])return D._trk[key];
+  var key=season+"|"+S.ft+"|"+(sim?1:0)+"|"+(S.win?1:0);D._trk=D._trk||{};if(D._trk[key])return D._trk[key];
   var IX=pickIndex(),out=[];
-  D.games.forEach(function(g){if(g.s!==season||g.po||!g.tip||g.lv)return;
+  D.games.forEach(function(g){if(g.s!==season||g.po||!g.tip||g.lv||!winOK(g.d))return;
     var e=IX.g[g.id],m={h:g.h,a:g.a,g:g,simLu:!!sim},o={m:g,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh};
     adjust(o,m,g.d);grade(o);if(!o.ok)return;
     var t=o.fav,j=t===g.h?o.jh:o.ja,f=(D.flags||{})[g.d+"|"+g.a+"|"+g.h],conf=!!sim||!!(f&&f.lu&&f.lu[t]&&f.lu[t].st&&f.lu[t].st.length);
@@ -1212,8 +1222,8 @@ function vTracker2(){
   var today=todayET(),sy=+today.slice(0,4)-(+today.slice(5,7)>=9?0:1),lab=function(y){return y+"-"+String(y+1).slice(2)};
   var cur=trackGames(sy),shown=S.trkConf?cur.filter(function(x){return x.conf}):cur,prev=trackGames(sy-1,true);
   var log=shown.slice().reverse(),more=log.length>S.trkN;
-  view.innerHTML='<section class="panel"><div class="phead"><h2>Tracker · '+lab(sy)+' regular season</h2><span class="seg" id="seg-trk"><button data-v="1" aria-pressed="'+(S.trkConf===1)+'">Lineup confirmed</button><button data-v="0" aria-pressed="'+(S.trkConf===0)+'">All games</button></span></div>'+
-    '<p class="note">Every finished regular-season game, read as it stood before tip: the favoured side by the rating and its three shooters. "Lineup confirmed" counts only games where the favoured team\'s starting lineup was saved before tip. Results follow the Free throws switch. If the pick rules change, the whole table is recalculated with the new rules.</p>'+
+  view.innerHTML='<section class="panel"><div class="phead"><h2>Tracker · '+lab(sy)+' regular season</h2><span class="pickers">'+winSeg()+' <span class="seg" id="seg-trk"><button data-v="1" aria-pressed="'+(S.trkConf===1)+'">Lineup confirmed</button><button data-v="0" aria-pressed="'+(S.trkConf===0)+'">All games</button></span></span></div>'+
+    '<p class="note">'+(S.win?'<b>Betting window:</b> every record on this page counts only Nov 1 to two weeks before the regular season ends ('+fmtD(winEnd(sy))+' this season), with no playoffs, the stretch you bet. Choose All dates to count everything. ':'<b>All dates:</b> every record on this page counts the whole season. ')+'Every finished regular-season game, read as it stood before tip: the favoured side by the rating and its three shooters. "Lineup confirmed" counts only games where the favoured team\'s starting lineup was saved before tip. Results follow the Free throws switch. If the pick rules change, the whole table is recalculated with the new rules.</p>'+
     (shown.length?trackTable(shown):'<p class="empty">'+(cur.length?"No games yet with a lineup saved before tip. Switch to All games to see the "+cur.length+" played so far.":"No "+lab(sy)+" regular-season games have been played yet. Results start here after opening night.")+'</p>')+'</section>'+
     (log.length?'<section class="panel" style="margin-top:20px"><h2>Game by game</h2><div class="tw"><table><thead><tr><th>Date</th><th>Game</th><th>Pick</th><th>Jumper</th><th>Tip</th><th>First-basket attempt</th><th>First '+(S.ft?"score":"basket")+'</th><th>Shooters</th></tr></thead><tbody>'+
       log.slice(0,S.trkN).map(function(x){var g=x.g,fs=firstScore(g);function yn(v){return '<span class="tag'+(v?" w":"")+'">'+(v?"YES":"NO")+'</span>'}
@@ -1590,7 +1600,7 @@ function mfHtml(day){var L=mfDay(day).filter(function(x){return pkOn(x.m)});if(!
     tbl+'<button class="more" id="mfGame" style="margin-top:12px">'+(S.mfGame?'Hide':'Show')+' the whole game, any player</button>'+gt+'</section>'}
 function bkAbbr(b){return {DraftKings:"DK",FanDuel:"FD",BetMGM:"MGM",Caesars:"CZR",Fanatics:"FAN",BetRivers:"BR",ESPNBet:"ESPN","ESPN BET":"ESPN",Bovada:"BOV","BetOnline.ag":"BOL"}[b]||String(b||"").slice(0,4)}
 function mfRecord(){if(D._mfr)return D._mfr;var R={m:{n:0,w:0,u:0},c:{n:0,w:0,u:0}},kb=S.book;S.book="";var days={};Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&o.mf&&o.mf.length)days[k.slice(0,10)]=1});
-  Object.keys(days).sort().forEach(function(d){mfDay(d).forEach(function(x){x.rows.forEach(function(r){if(!r.val||r.res==null)return;var K=r.p?R.c:R.m;K.n++;if(r.res){K.w++;K.u+=r.pay-1}else K.u-=1})})});
+  Object.keys(days).sort().forEach(function(d){if(!winOK(d))return;mfDay(d).forEach(function(x){x.rows.forEach(function(r){if(!r.val||r.res==null)return;var K=r.p?R.c:R.m;K.n++;if(r.res){K.w++;K.u+=r.pay-1}else K.u-=1})})});
   S.book=kb;return D._mfr=R}
 function mfChance(l){var k=l.k%10,mt=MFC[k],x=mfDay(l.d).filter(function(z){return z.m.h===l.t||z.m.a===l.t})[0];if(!x)return null;
   if(!(l.p>0))return x.P[mt]||null;var LG=mfLeague(l.d),c=S._conf&&S._conf.day===l.d?S._conf.list:(S._fbi&&S._fbi.list)||[],s=c.filter(function(q){return q.e.x.p===l.p})[0];if(!s)return null;
@@ -1635,7 +1645,7 @@ function mfPicksHtml(day){var F=mfPicks(day),priced=mfDay(day).some(function(x){
       :'<p class="note">No player-and-method price clears the bar tonight.</p>')+'</section>'}
 function mfPickRecord(){if(D._mfpr)return D._mfpr;var R={n:0,w:0,u:0},kb=S.book;S.book="";var days={};
   Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&o.mf&&o.mf.length)days[k.slice(0,10)]=1});Object.keys(D.locks||{}).forEach(function(d){if((D.locks[d]||{}).mf)days[d]=1});
-  Object.keys(days).sort().forEach(function(d){mfPicks(d).top.forEach(function(r){if(r.res!==1&&r.res!==0)return;R.n++;if(r.res){R.w++;R.u+=MFP.u*(r.pay-1)}else R.u-=MFP.u})});
+  Object.keys(days).sort().forEach(function(d){if(!winOK(d))return;mfPicks(d).top.forEach(function(r){if(r.res!==1&&r.res!==0)return;R.n++;if(r.res){R.w++;R.u+=MFP.u*(r.pay-1)}else R.u-=MFP.u})});
   S.book=kb;return D._mfpr=R}
 function ftHtml(day){var rows=ftDay(day).filter(function(r){return pkOn(r.m)});if(!rows.length)return "";var priced=rows.some(function(r){return r.price!=null}),played=rows.some(function(r){return r.res!=null}),vals=rows.filter(function(r){return r.val});
   var shown=priced?rows.filter(function(r){return r.price!=null}).slice(0,S.ftAll||S.pkGame?999:14):rows.slice(0,S.ftAll||S.pkGame?999:12);
@@ -1684,7 +1694,7 @@ function ftShadow(day){ // the two likeliest starters on every team, at their be
   var by={},out=[];ftDay(day).forEach(function(r){var k=r.m.a+"@"+r.m.h+"|"+r.t;(by[k]=by[k]||[]).push(r)});
   Object.keys(by).forEach(function(k){by[k].slice().sort(function(a,b){return b.p2-a.p2}).slice(0,2).forEach(function(r){if(r.price!=null)out.push(r)})});return out}
 function ftRecord(){if(D._ftr)return D._ftr;var R={n:0,h:0,u:0,days:{},sh:{n:0,h:0,u:0}},kb=S.bookOff;S.bookOff=1;
-  Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(!o||!o.ft||!o.ft.length)return;var day=k.split("|")[0];if(R.days[day])return;R.days[day]={n:0,h:0,u:0};
+  Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(!o||!o.ft||!o.ft.length)return;var day=k.split("|")[0];if(R.days[day]||!winOK(day))return;R.days[day]={n:0,h:0,u:0};
     ftPicks(day).top.forEach(function(r){if(r.res!==0&&r.res!==1)return;var u=r.res?r.pay-1:-1,a=R.days[day];a.n++;a.h+=r.res;a.u+=u;R.n++;R.h+=r.res;R.u+=u});
     ftShadow(day).forEach(function(r){if(r.res!==0&&r.res!==1)return;R.sh.n++;R.sh.h+=r.res;R.sh.u+=r.res?r.pay-1:-1})});
   S.bookOff=kb;return D._ftr=R}
@@ -1743,7 +1753,7 @@ function pzAdd(i){var z=PZV[i];if(!z)return;var key=z.legs.map(function(l){retur
   saveBets();betCount();toast("Parlay added to My bets: "+z.legs.length+" legs at "+fmtP(z.price)+" · "+z.book);if(S.tab==="bets")render()}
 function pzRecord(){if(D._pzr)return D._pzr;var days={},kb=S.book,R={n:0,w:0,u:0,days:[]};S.book="";
   Object.keys(D.locks||{}).forEach(function(d){if(((D.locks[d]||{}).pz||[]).length)days[d]=1});Object.keys(D.odds||{}).forEach(function(k){days[k.slice(0,10)]=1});
-  Object.keys(days).sort().forEach(function(d){if(!D.games.some(function(g){return g.d===d}))return;var l=pzIdeas(d).filter(function(z){return z.win===1||z.win===-1});if(!l.length)return;var x={d:d,n:l.length,w:0,u:0};
+  Object.keys(days).sort().forEach(function(d){if(!winOK(d)||!D.games.some(function(g){return g.d===d}))return;var l=pzIdeas(d).filter(function(z){return z.win===1||z.win===-1});if(!l.length)return;var x={d:d,n:l.length,w:0,u:0};
     l.forEach(function(z){R.n++;x.u+=z.u;if(z.win>0){R.w++;x.w++}});R.u+=x.u;R.days.push(x)});
   S.book=kb;return D._pzr=R}
 function vParlays(){
@@ -1917,6 +1927,7 @@ document.addEventListener("click",function(e){
   var b=e.target.closest("#seg-po button");if(b){S.po=b.dataset.v;return render()}
   b=e.target.closest("#seg-n button");if(b){S.n=+b.dataset.v;return render()}
   b=e.target.closest("#seg-ssn button");if(b){S.ssn=b.dataset.v;return render()}
+  b=e.target.closest("#seg-win button");if(b)return winSet(b.dataset.v==="1");
   b=e.target.closest("#seg-trk button");if(b){S.trkConf=+b.dataset.v;return render()}
   if(e.target.id==="trkMore"){S.trkN+=30;return render()}
   if(e.target.id==="t3More"){S.t3All=!S.t3All;return render()}
