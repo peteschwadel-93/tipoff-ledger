@@ -726,7 +726,7 @@ def remember_odds(sched, old):
         pass
     key = os.environ.get("ODDS_API_KEY", "").strip()
     if not key:
-        return store
+        return {k: v for k, v in store.items() if not k.startswith("_")}
     before = json.dumps(store, sort_keys=True)
     now = datetime.now(ET)
     want = []
@@ -794,6 +794,49 @@ def remember_odds(sched, old):
                     break
         except Exception as e:
             print(f"odds unavailable: {str(e).replace(key, '***')}", file=sys.stderr)
+    # Game lines for the whole slate in one request (spreads and totals, about 2 credits a call), taken when a game is within
+    # eight hours and the last look is three hours old, and again inside the last hour before a tip. The page turns the
+    # consensus (median) spread into blowout risk and the total into pace.
+    try:
+        def mins_to(u):
+            return (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60
+        soon = [u for u in sched if not u.get("lv") and u.get("ts") and 0 < mins_to(u) <= 480]
+        gl = store.get("_gl") or {}
+        since_gl = (now - datetime.fromisoformat(gl["at"]).replace(tzinfo=ET)).total_seconds() / 60 if gl.get("at") else 1e9
+        near = any(0 < mins_to(u) <= 60 for u in soon)
+        if soon and (since_gl >= 180 or (near and since_gl >= 45)):
+            docs = json.loads(get(f"{ODDS_API}/odds?apiKey={key}&regions=us&markets=spreads,totals&oddsFormat=american"))
+            for e in docs if isinstance(docs, list) else []:
+                a, h = TEAM_NAMES.get(e.get("away_team")), TEAM_NAMES.get(e.get("home_team"))
+                if not a or not h:
+                    continue
+                try:
+                    d = datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")).astimezone(ET).strftime("%Y-%m-%d")
+                except Exception:
+                    continue
+                sps, tots = [], []
+                for bk in e.get("bookmakers") or []:
+                    for mk in bk.get("markets") or []:
+                        for o in mk.get("outcomes") or []:
+                            pt = o.get("point")
+                            if not isinstance(pt, (int, float)):
+                                continue
+                            if mk.get("key") == "spreads" and TEAM_NAMES.get(o.get("name")) == h:
+                                sps.append(pt)
+                            elif mk.get("key") == "totals" and o.get("name") == "Over":
+                                tots.append(pt)
+                if not sps and not tots:
+                    continue
+                rec = store.get(f"{d}|{a}|{h}") or {}
+                if sps:
+                    rec["sp"] = sorted(sps)[len(sps) // 2]   # home team's spread: negative when the home team is favoured
+                if tots:
+                    rec["tot"] = sorted(tots)[len(tots) // 2]
+                rec["glat"] = now.strftime("%Y-%m-%dT%H:%M")
+                store[f"{d}|{a}|{h}"] = rec
+            store["_gl"] = {"at": now.strftime("%Y-%m-%dT%H:%M")}
+    except Exception as e:
+        print(f"game lines unavailable: {str(e).replace(key, '***')}", file=sys.stderr)
     # Keep the price store small: after three days a game keeps only its best prices (the book-by-book prices go),
     # and after two weeks its ladder prices go too. Picks and ladders themselves are kept in picks.json.
     today = now.date()
@@ -818,7 +861,7 @@ def remember_odds(sched, old):
     if json.dumps(store, sort_keys=True) != before:
         with open(ODDS, "w", encoding="utf-8") as f:
             json.dump(store, f, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
-    return store
+    return {k: v for k, v in store.items() if not k.startswith("_")}
 
 
 def remember_positions(flags, sched, games, limit=30):
