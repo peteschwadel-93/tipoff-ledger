@@ -1675,7 +1675,7 @@ function mfDay(day){D._mfd=D._mfd||{};var ck=day+"|"+S.book+"|"+(S.bookOff?1:0);
       var price=x[1],book=x[2],all=x[3]||null;if(S.book&&!S.bookOff&&all){if(all[S.book]==null)return;price=all[S.book];book=S.book}
       var pay=payOf(price),ev=q*pay-1,r={m:m,lab:x[0],mt:mt,p:pl?pl.e.x.p:0,t:pl?pl.t:m.h,opp:pl?(pl.t===m.h?m.a:m.h):m.a,q:q,price:price,book:book,all:all,pay:pay,ev:ev,vs:valScore(q,pay),ft:0};
       r.qs=pl?q*MFSH:q;r.evs=r.qs*pay-1;r.vss=valScore(r.qs,pay);r.val=pl?(r.qs>=.015&&r.evs>=.25):(q>=.08&&q-1/pay>=.03); // a method: 3 points above break-even; a player and method: a real chance and 25% over its price
-      if(f&&g&&!g.lv)r.res=(mt===res&&(!r.p||r.p===who))?1:0;rows.push(r)});
+      if(f&&g)r.res=(mt===res&&(!r.p||r.p===who))?1:0;rows.push(r)});
     out.push({m:m,cs:cs,P:P,ft:1,rows:rows.sort(function(a,b){return b.vs-a.vs}),res:res,who:who,priced:mf.length>0})});
   return D._mfd[ck]=out}
 function mfHtml(day){var L=mfDay(day).filter(function(x){return pkOn(x.m)});if(!L.length)return "";var priced=L.some(function(x){return x.priced}),ks=MFC,LG=mfLeague(day);
@@ -1716,7 +1716,7 @@ function mfRows(day){var out=[];mfDay(day).forEach(function(x){x.rows.forEach(fu
 function mfFill(rows,room,held){var g={},pl={},out=[];(held||[]).forEach(function(k){g[k]=1});
   rows.filter(function(r){return r.val}).forEach(function(r){var k=r.m.a+"@"+r.m.h;if(out.length>=room||g[k]||pl[r.p])return;g[k]=1;pl[r.p]=1;out.push(r)});return out}
 function mfOut(r){var m=r.m,f=function(v,n){return v==null?null:+(+v).toFixed(n)};return{p:r.p,n:D.players[r.p]||"",t:r.t,o:r.opp,a:m.a,h:m.h,ts:m.ts||null,mt:r.mt,price:r.price,book:r.book,q:f(r.q,5),ev:f(r.ev,4),vs:f(r.vs,2),lk:0}}
-function mfResOf(m,p,mt){var g=m&&m.g;if(!g||g.lv)return null;var f=mfFirst(g);if(!f)return null;
+function mfResOf(m,p,mt){var g=m&&m.g;if(!g)return null;var f=mfFirst(g);if(!f)return null;if(g.lv)return f[0]===p&&mfCat(f)===mt?1:0; // decided by the first basket, live or final
   var played=[g.h,g.a].some(function(t){return (g.st[t]||[]).indexOf(p)>=0||(g.b3&&(g.b3[t]||[]).some(function(q){return q[0]===p}))});if(!played)return "dnp";return f[0]===p&&mfCat(f)===mt?1:0}
 function mfPicks(day){var rows=mfRows(day),LK=(!S.book||S.bookOff)&&!S.lockOff?(D.locks||{})[day]:null,ms=ftMs(day);
   rows.forEach(function(r){r.res=mfResOf(r.m,r.p,r.mt)});
@@ -1995,7 +1995,7 @@ function tnMine(day,p,m,k,key){return S.bets.some(function(b){return b.d===day&&
 function tnItems(day){var out=[],conf=tnConf(day),seen={};
   // first basket: the three shooters on each game at the chosen rating
   conf.forEach(function(s){var r=s.r;if(!r.fav||s.t!==r.fav||r.lv<S.minLv||!(r.top||[]).slice(0,3).some(function(x){return x.p===s.e.x.p}))return;var k=s.e.x.p+"|fb";if(seen[k])return;seen[k]=1;
-    out.push({mk:"First basket",tag:"1B",p:s.e.x.p,t:s.t,opp:s.t===r.m.h?r.m.a:r.m.h,m:r.m,bet:"First basket",code:"fb",k:0,price:s.price,book:s.book,all:s.all,ch:s.e.p,u:1,res:r.m.g&&!r.m.g.lv?(function(){var fs=firstScore(r.m.g);return fs?(fs[0]===s.e.x.p?1:0):null})():null})});
+    out.push({mk:"First basket",tag:"1B",p:s.e.x.p,t:s.t,opp:s.t===r.m.h?r.m.a:r.m.h,m:r.m,bet:"First basket",code:"fb",k:0,price:s.price,book:s.book,all:s.all,ch:s.e.p,u:1,res:r.m.g?(function(){var fs=firstScore(r.m.g);return fs?(fs[0]===s.e.x.p?1:0):null})():null})});
   ftPicks(day).top.forEach(function(r){out.push({mk:"First team basket",tag:"FTB",p:r.p,t:r.t,opp:r.opp,m:r.m,bet:"First team basket",code:"ftb",k:0,price:r.price,book:r.book,all:r.all,ch:r.p2,u:1,res:r.res===1||r.res===0?r.res:null})});
   ["t3","rb","as"].forEach(function(sk){inSK(sk,function(){t3Day(day).top.forEach(function(x){var r=x.row,C=STAT[sk];
     out.push({mk:C.nm,tag:C.tag||"3PM",p:r.p,t:r.t,opp:r.opp,m:r.m,bet:/^(Over|Under)/.test(x.lab)?x.lab+" "+C.u:x.lab,code:C.mp+(x.over?(x.rg?"r":"o"):"u"),k:x.k,price:x.price,book:x.book,all:x.all,ch:x.p,u:1,res:x.hit===true?1:x.hit===false?0:null})})})});
@@ -2372,6 +2372,13 @@ function lvApply(doc,m,ids){var bs=(doc.boxscore||{}).players||[],b3={},st={},se
   if(g&&!g.lv)return false; // the rebuild already has the final: leave it
   if(!g){g={id:9e8+D.games.length,d:m.d,t:m.t||"",po:0,s:seasonOf(m.d),h:m.h,a:m.a,tip:null,fs:{},st:st,fb:null,fp:null,b3:b3,lv:1,esp:1};D.games.push(g)}
   else{g.b3=b3;[m.h,m.a].forEach(function(t){if(!(g.st[t]||[]).length)g.st[t]=st[t]||[]})}
+  if(g.esp){var fs={},ord=0,nf={};fs[m.h]=[];fs[m.a]=[];nf[m.h]=0;nf[m.a]=0; // the opening shots, the same shape the rebuild writes
+    (doc.plays||[]).forEach(function(p){if(!p.shootingPlay)return;var who=((p.participants||[])[0]||{}).athlete||{},pid=aid[who.id],t=tid[(p.team||{}).id];if(!pid||!fs[t])return;
+      var tx=String(((p.type||{}).text||"")+" "+(p.text||"")),ft=/free throw/i.test(tx),made=p.scoringPlay?1:0,val=ft?1:(+p.scoreValue>=2?+p.scoreValue:/three point|3-pt|3pt/i.test(tx)?3:2);
+      var per=+((p.period||{}).number)||1,ck=String((p.clock||{}).displayValue||"0:00").split(":"),left=ck.length>1?(+ck[0])*60+(+ck[1]):+ck[0]||0,el=(per<=4?(per-1)*720+720-left:2880+(per-5)*300+300-left);
+      var L=fs[t],last=L[L.length-1];if(ft&&last&&last[1]===1&&last[0]===pid&&last[5]===el){last[2]+=made;last[8]++;return}
+      if(nf[t]>=10&&!ft)return;if(!ft)nf[t]++;ord++;L.push([pid,val,made,null,ft?"Free Throw":/dunk/i.test(tx)?"DUNK":/layup/i.test(tx)?"Layup":/hook/i.test(tx)?"Hook":"Jump Shot",el,ord,null,1,null])});
+    g.fs=fs}
   var pl=(doc.plays||[]).filter(function(p){return p.scoringPlay}); // the first points (free throws count) and the first field goal
   pl.forEach(function(p){var who=((p.participants||[])[0]||{}).athlete||{},pid=aid[who.id],t=tid[(p.team||{}).id];if(!pid||!t)return;
     if(!g.fp)g.fp=[pid,t];if(!g.fb&&(+p.scoreValue||0)>=2)g.fb=[pid,t]});
