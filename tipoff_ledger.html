@@ -1658,7 +1658,8 @@ function mfDay(day){D._mfd=D._mfd||{};var ck=day+"|"+S.book+"|"+(S.bookOff?1:0);
     var rest=Math.max(0,1-tot);MFC.forEach(function(k){P[k]+=rest*LG[k];P[k]=MFW*P[k]+(1-MFW)*LG[k]});
     var f=g?mfFirst(g):null,res=f?mfCat(f):null,who=f?f[0]:null,rows=[];
     mf.forEach(function(x){var parts=x[0].split(" · "),mt=mfOf(parts[parts.length-1]),pl=null,q=null;
-      if(parts.length>1){var nn=normName(parts[0]);cs.forEach(function(s){if(normName(D.players[s.e.x.p])===nn)pl=s});if(!pl)return;q=pl.e.p*mfMix(pl.e.x.p,day,LG)[mt]}else q=P[mt];
+      if(parts.length>1){var nn=normName(parts[0]),nw=nn.split(" "),nk=nw[0].charAt(0)+" "+nw.slice(1).join(" "); // books give full names; the page keeps "D. Robinson"
+        cs.forEach(function(s){var q=normName(D.players[s.e.x.p]);if(q===nn||q===nk)pl=s});if(!pl)return;q=pl.e.p*mfMix(pl.e.x.p,day,LG)[mt]}else q=P[mt];
       var price=x[1],book=x[2],all=x[3]||null;if(S.book&&!S.bookOff&&all){if(all[S.book]==null)return;price=all[S.book];book=S.book}
       var pay=payOf(price),ev=q*pay-1,r={m:m,lab:x[0],mt:mt,p:pl?pl.e.x.p:0,t:pl?pl.t:m.h,opp:pl?(pl.t===m.h?m.a:m.h):m.a,q:q,price:price,book:book,all:all,pay:pay,ev:ev,vs:valScore(q,pay),ft:0};
       r.qs=pl?q*MFSH:q;r.evs=r.qs*pay-1;r.vss=valScore(r.qs,pay);r.val=pl?(r.qs>=.015&&r.evs>=.25):(q>=.08&&q-1/pay>=.03); // a method: 3 points above break-even; a player and method: a real chance and 25% over its price
