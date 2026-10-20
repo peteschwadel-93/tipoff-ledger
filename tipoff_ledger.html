@@ -2379,6 +2379,11 @@ function lvApply(doc,m,ids){var bs=(doc.boxscore||{}).players||[],b3={},st={},se
       var L=fs[t],last=L[L.length-1];if(ft&&last&&last[1]===1&&last[0]===pid&&last[5]===el){last[2]+=made;last[8]++;return}
       if(nf[t]>=10&&!ft)return;if(!ft)nf[t]++;ord++;L.push([pid,val,made,null,ft?"Free Throw":/dunk/i.test(tx)?"DUNK":/layup/i.test(tx)?"Layup":/hook/i.test(tx)?"Hook":"Jump Shot",el,ord,null,1,null])});
     g.fs=fs}
+  else{var mo=0;[m.h,m.a].forEach(function(t){(g.fs[t]||[]).forEach(function(x){if(x[6]>mo)mo=x[6]})}); // a rebuilt live game: add a team's first made shot if the rebuild has not caught it yet
+    [m.h,m.a].forEach(function(t){g.fs[t]=g.fs[t]||[];if(g.fs[t].some(function(x){return x[2]>0&&x[1]!==1}))return;
+      var p=(doc.plays||[]).filter(function(q){return q.shootingPlay&&q.scoringPlay&&tid[(q.team||{}).id]===t&&!/free throw/i.test(String((q.type||{}).text||"")+" "+(q.text||""))})[0];if(!p)return;
+      var pid=aid[(((p.participants||[])[0]||{}).athlete||{}).id];if(!pid)return;var tx=String(((p.type||{}).text||"")+" "+(p.text||""));
+      g.fs[t].push([pid,+p.scoreValue===3?3:2,1,null,/dunk/i.test(tx)?"DUNK":/layup/i.test(tx)?"Layup":/hook/i.test(tx)?"Hook":"Jump Shot",99999,++mo,null,1,null])})}
   var pl=(doc.plays||[]).filter(function(p){return p.scoringPlay}); // the first points (free throws count) and the first field goal
   pl.forEach(function(p){var who=((p.participants||[])[0]||{}).athlete||{},pid=aid[who.id],t=tid[(p.team||{}).id];if(!pid||!t)return;
     if(!g.fp)g.fp=[pid,t];if(!g.fb&&(+p.scoreValue||0)>=2)g.fb=[pid,t]});

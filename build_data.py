@@ -420,6 +420,7 @@ def build(df):
         att = g[g.actionType.isin(["2pt", "3pt", "freethrow"]) & (g.personId > 0)]
         shots = {t: [] for t in teams}
         nfg = {t: 0 for t in teams}
+        team_fg = {t: False for t in teams}   # each team's shots are kept until it has made a field goal, so its first basket is always on record
         order = 0
         first_fg = first_pts = None
         for r in att.itertuples():
@@ -436,7 +437,7 @@ def build(df):
                     last[2] += made; last[8] += 1
                 elif same and last[2] and str(r.subType).strip() == "1 of 1":   # and-one
                     last[9] = made
-                elif nfg[t] < N_SHOTS or first_fg is None:
+                elif nfg[t] < N_SHOTS or first_fg is None or not team_fg[t]:
                     order += 1
                     kind = r.descriptor if pd.notna(r.descriptor) else None
                     lst.append([int(r.personId), 1, made, None, "Free Throw", el, order, kind, 1, None])
@@ -448,12 +449,14 @@ def build(df):
                     first_fg = [int(r.personId), t]
                 if made and first_pts is None:
                     first_pts = [int(r.personId), t]
-                if nfg[t] < N_SHOTS or first_fg is None or (made and first_fg == [int(r.personId), t] and nfg[t] >= N_SHOTS):
+                if nfg[t] < N_SHOTS or first_fg is None or not team_fg[t] or (made and first_fg == [int(r.personId), t] and nfg[t] >= N_SHOTS):
                     nfg[t] += 1
+                    if made:
+                        team_fg[t] = True
                     dist = int(round(r.shotDistance)) if pd.notna(r.shotDistance) else None
                     lst.append([int(r.personId), 3 if r.actionType == "3pt" else 2, made, dist, r.subType,
                                 el, order, r.descriptor if pd.notna(r.descriptor) else None, 1, None])
-            if first_fg and all(n >= N_SHOTS for n in nfg.values()) and el > max(x[-1][5] for x in shots.values()):
+            if first_fg and all(team_fg.values()) and all(n >= N_SHOTS for n in nfg.values()) and el > max(x[-1][5] for x in shots.values()):
                 break
         games.append({"id": int(gid), "d": ts.strftime("%Y-%m-%d"), "t": ts.strftime("%I:%M %p ET").lstrip("0"), "po": int(g.po.iloc[0]), "s": int(g.ssn.iloc[0]),
                       "h": home, "a": away, "tip": tip, "fs": shots, "st": starters, "fb": first_fg, "fp": first_pts,
