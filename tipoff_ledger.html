@@ -87,6 +87,8 @@ button:focus-visible,select:focus-visible,input:focus-visible,tr[tabindex]:focus
 .t3 td.lc0{vertical-align:bottom;padding:8px 8px;position:relative}.lc{display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px;padding:7px 11px;border-radius:10px;border:1px solid transparent;min-width:78px;line-height:1.15}
 .lc .lkk2{font:600 10.5px/1 var(--body);letter-spacing:.06em;margin-bottom:2px}.lkk{display:none}
 .lc .stk{font:700 11px/1 var(--body);color:var(--accent);letter-spacing:.03em;margin-top:2px}.lc.good{background:rgba(99,210,180,.12);border-color:rgba(99,210,180,.22)}.lc.hit{border-color:var(--made);background:linear-gradient(180deg,var(--made-soft),rgba(23,53,46,.25));box-shadow:0 0 0 1px var(--made),0 0 16px -3px var(--made)}.lc.hit b.o,.lc.hit .o{color:var(--soft)}
+.lc.hot{opacity:.45}.lc.hot.hit{opacity:1}
+.alad td.lc0 .lc{min-width:70px;padding:6px 9px}
 .t3 td.lnm{box-shadow:inset 3px 0 0 var(--accent)}.t3 td.lc0{text-align:center}.lnl{position:absolute;left:9px;top:50%;transform:translateY(-50%);font:700 9.5px/1.2 var(--body);letter-spacing:.08em;color:var(--accent);white-space:nowrap}.t3 td .up{color:#3ef07f;font-size:12.5px}.t3 td b.o{font-weight:500}
 .pxb{cursor:pointer;border-bottom:1px dotted color-mix(in srgb,var(--accent) 60%,transparent);padding-bottom:1px}.pxb:hover,.pxb:focus-visible{border-bottom:1px solid var(--accent);filter:brightness(1.25);outline:0}
 #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);z-index:80;max-width:calc(100vw - 32px);padding:11px 16px;border-radius:10px;background:var(--raise);border:1px solid color-mix(in srgb,var(--accent) 55%,var(--line));color:var(--ink);font-size:13.5px;box-shadow:0 12px 32px -8px rgba(0,0,0,.7);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}#toast.on{opacity:1;transform:translate(-50%,0)}
@@ -657,7 +659,7 @@ function priceTable(t,v,at,m){if(!v.length)return "";
 S.dsort={};S.pkGame="";
 function pkOn(m){return !S.pkGame||(m.a+"@"+m.h)===S.pkGame}
 function dsVal(td,num){var v=td.getAttribute("data-v");if(v!=null)return v===""?null:+v;var t=(td.textContent||"").replace(/\u2212/g,"-").replace(/,/g,"").trim();if(!num)return t?t.toLowerCase():null;var m=t.match(/[+-]?\d+(\.\d+)?/);return m?parseFloat(m[0]):null}
-function dsApplyAll(){[].forEach.call(view.querySelectorAll("table"),function(tb,i){if(tb.classList.contains("nosort")||!tb.tHead||!tb.tHead.rows.length)return;if(!tb.id)tb.id="pkT"+i;tb.classList.add("dsort");
+function dsApplyAll(sel){[].forEach.call(view.querySelectorAll(sel||"table"),function(tb,i){if(tb.classList.contains("nosort")||!tb.tHead||!tb.tHead.rows.length)return;if(!tb.id)tb.id="pkT"+i;tb.classList.add("dsort");
   var st=S.dsort[tb.id],ths=tb.tHead.rows[tb.tHead.rows.length-1].cells;[].forEach.call(ths,function(th,j){th.setAttribute("tabindex","0");th.removeAttribute("aria-sort");if(st&&st.c===j)th.setAttribute("aria-sort",st.d>0?"ascending":"descending")});
   var body=tb.tBodies[0];if(!st||!body||!ths[st.c])return;var rows=[].slice.call(body.rows),c0=rows[0]&&rows[0].cells[st.c],num=/\bn\b/.test(ths[st.c].className)||!!(c0&&/^\s*\d+\s*$/.test(c0.textContent));
   rows.sort(function(a,b){var x=a.cells[st.c],y=b.cells[st.c];x=x?dsVal(x,num):null;y=y?dsVal(y,num):null;if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return (x<y?-1:x>y?1:0)*st.d});
@@ -1121,7 +1123,33 @@ function vThrees(){
           :'<td class="n"><span class="o">'+BEK.map(function(k){return fairOdds(t3AtLeast(d,k))}).join(" / ")+'</span></td>')+
         '<td class="n"><span class="o">'+pr.l10m.toFixed(1)+(RBT?'':' of '+pr.l10a.toFixed(1))+'</span></td>'+(anyRes?'<td class="n">'+resCell(r)+'</td>':'')+'</tr>'}).join("")+'</tbody></table></div>'+
     (hidden>0||S.t3All?'<p class="note" style="margin-top:12px">'+(S.t3All?'Showing every player with a projection. ':'Players projected for fewer than '+(S.t3Game?(CNT()?"1 "+SC().u1:"1 attempt"):(CNT()?SC().volShow+" "+SC().u:"2.5 attempts"))+' are hidden unless they have a price ('+hidden+' more). ')+'<button class="more" id="t3More">'+(S.t3All?"Show fewer":"Show all")+'</button></p>':'')+'</section>':"";
-  view.innerHTML='<div class="picks">'+hd+picksTbl+t3LadderHtml(rows,top,anyOdds)+slate+'</div>'}
+  view.innerHTML='<div class="picks">'+hd+picksTbl+t3LadderHtml(rows,top,anyOdds)+slate+allLadHtml(rows,ms)+'</div>'}
+/* ---- All ladders: every player's rungs on this stat, for research. Each cell is the best price (or the chosen book's), its edge
+   on the pick chance and that chance; plain cells have no price and show the model chance and fair price. Not a pick list. ---- */
+function alKs(row){if(!CNT())return[1,2,3,4,5,6];var b=row.ln?Math.floor(row.ln[1])+1:Math.max(1,Math.round(row.pr.mu)),o=[];for(var j=-2;j<=5;j++)o.push(b+j);return o}
+function alRow(row){var by={};(row.cand||[]).forEach(function(x){if(x.over&&(!by[x.k]||x.price>by[x.k].price))by[x.k]=x});
+  var be=null,bx_=null;Object.keys(by).forEach(function(k){var x=by[k];if(x.gap<=.12&&x.p>=.05&&(be==null||x.ev>be)){be=x.ev;bx_=x}});
+  return{row:row,by:by,n:Object.keys(by).length,be:be,bk:bx_}}
+function allLadHtml(rows,ms){var RBT=CNT(),CC=SC().col,gk=function(m){return m.a+"@"+m.h};
+  var base=rows.filter(function(r){return !S.t3Game||gk(r.m)===S.t3Game}).map(alRow),priced=base.filter(function(a){return a.n}).length;
+  var show=S.alShow||(priced?"priced":"all");if(!priced&&show!=="all")show="all";
+  var L=base.filter(function(a){return show==="all"?(a.n||a.row.pr.att>=SC().volShow):show==="value"?(a.be!=null&&a.be>=.05):a.n});
+  L.sort(function(a,b){return (b.be==null?-9:b.be)-(a.be==null?-9:a.be)||b.row.pr.mu-a.row.pr.mu});
+  var full=S.alAll||S.t3Game,total=L.length;if(!full)L=L.slice(0,40);var anyRes=L.some(function(a){return a.row.res});
+  var heads=RBT?["Line −2","Line −1","Line","+1","+2","+3","+4","+5"]:["1+","2+","3+","4+","5+","6+"];
+  function cell(a,k){var r=a.row;if(k<1)return '<td class="n lc0" data-v=""></td>';var x=a.by[k],v=t3AtLeast(r.d,k),hit=r.res?r.res[CC]>=k:false,kk=r.ln?Math.floor(r.ln[1])+1:0,mark=kk===k,lab=RBT?'<span class="o lkk2">'+k+'+</span>':'';
+    if(!x)return '<td class="n lc0'+(mark?" lnm":"")+'" data-v="" title="No price on record · model '+(v*100).toFixed(1)+'%, fair '+fairOdds(v)+'"><div class="lc'+(hit?" hit":"")+'">'+lab+(v>=.02&&v<=.98?'<span class="o">'+Math.round(v*100)+'%</span><span class="o">'+fairOdds(v)+'</span>':'<span class="o">–</span>')+'</div></td>';
+    var good=x.ev>=.05&&x.gap<=.12&&x.p>=.05,hot=x.gap>.12,nb=x.all?Object.keys(x.all).length:1;
+    return '<td class="n lc0'+(mark?" lnm":"")+'" data-v="'+(hot?"":x.ev.toFixed(4))+'" title="'+esc(k+'+ · pick chance '+(x.p*100).toFixed(1)+'% (model '+(x.pm*100).toFixed(1)+'%, market '+(x.mk*100).toFixed(1)+'%) · fair '+fairOdds(x.p)+' · '+fmtP(x.price)+' at '+x.book+' · '+nb+' book'+(nb===1?'':'s')+(hot?' · model and market more than 12 points apart: check the news':''))+'"><div class="lc'+(good?" good":"")+(hot?" hot":"")+(hit?" hit":"")+'">'+lab+
+      bxc(x,'<b class="'+(good?"":"o")+'">'+fmtP(x.price)+'</b>')+'<span class="'+(x.ev>0?"up":"o")+'">'+(x.ev>0?"+":"")+Math.round(x.ev*100)+'%</span><span class="o">'+Math.round(x.p*100)+'%</span></div></td>'}
+  var seg='<span class="seg" id="seg-al">'+[["priced","Priced"],["value","Edge 5%+"],["all","All"]].map(function(o){return '<button data-v="'+o[0]+'" aria-pressed="'+(show===o[0])+'"'+(!priced&&o[0]!=="all"?" disabled":"")+'>'+o[1]+'</button>'}).join("")+'</span>';
+  var h='<section class="panel"><div class="phead"><h2>All ladders</h2><div class="pickers"><label class="f">Show '+seg+'</label></div></div>'+
+    '<p class="note" style="margin-bottom:14px">Every player\'s '+SC().u+' ladder, for research: not picks, and nothing here is tracked. '+(RBT?'The columns run from two rungs below his main line to five above it (the rung number is in each cell); ':'')+'each priced cell is the '+(S.book&&!S.bookOff?esc(S.book):'best')+' price, its edge, and the pick chance underneath (model and market half and half, as everywhere on this page); hover for the model, the market, the fair price and how many books post it. <b>Green</b> is 5% or more over its price with the model within 12 points of the market. <b>Faded</b> is a rung where the two are more than 12 points apart, which usually means news the model has not seen: those are left out of the sorting and the picks. Plain cells have no price and show the model chance and the price it needs. The orange bar marks his main line; every rung he reaches glows, live as well as after the game. Sorted by each player\'s best edge; click a column to re-sort. '+priced+' of '+base.length+' players priced'+(S.t3Game?' in this game':' tonight')+'. The game buttons in the Full slate also filter this table.</p>';
+  if(!L.length)return h+'<p class="note">'+(base.length?'Nothing in this view.':'No players to show for this day.')+'</p></section>';
+  return h+'<div class="tw"><table class="t3 alad" id="t3AllLad"><thead><tr><th>Team</th><th>Player</th><th>Opp</th><th class="n" title="Projected '+SC().u+' · projected minutes">Proj</th><th class="n" title="His main over/under line">Line</th><th class="n" title="His best edge among rungs where model and market agree">Best edge</th>'+heads.map(function(k){return '<th class="n">'+k+'</th>'}).join("")+(anyRes?'<th class="n">Got</th>':'')+'</tr></thead><tbody>'+
+    L.map(function(a){var r=a.row,m=r.m;return '<tr><td>'+tmL(r.t)+'</td><td>'+nm(r.p)+(r.st?'':' <span class="tag">BENCH</span>')+'</td><td><span class="o">'+(r.t===m.h?"v ":"@ ")+r.opp+'</span></td><td class="n"><b>'+r.pr.mu.toFixed(1)+'</b> <span class="o">'+r.pr.pmin.toFixed(0)+'m</span></td><td class="n">'+(r.ln?r.ln[1]:'<span class="o">–</span>')+'</td><td class="n" data-v="'+(a.be==null?"":a.be.toFixed(4))+'">'+(a.be==null?'<span class="o">–</span>':'<span class="tag '+(a.be>=.05?"w":"")+'">'+(a.be>0?"+":"")+Math.round(a.be*100)+'%</span>')+'</td>'+
+      alKs(r).map(function(k){return cell(a,k)}).join("")+(anyRes?'<td class="n">'+(r.res?'<b>'+r.res[CC]+'</b>'+(m.g&&m.g.lv?' <span class="tag q">LIVE</span>':''):'<span class="o">–</span>')+'</td>':'')+'</tr>'}).join("")+'</tbody></table></div>'+
+    (total>40&&!S.t3Game?'<button class="more" id="alMore" style="margin-top:12px">'+(S.alAll?"Show the top 40":"Show all "+total+" players")+'</button>':'')+'</section>'}
 function vMatchup(){
   var a=S.a,b=S.b;if(a===b)b=teams().filter(function(t){return t!==a})[0];
   if(!S.ja||!teamTipAll(a).some(function(j){return j.p===S.ja}))S.ja=likelyJumper(a);
@@ -1354,9 +1382,11 @@ function t3Last10(x){var l=t3Index().L[x.row.p]||[],n=t3Before(l,x.row.m.g?x.row
 function lnc(r,over){var v=r.ln[over?2:4];if(v==null)return "–";var c=(r.cand||[]).filter(function(x){return (over?/^Over/:/^Under/).test(x.lab)})[0];return c?bxc(c,fmtP(v)):fmtP(v)}
 function t3Card(x,i){var r=x.row,pr=r.pr,m=r.m,l10=t3Last10(x),under=!x.over,vl=x.vs>=12?4:x.vs>=8?3:x.vs>=4?2:1,pos=posOf(r.p);
   var GOT=r.res?r.res[SC().col]+(CNT()?" "+SC().tag:" MADE"):"";
-  var st=x.hit!=null?'<span class="tag '+(x.hit?"w":"l")+'">'+GOT+' · '+(x.hit?"WON":"LOST")+'</span>':r.dnp?'<span class="tag">DID NOT PLAY · VOID</span>':r.res&&m.g?'<span class="tag q">'+GOT+' · LIVE</span>':'';
-  if(x.over&&r.st&&x.hit==null&&blowRisk(m)!=null&&blowRisk(m)>=GL.warn)st+=glTag(m,true);
+  var st=x.hit!=null?'<span class="tag '+(x.hit?"w":"l")+'">'+GOT+' · '+(x.hit?"WON":"LOST")+'</span>':r.dnp?'<span class="tag">DID NOT PLAY · VOID</span>':'';
   if(S._t3lk&&x.hit==null&&!r.dnp)st+=(st?' ':'')+(t3Started(m)?'<span class="tag" title="Fixed when this game tipped off: the price and chances are from the last refresh before tip.">LOCKED</span>':'<span class="tag q" title="This pick can still change until its game tips off.">OPEN'+(m.t?' · LOCKS '+esc(String(m.t).replace(/ ET$/,"")):'')+'</span>');
+  if(m.g&&m.g.lv&&x.hit==null&&!r.dnp){var N=r.res?r.res[SC().col]:0,U=CNT()?SC().tag:"MADE",need=x.over?x.k-N:x.k-1-N; // live: what he has so far, and how far from winning (an over) or from losing (an under)
+    st+=(st?' ':'')+'<span class="tag q" title="Updates with each refresh while the game is on">LIVE · '+N+' '+U+(x.over?(need>0?' · '+need+' TO GO':''):(need>0?' · '+need+' TO SPARE':need===0?' · ONE MORE LOSES':''))+'</span>'}
+  if(x.over&&r.st&&x.hit==null&&blowRisk(m)!=null&&blowRisk(m)>=GL.warn)st+=glTag(m,true);
   function row(a,b){return '<div class="rl"><span class="o">'+a+'</span><span>'+b+'</span></div>'}
   return '<article class="t3c'+(x.hit===true?" win":x.hit===false?" lost":"")+'" data-i="'+i+'" tabindex="0" role="button" aria-label="Why this pick"><div class="t3h"><span class="tm">'+lg(r.t)+m.a+' <span class="o">@</span> '+m.h+'</span><span class="bet'+(under?" un":"")+'">'+esc((x.lab+(CNT()&&!x.rg?SC().rg:"")).replace(" made","+ MADE").replace("++","+").toUpperCase())+'</span></div>'+
     '<div class="rl"><span class="o">'+(i+1)+' · '+r.t+(pos?" · "+pos:"")+' · '+(r.st?"START":"BENCH")+(!r.conf&&!m.g?' · <span style="color:var(--accent)" title="The lineup is not posted yet, so his role and minutes are the expected ones. Worth a second look once it posts.">LINEUP NOT POSTED</span>':'')+'</span><span class="o">'+(m.g&&m.g.t?"TIPPED "+esc(m.g.t):m.t?esc(m.t):"")+'</span></div>'+
@@ -1998,7 +2028,7 @@ function render(){
   if(!G.length){view.innerHTML='<p class="empty">No games match these filters.</p>';return}
   var keep=document.activeElement&&document.activeElement.id,pos=keep==="q"?document.activeElement.selectionStart:null;
   ({picks:vPicks,tonight:vTonight,lineups:vLineups,threes:vThrees,rebounds:function(){inSK("rb",vThrees)},assists:function(){inSK("as",vThrees)},parlays:vParlays,movers:vMovers,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,bets:vBets,games:vGames,model:vModel})[S.tab]();
-  if(S.tab==="picks")dsApplyAll();
+  if(S.tab==="picks")dsApplyAll();else if(S.tab==="threes"||S.tab==="rebounds"||S.tab==="assists")dsApplyAll("table.alad");
   if(keep&&$(keep)){$(keep).focus();if(pos!=null)$(keep).setSelectionRange(pos,pos)}
   if(S.tab!=="bets")betCount();
   renderSlip();
@@ -2046,6 +2076,8 @@ document.addEventListener("click",function(e){
   b=e.target.closest("#seg-trk button");if(b){S.trkConf=+b.dataset.v;return render()}
   if(e.target.id==="trkMore"){S.trkN+=30;return render()}
   if(e.target.id==="t3More"){S.t3All=!S.t3All;return render()}
+  if(e.target.id==="alMore"){S.alAll=!S.alAll;return render()}
+  b=e.target.closest("#seg-al button");if(b&&!b.disabled){S.alShow=b.dataset.v;return render()}
   if(e.target.id==="ftMore"){S.ftAll=!S.ftAll;return render()}
   if(e.target.id==="mfMore"){S.mfAll=!S.mfAll;return render()}
   if(e.target.id==="mfGame"){S.mfGame=!S.mfGame;return render()}
