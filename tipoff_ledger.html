@@ -115,6 +115,9 @@ button:focus-visible,select:focus-visible,input:focus-visible,tr[tabindex]:focus
 .bets tbody tr.bwon>td:not(:last-child),.bets tbody tr.bwon:nth-child(odd)>td:not(:last-child){background:rgba(99,210,180,.09)}.bets tbody tr.bwon>td:first-child{box-shadow:inset 3px 0 0 var(--made)}
 .bty{font:500 13.5px var(--body);color:var(--soft)}.bty::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:8px;vertical-align:1px;background:var(--made)}.bty.bu::before{background:#f5c542}.bty.bg::before{background:var(--accent)}
 .bty.bp::before{background:#7cc4ff}
+.lvtag{font:700 10.5px var(--body);letter-spacing:.06em;color:#ff9f6b;background:rgba(255,159,107,.12);border:1px solid rgba(255,159,107,.45);border-radius:999px;padding:2px 8px;margin-left:6px;cursor:pointer;vertical-align:1px}
+.lvtag.off{color:var(--muted);background:none;border-color:var(--line);font-weight:500;letter-spacing:0}
+.lvck{display:flex;align-items:center;gap:6px;cursor:pointer}
 ul.parl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
 ul.parl li{white-space:nowrap;font-size:13.5px}
 ul.parl li::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;border:1.5px solid var(--muted);margin-right:8px;vertical-align:1px}
@@ -1553,7 +1556,7 @@ function betManual(){var q=function(id){return ($(id)||{}).value||""},N=betNames
   if(!/^\d{4}-\d\d-\d\d$/.test(d)){toast("Choose the night of the game");return}
   if(!price||Math.abs(price)<100){toast("Enter the odds, like +650 or -120");return}
   var k=0;if(m!=="fb"){if(!(ln>0)){toast(m==="r"?"Enter how many threes, like 3 for 3+":"Enter the line, like 2.5");return}k=/r$/.test(m)?Math.round(ln):Math.floor(ln)+1}
-  var b={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString(),d:d,p:who.p,nm:D.players[who.p],t:"",opp:"",home:null,m:m,k:k,price:price,price0:price,book:book,u:Math.round(u*100)/100,res:"auto",hand:1};
+  var b={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString(),d:d,p:who.p,nm:D.players[who.p],t:"",opp:"",home:null,m:m,k:k,price:price,price0:price,book:book,u:Math.round(u*100)/100,res:"auto",hand:1};if(($("bfLive")||{}).checked)b.lv=1;
   var g=betGame(b),sc=g||(D.sched||[]).filter(function(x){return x.d===d&&(x.h===who.t||x.a===who.t)})[0];
   if(g){b.t=[g.h,g.a].filter(function(tm){return (g.st[tm]||[]).indexOf(b.p)>=0||(g.b3&&(g.b3[tm]||[]).some(function(z){return z[0]===b.p}))})[0]||who.t}else b.t=who.t;
   if(sc){b.opp=sc.h===b.t?sc.a:sc.h;b.home=sc.h===b.t?1:0}
@@ -1561,12 +1564,12 @@ function betManual(){var q=function(id){return ($(id)||{}).value||""},N=betNames
 function vBets(){BCH={};S.bsel=S.bsel||{};
   function sg(u,dp){return (u>=0?"+":"−")+Math.abs(u).toFixed(dp==null?2:dp)}
   function usd(u){return (u<0?"−$":"+$")+Math.abs(u*S.unit).toFixed(2)}
-  var all=S.bets.map(function(b){return{b:b,g:betGrade(b)}}),T={n:0,w:0,l:0,p:0,u:0,stk:0,open:0,ostk:0},kinds={fb:{l:"First basket",n:0,w:0,u:0,stk:0},mf:{l:"Method of first basket",n:0,w:0,u:0,stk:0},o:{l:"Threes overs and rungs",n:0,w:0,u:0,stk:0},u:{l:"Threes unders",n:0,w:0,u:0,stk:0},rb:{l:"Rebounds",n:0,w:0,u:0,stk:0},as:{l:"Assists",n:0,w:0,u:0,stk:0},ftb:{l:"First team basket",n:0,w:0,u:0,stk:0},par:{l:"Parlays",n:0,w:0,u:0,stk:0}},byDay={};
+  var all=S.bets.map(function(b){return{b:b,g:betGrade(b)}}),T={n:0,w:0,l:0,p:0,u:0,stk:0,open:0,ostk:0},kinds={fb:{l:"First basket",n:0,w:0,u:0,stk:0},mf:{l:"Method of first basket",n:0,w:0,u:0,stk:0},o:{l:"Threes overs and rungs",n:0,w:0,u:0,stk:0},u:{l:"Threes unders",n:0,w:0,u:0,stk:0},rb:{l:"Rebounds",n:0,w:0,u:0,stk:0},as:{l:"Assists",n:0,w:0,u:0,stk:0},ftb:{l:"First team basket",n:0,w:0,u:0,stk:0},par:{l:"Parlays",n:0,w:0,u:0,stk:0},live:{l:"Live bets",n:0,w:0,u:0,stk:0}},byDay={};
   all.forEach(function(x){var g=x.g,b=x.b;if(g.st==="void")return;if(g.pl==null){T.open++;T.ostk+=b.u;return}
-    T.n++;T.stk+=b.u;T.u+=g.pl;if(g.w>0)T.w++;else if(g.w<0)T.l++;else T.p++;var K=kinds[b.m.charAt(0)==="R"?"rb":b.m.charAt(0)==="A"?"as":b.m==="r"?"o":b.m]||kinds.o;K.n++;K.stk+=b.u;K.u+=g.pl;if(g.w>0)K.w++;byDay[b.d]=(byDay[b.d]||0)+g.pl});
+    T.n++;T.stk+=b.u;T.u+=g.pl;if(g.w>0)T.w++;else if(g.w<0)T.l++;else T.p++;var K=betIsLive(b)?kinds.live:kinds[b.m.charAt(0)==="R"?"rb":b.m.charAt(0)==="A"?"as":b.m==="r"?"o":b.m]||kinds.o;K.n++;K.stk+=b.u;K.u+=g.pl;if(g.w>0)K.w++;byDay[b.d]=(byDay[b.d]||0)+g.pl});
   var dk=Object.keys(byDay).sort(),run=0,runs=dk.map(function(d){run+=byDay[d];return{d:d,u:byDay[d],run:run}});
   var head='<section class="panel netp"><div class="netbig '+(T.u>0?"up":T.u<0?"dn":"")+'"><small>My bets · net units</small><b>'+(T.n?sg(T.u)+"u":"–")+'</b><span>'+(T.n?usd(T.u)+' at $'+S.unit+' a unit · '+T.w+'–'+T.l+(T.p?'–'+T.p:'')+' · '+(+T.stk.toFixed(2))+' units staked · ROI '+(T.u/T.stk>=0?"+":"−")+Math.abs(Math.round(100*T.u/T.stk))+'%':'Nothing settled yet')+(T.open?' · '+T.open+' open ('+(+T.ostk.toFixed(2))+'u at risk)':'')+'</span></div>'+
-    '<div class="netparts">'+["fb","ftb","mf","o","u","rb","as","par"].map(function(k){var K=kinds[k];return '<div class="netpart"><small>'+K.l+'</small><b class="'+(K.u>0?"up":K.u<0?"dn":"")+'">'+(K.n?sg(K.u)+'u':"–")+'</b><span>'+(K.n?K.w+' of '+K.n+' won · ROI '+(K.u/K.stk>=0?"+":"−")+Math.abs(Math.round(100*K.u/K.stk))+'%':'nothing settled yet')+'</span></div>'}).join("")+'</div>'+
+    '<div class="netparts">'+["fb","ftb","mf","o","u","rb","as","par","live"].map(function(k){var K=kinds[k];return '<div class="netpart"><small>'+K.l+'</small><b class="'+(K.u>0?"up":K.u<0?"dn":"")+'">'+(K.n?sg(K.u)+'u':"–")+'</b><span>'+(K.n?K.w+' of '+K.n+' won · ROI '+(K.u/K.stk>=0?"+":"−")+Math.abs(Math.round(100*K.u/K.stk))+'%':'nothing settled yet')+'</span></div>'}).join("")+'</div>'+
     (runs.length?'<div class="netdays"><small>Night by night</small>'+runs.slice().reverse().slice(0,14).map(function(x){return '<span class="netday '+(x.u>0?"up":x.u<0?"dn":"")+'" title="Running total '+sg(x.run)+'u">'+fmtD(x.d)+' <b>'+sg(x.u)+'u</b></span>'}).join("")+'</div>':'')+
     (function(){var n=0,w=0,t=0,ev=0;S.bets.forEach(function(b){var c=clvOf(b);if(!c||!c.fin)return;n++;t+=c.pct;if(c.pct>0.0005)w++;else if(c.pct>-0.0005)ev++});
       return '<div class="netdays"><small>Closing line value</small>'+(n?'<span class="netday '+(t>0?"up":t<0?"dn":"")+'" title="Bets whose listed price paid more than the last price before tip">Beat the close on <b>'+w+' of '+n+'</b>'+(ev?' <span class="o">('+ev+' unchanged)</span>':'')+'</span><span class="netday '+(t>0?"up":t<0?"dn":"")+'" title="Average of listed price against closing price, in payout">Average <b>'+(t>0?"+":"")+(100*t/n).toFixed(1)+'%</b></span>':'<span class="o" style="font-size:13px">fills in as games tip off · the quickest sign of a real edge, weeks before results can show it</span>')+'</div>'})()+
@@ -1580,7 +1583,7 @@ function vBets(){BCH={};S.bsel=S.bsel||{};
     {k:"t",l:"Team",v:function(x){return x.b.t||""},f:function(x){return x.b.t?tmL(x.b.t):"–"}},
     {k:"nm",l:"Player",v:function(x){return x.b.nm},f:function(x){return x.b.m==="par"?'<ul class="parl">'+x.b.legs.map(function(l,i){var q=(x.g.lg||[])[i]||{},c0=l.m.charAt(0),u=c0==="R"?" REB":c0==="A"?" AST":/^[our]$/.test(l.m)?" 3PM":"";
         return '<li class="'+(q.st==="won"?"lw":q.st==="lost"?"ll":"")+'"><b>'+nm(l.p)+'</b> <span class="o">'+esc(betWhat(l))+'</span>'+(q.act!=null&&q.st!=="won"&&q.st!=="lost"?' <span class="lgn">'+q.act+u+'</span>':'')+(q.st==="won"?' <span class="lgn w">✓</span>':q.st==="lost"?' <span class="lgn l">✗</span>':q.st==="void"?' <span class="lgn">void</span>':'')+'</li>'}).join("")+'</ul>':(x.b.p<0?'<b>Any player</b> <span class="o">'+esc(x.b.opp||"")+' @ '+esc(x.b.t||"")+'</span>':'<b>'+nm(x.b.p)+'</b>'+(x.b.opp?' <span class="o">'+(x.b.home?"vs":"@")+" "+esc(x.b.opp)+'</span>':''))}},
-    {k:"m",l:"Bet",v:function(x){return x.b.m+x.b.k},f:function(x){return '<span class="bty '+(x.b.m==="u"?"bu":x.b.m==="fb"?"bg":x.b.m==="par"?"bp":"bo")+'">'+esc(x.b.m==="par"?"Parlay · "+x.b.legs.length+" legs":betWhat(x.b))+'</span>'}},
+    {k:"m",l:"Bet",v:function(x){return x.b.m+x.b.k},f:function(x){return '<span class="bty '+(x.b.m==="u"?"bu":x.b.m==="fb"?"bg":x.b.m==="par"?"bp":"bo")+'">'+esc(x.b.m==="par"?"Parlay · "+x.b.legs.length+" legs":betWhat(x.b))+'</span>'+(betIsLive(x.b)?' <button type="button" class="lvtag" data-blv="'+x.b.id+'" title="Placed during the game: graded as usual, but chance, edge and CLV are left out. Click if it was a pre-game bet.">LIVE BET</button>':x.b.lv===0?' <button type="button" class="lvtag off" data-blv="'+x.b.id+'" title="Marked as a pre-game bet. Click to mark it live.">pre-game</button>':'')}},
     {k:"book",l:"Book",v:function(x){return x.b.book||""},f:function(x){return esc(x.b.book||"")||'<span class="o">–</span>'}},
     {k:"price",l:"Odds",num:1,v:function(x){return payOf(x.b.price)},f:function(x){return '<input type="text" inputmode="numeric" class="pxin" data-be="'+x.b.id+'|price" value="'+fmtP(x.b.price)+'" aria-label="Odds for '+esc(x.b.nm)+'">'}},
     {k:"p0",l:"Listed",num:1,v:function(x){return x.b.price0&&x.b.price0!==x.b.price?payOf(x.b.price0):null},f:function(x){return x.b.price0&&x.b.price0!==x.b.price?'<span class="o bwas" title="'+(x.b.legs?"The legs multiplied together, or the price the idea was listed at":"The price listed when you added it, before your change")+'">'+fmtP(x.b.price0)+'</span>':''}},
@@ -1610,8 +1613,8 @@ function vBets(){BCH={};S.bsel=S.bsel||{};
     '<label class="f">Line <input type="text" inputmode="decimal" id="bfLine" class="pxin bun" placeholder="2.5" value="'+esc(F.ln||"")+'"></label>'+
     '<label class="f">Odds <input type="text" inputmode="numeric" id="bfOdds" class="pxin" placeholder="+650" value="'+esc(F.odds||"")+'"></label>'+
     '<label class="f">Units <input type="text" inputmode="decimal" id="bfUnits" class="pxin bun" value="'+esc(F.u||"1")+'"></label>'+
-    '<label class="f">Book <input type="text" id="bfBook" class="pxin" style="width:120px;text-align:left" placeholder="optional" value="'+esc(F.book||"")+'"></label>'+
-    '<button class="btn2" id="bfAdd">Add bet</button></div><p class="note" style="margin-top:10px">Line is for threes, rebounds and assists: the over/under number (2.5), or for a ladder rung the count (3 for 3+). Leave it empty for a first basket.</p></section>';
+    '<label class="f">Book <input type="text" id="bfBook" class="pxin" style="width:120px;text-align:left" placeholder="optional" value="'+esc(F.book||"")+'"></label><label class="f lvck"><input type="checkbox" id="bfLive"'+(F.lv?" checked":"")+'> Live bet</label>'+
+    '<button class="btn2" id="bfAdd">Add bet</button></div><p class="note" style="margin-top:10px">Line is for threes, rebounds and assists: the over/under number (2.5), or for a ladder rung the count (3 for 3+). Leave it empty for a first basket. Tick <b>Live bet</b> for one placed during the game (anything added after tip is marked live anyway): it is graded as usual, but kept out of chance, edge and CLV, and gets its own tile above.</p></section>';
   view.innerHTML=head+'<section class="panel bets" style="margin-top:20px"><div class="phead"><h2>My bets · '+S.bets.length+'</h2><div class="pickers"><span class="seg" role="group" aria-label="Which bets">'+[["all","All"],["open","Open"],["done","Settled"]].map(function(o){return '<button data-bf="'+o[0]+'" aria-pressed="'+(f===o[0])+'">'+o[1]+'</button>'}).join("")+'</span>'+
     '<label class="f">One unit = $ <input type="text" inputmode="decimal" class="pxin" id="unitSize" value="'+S.unit+'" aria-label="Dollars per unit"></label><button class="btn2" id="betParlay"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. The ticked bets move into the parlay.">Make parlay'+(nSel?" · "+nSel:"")+'</button><button class="btn2" id="betParlayK"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. Makes the parlay and leaves the ticked bets as singles too.">Parlay + keep singles</button><button class="btn2" id="betExport"'+(S.bets.length?"":" disabled")+'>Export</button><button class="btn2" id="betImport">Import</button><input type="file" id="betFile" accept="application/json,.json" hidden></div></div>'+
     (S.bets.length?table("bets",cols,rows,{k:"d",dir:-1},{row:function(x){var c=(x.g.st==="won"?"bwon":"")+(byN&&x.first?" bday":"");return c?' class="'+c+'"':""}}):'<p class="empty">No bets yet. Click any underlined price on the Picks or Threes tabs, or add one by hand below.</p>')+'</section><div style="margin-top:20px">'+form+'</div>';
@@ -1892,7 +1895,17 @@ function legChance(l){if(!l||!l.p||!l.d||!l.m)return null;var key=l.d+"|"+(S.boo
   var rows=c[sk]||(c[sk]=inSK(sk,function(){var o={};t3Day(l.d).rows.forEach(function(r){o[r.p]=r});return o})),r=rows[l.p];if(!r)return null;
   var x=(r.cand||[]).filter(function(q){return q.k===l.k&&(bm==="u"?!q.over:q.over)}).sort(function(a,b){return b.p-a.p})[0];if(x)return x.p;
   var q=t3AtLeast(r.d,l.k);return bm==="u"?1-q:q}
-function betChance(b){if(!b||b.man)return null;if(b.m!=="par")return legChance(b);var P=1;for(var i=0;i<b.legs.length;i++){var q=legChance(Object.assign({d:b.d},b.legs[i]));if(q==null)return null;P*=q}return P}
+/* ---- live bets: placed after the game tipped. They are graded like any other bet, but the pre-game chance, edge and closing
+   price say nothing about a live price, so those show a dash, they stay out of the CLV summary, and they get their own tile.
+   Marked by hand ("Live bet" on the form, or the tag in the table) or, failing that, by being added after tip. ---- */
+function etOff(d){var y=+d.slice(0,4),sun=function(m,n){var x=new Date(Date.UTC(y,m,1)),w=x.getUTCDay();return 1+((7-w)%7)+7*(n-1)},md=d.slice(5);
+  var a=("0"+(3)).slice(-2)+"-"+("0"+sun(2,2)).slice(-2),b=("11")+"-"+("0"+sun(10,1)).slice(-2);return md>=a&&md<b?"-04:00":"-05:00"}
+function tipTsOf(d,t){if(!d||!t)return null;var s=(D.sched||[]).filter(function(x){return x.d===d&&(x.h===t||x.a===t)&&x.ts})[0];if(s)return Date.parse(s.ts);
+  var g=D.games.filter(function(x){return x.d===d&&(x.h===t||x.a===t)})[0],mm=g&&g.t&&/(\d+):(\d+)\s*(AM|PM)/i.exec(g.t);if(!mm)return null;
+  var h=(+mm[1])%12+(/pm/i.test(mm[3])?12:0);return Date.parse(d+"T"+("0"+h).slice(-2)+":"+mm[2]+":00"+etOff(d))}
+function betIsLive(b){if(!b)return false;if(b.lv===1)return true;if(b.lv===0||!b.at)return false;var at=Date.parse(b.at);
+  return (b.m==="par"?b.legs:[b]).some(function(l){var ts=tipTsOf(l.d||b.d,l.t);return ts!=null&&at>ts+60000})}
+function betChance(b){if(!b||b.man||betIsLive(b))return null;if(b.m!=="par")return legChance(b);var P=1;for(var i=0;i<b.legs.length;i++){var q=legChance(Object.assign({d:b.d},b.legs[i]));if(q==null)return null;P*=q}return P}
 function tipAttr(head,rows){return ' data-th="'+esc(head)+'" data-tip="'+esc(rows.map(function(x){return String(x[0]).replace(/[|;]/g,"/")+"|"+String(x[1]).replace(/[|;]/g,"/")}).join(";"))+'"'}
 function showHint(h){var el=TIP.el||(TIP.el=document.body.appendChild(Object.assign(document.createElement("div"),{className:"bktip"})));
   el.innerHTML='<div class="bkh">'+esc(h.dataset.th||"")+'</div>'+(h.dataset.tip||"").split(";").filter(Boolean).map(function(x){var i=x.lastIndexOf("|");return '<div class="bkr'+(/^Fair price/.test(x)?" top":"")+'"><span>'+esc(x.slice(0,i))+'</span><b>'+esc(x.slice(i+1))+'</b></div>'}).join("");
@@ -1914,7 +1927,7 @@ function bchRow(d,sk,p){var key=d+"|"+(S.book||"")+"|"+(S.bookOff?1:0),c=BCH[key
 function bchLeg(l){var sk=parSK(l.m),bm=l.m.slice(-1),r=bchRow(l.d,sk,l.p),out={l:l,r:r,by:{}};if(!r)return out;
   var x=(r.cand||[]).filter(function(q){return q.k===l.k&&(bm==="u"?!q.over:bm==="r"?q.over&&q.rg:q.over&&!q.rg)})[0]||(r.cand||[]).filter(function(q){return q.k===l.k&&(bm==="u"?!q.over:q.over)})[0];
   if(x){Object.keys(x.all||{}).forEach(function(b){if(b.indexOf(" · ")<0&&x.all[b]!=null)out.by[b]=x.all[b]});if(!Object.keys(out.by).length&&x.book)out.by[x.book]=x.price}return out}
-function clvOf(b){if(!b||b.man)return null;BCH._clv=BCH._clv||{};if(b.id&&BCH._clv[b.id]!==undefined)return BCH._clv[b.id];var res=clvOf0(b);if(b.id)BCH._clv[b.id]=res;return res}
+function clvOf(b){if(!b||b.man||betIsLive(b))return null;BCH._clv=BCH._clv||{};if(b.id&&BCH._clv[b.id]!==undefined)return BCH._clv[b.id];var res=clvOf0(b);if(b.id)BCH._clv[b.id]=res;return res}
 function clvOf0(b){var p0=b.price0||b.price;if(b.m==="par"){var d=1,ok=true;(b.legs||[]).forEach(function(l){var c=closeOf(Object.assign({d:b.d},l,{book:l.book||b.book}));if(!c)ok=false;else d*=payOf(c.price)});if(!ok)return null;var pay0=1;(b.legs||[]).forEach(function(l){pay0*=payOf(l.price||100)});if(!(b.legs||[]).every(function(l){return l.price}))pay0=payOf(p0);return{close:payToAm(d),pct:pay0/d-1,fin:betStarted(b)}}
   var c=closeOf(b);if(!c)return null;return{close:c.price,book:c.book,pct:payOf(p0)/payOf(c.price)-1,fin:betStarted(b)}}
 function betNew(b){return Object.assign({},b,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString()})}
@@ -2092,6 +2105,7 @@ document.addEventListener("click",function(e){
   if(e.target.id==="betExport")return betExport();
   if(e.target.id==="betImport"){var fi=$("betFile");if(fi)fi.click();return}
   if(e.target.id==="bfAdd")return betManual();
+  var lvb=e.target.closest("[data-blv]");if(lvb){var lb=S.bets.filter(function(x){return x.id===lvb.dataset.blv})[0];if(lb){lb.lv=betIsLive(lb)?0:1;saveBets();BCH={};return render()}}
   var bf=e.target.closest("[data-bf]");if(bf){S.betF=bf.dataset.bf;return render()}
   if(S.tab==="bets"&&e.target.closest(".bets input,.bets select,#betAdd"))return;
   var pl=e.target.closest("[data-pl]");if(pl&&!e.target.closest("select")){e.preventDefault();return showPlayer(+pl.dataset.pl)}
@@ -2160,7 +2174,7 @@ document.addEventListener("mouseover",function(e){var h=e.target.closest&&e.targ
 document.addEventListener("focusin",function(e){var h=e.target.closest&&e.target.closest(".pxb");if(h&&!TIP.pin)return showTip(h);var q=e.target.closest&&e.target.closest("[data-tip]");if(q&&!TIP.pin)showHint(q)});
 document.addEventListener("focusout",function(e){if(!TIP.pin&&e.target.closest&&e.target.closest(".pxb"))hideTip()});
 document.addEventListener("scroll",function(e){if(!(TIP.el&&e.target===TIP.el))hideTip()},true);
-function bformKeep(){if($("bfDay"))S.bform={d:$("bfDay").value,who:$("bfWho").value,m:$("bfType").value,ln:$("bfLine").value,odds:$("bfOdds").value,u:$("bfUnits").value,book:$("bfBook").value}}
+function bformKeep(){if($("bfDay"))S.bform={d:$("bfDay").value,who:$("bfWho").value,m:$("bfType").value,ln:$("bfLine").value,odds:$("bfOdds").value,u:$("bfUnits").value,book:$("bfBook").value,lv:!!($("bfLive")||{}).checked}}
 document.addEventListener("input",function(e){if(e.target.closest&&e.target.closest("#betAdd"))bformKeep()});
 document.addEventListener("change",function(e){var id=e.target.id,v=e.target.value,t=e.target;
   if(id==="bstBook"){S.bst.book=v;saveBst();return setTimeout(render,0)}
