@@ -1496,7 +1496,7 @@ function t3LadderOf(row){var pr=row.pr,d=row.d,KS=ladKs(row);
       return{by:by,pos:pos,score:s,priced:1,res:res,lv:lv}}
     return Object.keys(by).length?null:(ladProf(row)?{by:{},pos:[],score:ladProf(row),priced:0}:null)}
   return ladProf(row)?{by:{},pos:[],score:ladProf(row),priced:0}:null}
-function t3LadderHtml(rows,top,anyOdds){var A=t3LadderList(rows),lkd=A.filter(function(r){return r.lad.lk}),opn=A.filter(function(r){return !r.lad.lk}),L=t3LadderList(lkd.concat(opn.slice(0,Math.max(0,8-lkd.length))));
+function t3LadderHtml(rows,top,anyOdds){var A=t3LadderList(rows).filter(function(r){return !anyOdds||r.lad.priced}), /* once prices are posted, only ladders that beat them: a player the books do not price is not a bet */lkd=A.filter(function(r){return r.lad.lk}),opn=A.filter(function(r){return !r.lad.lk}),L=t3LadderList(lkd.concat(opn.slice(0,Math.max(0,8-lkd.length))));
   var inTop={};top.forEach(function(x){inTop[x.row.p]=1});
   var RBT=CNT(),CC=SC().col;
   function cell(r,k){var x=r.lad.by[k],v=t3AtLeast(r.d,k),hit=r.res?r.res[CC]>=k:false,ln=r.ln?r.ln[1]:null,kk=ln!=null?Math.max(2,Math.floor(ln)+1):0,mark=kk===k;
