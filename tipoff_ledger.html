@@ -675,7 +675,8 @@ function priceTable(t,v,at,m){if(!v.length)return "";
 S.dsort={};S.pkGame="";
 function pkOn(m){return !S.pkGame||(m.a+"@"+m.h)===S.pkGame}
 function dsVal(td,num){var v=td.getAttribute("data-v");if(v!=null)return v===""?null:+v;var t=(td.textContent||"").replace(/\u2212/g,"-").replace(/,/g,"").trim();if(!num)return t?t.toLowerCase():null;var m=t.match(/[+-]?\d+(\.\d+)?/);return m?parseFloat(m[0]):null}
-function dsApplyAll(sel){[].forEach.call(view.querySelectorAll(sel||"table"),function(tb,i){if(tb.classList.contains("nosort")||!tb.tHead||!tb.tHead.rows.length)return;if(!tb.id)tb.id="pkT"+i;tb.classList.add("dsort");
+function dsApplyAll(sel){var all=view&&view.querySelectorAll?view.querySelectorAll(sel||"table"):null;if(!all||!all.length)return; // (also runs inside lock_picks.js, where there is no real page)
+  [].forEach.call(all,function(tb,i){if(tb.classList.contains("nosort")||!tb.tHead||!tb.tHead.rows.length)return;if(!tb.id)tb.id="pkT"+i;tb.classList.add("dsort");
   var st=S.dsort[tb.id],ths=tb.tHead.rows[tb.tHead.rows.length-1].cells;[].forEach.call(ths,function(th,j){th.setAttribute("tabindex","0");th.removeAttribute("aria-sort");if(st&&st.c===j)th.setAttribute("aria-sort",st.d>0?"ascending":"descending")});
   var body=tb.tBodies[0];if(!st||!body||!ths[st.c])return;var rows=[].slice.call(body.rows),c0=rows[0]&&rows[0].cells[st.c],num=/\bn\b/.test(ths[st.c].className)||!!(c0&&/^\s*\d+\s*$/.test(c0.textContent));
   rows.sort(function(a,b){var x=a.cells[st.c],y=b.cells[st.c];x=x?dsVal(x,num):null;y=y?dsVal(y,num):null;if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return (x<y?-1:x>y?1:0)*st.d});
