@@ -65,7 +65,7 @@ function lockStat(sk) {
      places go to the best plays from games still to start; a player whose game has started can no longer become one. */
   const kept = (prev[C.lk] || []).filter(gone).map(k => Object.assign(k, { lk: 1 }));
   const taken = new Set(kept.map(k => k.p));
-  const open = (OPEN[sk] || []).filter(x => !taken.has(x.row.p)).map(api.t3PickOut);   // this stat's share of the night's open places (worked out across all three stats below)
+  const open = (OPEN[sk] || []).filter(x => !taken.has(x.row.p)).map(api.t3PickOut);   // this stat's open places (worked out below)
   const picks = kept.concat(open).sort((a, b) => b.vs - a.vs);
 
   /* Every pick as it was first listed, and the last price on that same bet before its game started. */
@@ -95,13 +95,13 @@ function lockStat(sk) {
   });
   rec[C.lk] = picks; rec[C.seen] = seen; rec[C.lw] = lw; rec[C.fz] = fz;
 }
-/* Best plays share one budget across threes, rebounds and assists (one for every two games, at most five a night): the picks
-   already locked in every stat hold their places, and the rest go to the best value from games still to start, whatever the stat. */
+/* Best plays: one for every two games and at most five a night in each stat. The picks already locked hold their places;
+   the rest go to the best value from games still to start. */
 const OPEN = (() => {
   const kept = [];
   ["t3", "rb", "as"].forEach(sk => api.inSK(sk, () => {
     const C = api.STAT[sk], T = api.t3Day(day, 1);
-    (prev[C.lk] || []).filter(k => { const m = T.ms.find(x => x.a === k.a && x.h === k.h); return !m || started(m); }).forEach(k => kept.push({ p: k.p, a: k.a, h: k.h }));
+    (prev[C.lk] || []).filter(k => { const m = T.ms.find(x => x.a === k.a && x.h === k.h); return !m || started(m); }).forEach(k => kept.push({ sk, p: k.p, a: k.a, h: k.h }));
   }));
   return api.propOpen ? api.propOpen(day, kept, true) : {};
 })();
