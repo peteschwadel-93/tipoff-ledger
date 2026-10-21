@@ -563,7 +563,7 @@ function grade(o){ // rating and favourite from the two jumpers' full records (o
 /* ---- availability: ESPN injury designations and, once posted, NBA starting lineups ---- */
 function normName(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z ]/g,"").replace(/\s+(jr|sr|ii|iii|iv)$/,"").replace(/\s+/g," ").trim()}
 function ctxOf(m){ // what is known about availability: live feeds for games to come, the saved pre-tip note for played ones
-  if(!m.g)return D.inj||m.lu?{inj:D.inj||{},lu:m.lu||null,past:false}:null;
+  if(!m.g)return D.inj||m.lu||m.ex?{inj:D.inj||{},lu:m.lu||null,ex:m.ex||null,past:false}:null;
   // played games: that night's actual starters are the lineup, so the jumper and the three shooters match who really started
   var lu=null;if(m.g.st&&(m.g.st[m.h]||[]).length&&(m.g.st[m.a]||[]).length){lu={};[m.h,m.a].forEach(function(t){lu[t]={st:m.g.st[t].map(function(p){return[p,D.players[p]||""]}),out:[]}})}
   var f=m.simLu?null:(D.flags||{})[m.g.d+"|"+m.a+"|"+m.h],inj={};
@@ -590,6 +590,9 @@ function teamJumpersBefore(t,day){ // most likely jumpers first: by how many of 
   var l=[];D.games.forEach(function(g){var tp=g.tip;if(g.d>=day||!tp)return;var p=tp.wt===t?tp.w:(tp.lt===t?tp.l:null);if(p)l.push(p)});
   l=l.slice(-30);var c={},last={};l.forEach(function(p,i){c[p]=(c[p]||0)+1;last[p]=i});
   return Object.keys(c).map(Number).sort(function(a,b){return c[b]-c[a]||last[b]-last[a]})}
+function startShareAny(j,day){ // his last 10 starts for any team: how many opening tips he took
+  var l=[];D.games.forEach(function(g){if(g.d>=day)return;[g.h,g.a].forEach(function(t){if((g.st[t]||[]).indexOf(j)<0)return;var tp=g.tip,p=tp?(tp.wt===t?tp.w:(tp.lt===t?tp.l:null)):null;if(p)l.push(p===j?1:0)})});
+  l=l.slice(-10);var w=0;l.forEach(function(x){w+=x});return{w:w,k:l.length,split:l.length>=5&&w/l.length<.8}}
 function startShare(t,j,day){ // of this player's last 10 starts for the team, how many opening tips he took
   var l=[];D.games.forEach(function(g){if(g.d>=day||(g.h!==t&&g.a!==t)||(g.st[t]||[]).indexOf(j)<0)return;var tp=g.tip,p=tp?(tp.wt===t?tp.w:(tp.lt===t?tp.l:null)):null;if(p)l.push(p===j?1:0)});
   l=l.slice(-10);var w=0;l.forEach(function(x){w+=x});return{w:w,k:l.length,split:l.length>=5&&w/l.length<.8}}
@@ -598,11 +601,11 @@ function shareTag(t,j,day){if(!j)return "";var s=startShare(t,j,day);if(!s.k)ret
 function recBefore(p,day){var r=[];D.games.forEach(function(g){var t=g.tip;if(g.d>=day||!t)return;if(t.w===p)r.push(1);else if(t.l===p)r.push(0)});
   function s(l){var w=0;l.forEach(function(x){w+=x});return{w:w,n:l.length}}return{full:s(r),l15:s(r.slice(-15))}}
 function pickJumper(c,t,j,day){ // returns the jumper to rate, or null when nobody suitable is known
-  var u=c.lu&&c.lu[t],order=teamJumpersBefore(t,day),i;
+  var u=(c.lu&&c.lu[t])||(c.ex&&c.ex[t]&&(c.ex[t].st||[]).length>=5?c.ex[t]:null),order=teamJumpersBefore(t,day),i; // the confirmed five, else the expected one
   if(u&&u.st.length){var st={};u.st.forEach(function(x){st[x[0]]=1});
     // the starter who takes the tip most often when he starts (two phantom starts keep a 1-for-1 newcomer from leading);
     // backtest: right 95% of the time against 92% for whoever took most of the team's recent tips
-    var pick=null,ps=0;u.st.forEach(function(x){var s=startShare(t,x[0],day),v=s.w/(s.k+2);if(v>ps||(v===ps&&v>0&&order.indexOf(x[0])>=0&&(order.indexOf(pick)<0||order.indexOf(x[0])<order.indexOf(pick)))){ps=v;pick=x[0]}});
+    var pick=null,ps=0;u.st.forEach(function(x){var s=startShare(t,x[0],day);if(s.k<3)s=startShareAny(x[0],day);var v=s.w/(s.k+2); /* new to the team: his tip role in his last starts anywhere */if(v>ps||(v===ps&&v>0&&order.indexOf(x[0])>=0&&(order.indexOf(pick)<0||order.indexOf(x[0])<order.indexOf(pick)))){ps=v;pick=x[0]}});
     if(pick)return pick;
     var best=null,bn=0;u.st.forEach(function(x){var n=recBefore(x[0],day).full.n;if(n>bn){bn=n;best=x[0]}});return best} // else the starter with most tips anywhere
   var inj=j&&injOf(c,t,j);
