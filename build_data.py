@@ -52,6 +52,7 @@ NBA_BOX = "/liveData/boxscore/boxscore_{gid}.json"
 ESPN_INJ = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
 ESPN_ABBR = {"GS": "GSW", "NY": "NYK", "SA": "SAS", "NO": "NOP", "UTAH": "UTA", "WSH": "WAS"}
 UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.nba.com/", "Accept": "application/json"}
+DIAG = []   # what each data source returned on this run, shown on the page's Lineups tab
 COLS = {"gameId", "orderNumber", "period", "clock", "timeActual", "actionType", "subType", "descriptor",
         "personId", "playerNameI", "teamTricode", "shotResult", "shotDistance", "scoreHome",
         "jumpBallWonPersonId", "jumpBallLostPersonId", "jumpBallRecoverdPersonId", "assistPersonId"}
@@ -200,6 +201,7 @@ def daily_lineups(day):
             doc = json.loads(r.read())
     except Exception as e:
         print(f"daily lineups {day}: unavailable ({e})", file=sys.stderr, flush=True)
+        DIAG.append(f"NBA lineups page {day}: unavailable ({str(e)[:120]})")
         return {}
     out = {}
     for g in doc.get("games") or []:
@@ -329,6 +331,7 @@ def load_bm(cache="pbp_cache", every=30):
             html = r.read().decode("utf-8", "replace")
         got = parse_bm(html)
         n = len([k for k in got if not k.startswith("_")])
+        DIAG.append(f"Basketball Monster: read {n} team lineups ({sum(1 for k, v in got.items() if not k.startswith('_') and v['v'])} marked verified), page date {got.get('_date', '?')}")
         print(f"basketball monster: {n} lineups ({sum(1 for k, v in got.items() if not k.startswith('_') and v['v'])} verified)"
               + (f"; header styles seen: {sorted({v['cls'] for k, v in got.items() if not k.startswith('_')})[:4]}" if n else ""), flush=True)
         if n:
@@ -338,6 +341,7 @@ def load_bm(cache="pbp_cache", every=30):
             return got
     except Exception as e:
         print(f"basketball monster unavailable: {e}", file=sys.stderr, flush=True)
+        DIAG.append(f"Basketball Monster: unavailable ({str(e)[:120]})")
     return old["r"] if old else {}
 
 
@@ -372,13 +376,17 @@ def apply_bm(sched, players, games, rost=None):
                 src[t] = "nba"
                 continue
             B = bm.get(t) if bm.get("_date") in (None, md) else None
-            st = []
+            st, unmatched = [], []
             for name, pos, note in (B or {}).get("pl", []):
                 k = name_key(name)
                 c = list(dict.fromkeys(known.get(k, []) + by.get(k, [])))
                 pick = [p for p in c if last.get(p) == t] or [p for p in known.get(k, [])] or (c if len(c) == 1 else [])
                 if pick:
                     st.append([pick[0], players.get(str(pick[0])) or players.get(pick[0]) or name, pos])
+                else:
+                    unmatched.append(name)
+            if B and len(st) < 5:
+                DIAG.append(f"{t}: Basketball Monster names not matched: " + ", ".join(unmatched)[:200])
             if B and len(st) == 5:
                 L = {"st": st, "out": ((u.get("ex") or {}).get(t) or {}).get("out", [])}
                 if B.get("v"):
@@ -394,6 +402,9 @@ def apply_bm(sched, players, games, rost=None):
             del u["ex"]
         if src:
             u["src"] = src
+        miss = [t for t in (u["h"], u["a"]) if t not in src]
+        DIAG.append(f"{u['a']} @ {u['h']} starters: " + ", ".join(f"{t} {src.get(t, 'none')}" for t in (u["a"], u["h"]))
+                    + (f" (Basketball Monster had {', '.join(t for t in miss if bm.get(t))} but not every name matched)" if any(bm.get(t) for t in miss) else ""))
 
 
 def load_github(season):
@@ -505,6 +516,7 @@ def load_nba(season, cache="pbp_cache"):
             if ex:
                 u["ex"] = ex
             print(f"lineup {u['a']} @ {u['h']} ({mins:+.0f} min to tip): " + "; ".join(note), flush=True)
+            DIAG.append(f"{u['a']} @ {u['h']}: " + "; ".join(note))
         del u["gid"]
     return (pd.DataFrame(rows) if rows else None), upcoming
 
@@ -1222,10 +1234,13 @@ def make(source, season, prev=False, html=None):
         rost = load_rosters()
         if rost:
             out["rost"] = rost
+        DIAG.append(f"ESPN rosters: {len(rost or {})} teams")
         try:
             apply_bm(sched, players, games, rost)
         except Exception as e:
             print(f"basketball monster lineups skipped: {e}", file=sys.stderr)
+            DIAG.append(f"Basketball Monster lineups skipped: {str(e)[:160]}")
+        out["diag"] = {"at": datetime.now(ET).strftime("%Y-%m-%d %H:%M"), "l": DIAG[-80:]}
         out["flags"] = remember_flags(sched, inj, old, games)
         out["odds"] = remember_odds(sched, old)
         try:  # picks and game numbers locked at tip by lock_picks.js; carried along so the page has them even if that step is skipped
