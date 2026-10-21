@@ -1009,7 +1009,11 @@ function lineF(m,st,pmin){var x=1,r=blowRisk(m),L=glOf(m),A=glAvg();
 function glTag(m,starterOver){var r=blowRisk(m);if(r==null||r<GL.warn)return "";var L=glOf(m),fav=L.sp<0?m.h:m.a;
   return ' <span class="tag l" title="Blowout risk: a '+Math.round(r*100)+'% chance one team wins by 20 or more ('+fav+' favoured by '+Math.abs(L.sp)+'). Starters sit the end of blowouts'+(starterOver?', which hurts a starter\u2019s over':'')+'.">BLOWOUT RISK '+Math.round(r*100)+'%</span>'}
 function glChip(m){var L=glOf(m);if(!L)return "";var r=blowRisk(m);return '<span class="tag" title="The books\u2019 consensus line'+(r!=null?'; '+Math.round(r*100)+'% chance of a 20-point game':'')+'">'+(L.sp!=null?(L.sp<0?m.h+" "+L.sp:L.sp>0?m.a+" "+(-L.sp):"PICK"):"")+(L.tot?" · O/U "+L.tot:"")+'</span>'+glTag(m)+' '}
-function t3Day(day){var all=D.games,sched=D.sched||[],C=SC(),LK=(!S.book||S.bookOff)&&!S.lockOff?(D.locks||{})[day]:null;
+/* the night's lock record. Locked picks hold whatever book is chosen. A day with no record yet that has started (the
+   lock step missed it) gets an empty one, so games already under way never get picks worked out after tip. Days before
+   locks existed have none, and are worked out from the data as before (the back-test). lock_picks.js sets lockOff. */
+function lkOf(day){if(S.lockOff)return null;var L=(D.locks||{})[day];if(L)return L;return day>=todayET()?{}:null}
+function t3Day(day){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day);
   var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g}});
   var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
   var mo=+day.slice(5,7),sy=+day.slice(0,4)-(mo>=9?0:1),rows=[],plays=[];
@@ -1056,7 +1060,7 @@ function t3Day(day){var all=D.games,sched=D.sched||[],C=SC(),LK=(!S.book||S.book
     rows.forEach(function(r){if(t3Started(r.m))r.lad=null});
     (LK[C.lw]||[]).forEach(function(e){var r=rows.filter(function(q){return q.p===e.p&&q.m.a===e.a&&q.m.h===e.h})[0];if(r&&t3Started(r.m))r.lad=t3LockedLad(e,r)});
     var on={};top.forEach(function(x){on[x.row.p+"|"+x.lab]=1});Object.keys(LK[C.seen]||{}).forEach(function(id){if(!on[id])dropped.push(LK[C.seen][id])})}
-  return{ms:ms,rows:rows,plays:plays,cap:cap,top:top,dropped:dropped,lk:!!(LK&&(LK[C.lk]||LK[C.fz]))}}
+  return{ms:ms,rows:rows,plays:plays,cap:cap,top:top,dropped:dropped,lk:!!LK}}
 function calKs(){return SC().calK||[1,2,3,4,5]}
 function t3Calib(s){ // every regular-season projection against what the player did (2.5+ projected attempts for threes, 3+ projected rebounds)
   var C=SC();D._t3c=D._t3c||{};if(D._t3c[s+SK])return D._t3c[s+SK];
@@ -1719,10 +1723,10 @@ function mfFill(rows,room,held){var g={},pl={},out=[];(held||[]).forEach(functio
 function mfOut(r){var m=r.m,f=function(v,n){return v==null?null:+(+v).toFixed(n)};return{p:r.p,n:D.players[r.p]||"",t:r.t,o:r.opp,a:m.a,h:m.h,ts:m.ts||null,mt:r.mt,price:r.price,book:r.book,q:f(r.q,5),ev:f(r.ev,4),vs:f(r.vs,2),lk:0}}
 function mfResOf(m,p,mt){var g=m&&m.g;if(!g)return null;var f=mfFirst(g);if(!f)return null;if(g.lv)return f[0]===p&&mfCat(f)===mt?1:0; // decided by the first basket, live or final
   var played=[g.h,g.a].some(function(t){return (g.st[t]||[]).indexOf(p)>=0||(g.b3&&(g.b3[t]||[]).some(function(q){return q[0]===p}))});if(!played)return "dnp";return f[0]===p&&mfCat(f)===mt?1:0}
-function mfPicks(day){var rows=mfRows(day),LK=(!S.book||S.bookOff)&&!S.lockOff?(D.locks||{})[day]:null,ms=ftMs(day);
+function mfPicks(day){var rows=mfRows(day),LK=lkOf(day),ms=ftMs(day);
   rows.forEach(function(r){r.res=mfResOf(r.m,r.p,r.mt)});
-  if(!LK||!LK.mf)return{top:mfFill(rows,MFP.n,[]),dropped:[],lk:!!LK};
-  var kept=LK.mf.filter(function(k){var m=ms.filter(function(x){return x.a===k.a&&x.h===k.h})[0];return !m||t3Started(m)}).map(function(k){
+  if(!LK)return{top:mfFill(rows,MFP.n,[]),dropped:[],lk:false};
+  var kept=(LK.mf||[]).filter(function(k){var m=ms.filter(function(x){return x.a===k.a&&x.h===k.h})[0];return !m||t3Started(m)}).map(function(k){
     var m=ms.filter(function(x){return x.a===k.a&&x.h===k.h})[0]||{a:k.a,h:k.h,d:day},r=rows.filter(function(q){return q.p===k.p&&q.mt===k.mt&&q.m.a===k.a&&q.m.h===k.h})[0];
     return{p:k.p,t:k.t,opp:k.o,m:m,mt:k.mt,q:k.q,price:k.price,book:k.book,all:r?r.all:null,pay:payOf(k.price),ev:k.ev,vs:k.vs,val:1,res:mfResOf(m,k.p,k.mt),lk:1}});
   var held=kept.map(function(r){return r.m.a+"@"+r.m.h}),tk={};kept.forEach(function(r){tk[r.p]=1});
@@ -1767,9 +1771,9 @@ function ftHtml(day){var rows=ftDay(day).filter(function(r){return pkOn(r.m)});i
 function ftFill(rows,room,held){var n={},out=[];(held||[]).forEach(function(k){n[k]=1});
   rows.filter(function(r){return r.val}).forEach(function(r){var k=r.m.a+"@"+r.m.h+"|"+r.t;if(out.length>=room||n[k])return;n[k]=1;out.push(r)});return out}
 function ftOut(r){var m=r.m,f=function(v,n){return v==null?null:+(+v).toFixed(n)};return{p:r.p,n:D.players[r.p]||"",t:r.t,o:r.opp,a:m.a,h:m.h,ts:m.ts||null,price:r.price,book:r.book,p2:f(r.p2,4),ev:f(r.ev,4),vs:f(r.vs,2),gc:r.x.gc,gs:r.x.gs,lk:0}}
-function ftPicks(day){var rows=ftDay(day),LK=(!S.book||S.bookOff)&&!S.lockOff?(D.locks||{})[day]:null,ms=ftMs(day);
-  if(!LK||!LK.ft)return{top:ftFill(rows,4,[]),dropped:[],lk:!!LK};
-  var kept=LK.ft.filter(function(k){var m=ms.filter(function(x){return x.a===k.a&&x.h===k.h})[0];return !m||t3Started(m)}).map(function(k){
+function ftPicks(day){var rows=ftDay(day),LK=lkOf(day),ms=ftMs(day);
+  if(!LK)return{top:ftFill(rows,4,[]),dropped:[],lk:false};
+  var kept=(LK.ft||[]).filter(function(k){var m=ms.filter(function(x){return x.a===k.a&&x.h===k.h})[0];return !m||t3Started(m)}).map(function(k){
     var m=ms.filter(function(x){return x.a===k.a&&x.h===k.h})[0]||{a:k.a,h:k.h,d:day},r=rows.filter(function(q){return q.p===k.p&&q.m.a===k.a&&q.m.h===k.h})[0],g=m.g;
     var res=r?r.res:(g&&!g.lv?(function(){var f=ftFirst(g,k.t),here=g.b3?(g.b3[k.t]||[]).map(function(x){return x[0]}):null;return here&&here.indexOf(k.p)<0?"dnp":f===undefined?"unknown":f===k.p?1:0})():null);
     return{p:k.p,t:k.t,opp:k.o,m:m,x:{gc:k.gc,gs:k.gs},p2:k.p2,price:k.price,book:k.book,all:r?r.all:null,pay:payOf(k.price),ev:k.ev,vs:k.vs,val:1,res:res,lk:1}});
@@ -1841,8 +1845,8 @@ function pzUnits(z){var pay=payOf(z.price),f=(z.P*pay-1)/(pay-1);if(!(f>0))retur
 function pzGrade(z,day){var w=1,open=0,vd=0;z.legs.forEach(function(l){var g=betGrade({res:"auto",price:100,u:1,d:day,p:l.p,t:l.t,m:l.m,k:l.k});l.st=g.st;l.act=g.act;
     if(g.st==="lost")w=-1;else if(g.st==="void")vd=1;else if(g.st!=="won")open=1});
   z.win=w<0?-1:vd?0:open?null:1;z.u=z.win==null?null:z.win>0?payOf(z.price)-1:z.win<0?-1:0;z.units=pzUnits(z);return z}
-function pzIdeas(day){var sv=((D.locks||{})[day]||{}).pz,saved=sv&&sv.length&&(!S.book||S.bookOff);
-  var list=saved?sv.map(function(z){return Object.assign({saved:1},JSON.parse(JSON.stringify(z)))}):pzPick(day,[],false);return list.map(function(z){return pzGrade(z,day)})}
+function pzIdeas(day){var LK=lkOf(day),sv=(LK||{}).pz,saved=sv&&sv.length;
+  var list=saved?sv.map(function(z){return Object.assign({saved:1},JSON.parse(JSON.stringify(z)))}):pzPick(day,[],!!LK); /* with a lock record, legs from games under way are never added after tip */return list.map(function(z){return pzGrade(z,day)})}
 function pzLegTxt(l){var C=STAT[l.sk];return /^(Over|Under) /.test(l.lab)?l.lab+" "+C.u:l.lab}
 var PZV=[];
 function pzCard(z,i){var res=z.win==null?(z.legs.some(function(l){return l.st==="live"||l.st==="won"})?'<span class="tag q">LIVE</span>':''):z.win>0?'<span class="tag w">WON</span>':z.win<0?'<span class="tag l">LOST</span>':'<span class="tag">VOID</span>';
