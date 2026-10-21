@@ -223,6 +223,179 @@ def daily_lineups(day):
     return out
 
 
+# ---------- Basketball Monster projected lineups ----------
+BM_URL = "https://basketballmonster.com/nbalineups.aspx"
+BM_ABBR = {"GS": "GSW", "NY": "NYK", "SA": "SAS", "NO": "NOP", "PHO": "PHX", "UTAH": "UTA", "WSH": "WAS", "BRK": "BKN", "CHO": "CHA", "NOR": "NOP"}
+BM_POS = {"PG", "SG", "SF", "PF", "C", "G", "F", "G-F", "F-C", "F-G", "C-F"}
+
+
+def name_key(full):
+    """'C.J. McCollum' / 'C. McCollum' -> 'c mccollum': first initial and surname, the key used everywhere for names."""
+    import unicodedata
+    s = unicodedata.normalize("NFD", str(full or "")).encode("ascii", "ignore").decode().lower()
+    s = re.sub(r"[^a-z ]", "", s)
+    s = re.sub(r"\s+(jr|sr|ii|iii|iv)$", "", s.strip())
+    w = s.split()
+    return (w[0][:1] + " " + " ".join(w[1:])) if len(w) > 1 else (w[0] if w else "")
+
+
+def parse_bm(html):
+    """Every lineup table on the page: {TEAM: {"v": verified?, "pl": [[name, pos, note], ...]}, "_date": "MM/DD"}."""
+    from html.parser import HTMLParser
+
+    class P(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.tables, self.stack, self.cell, self.row, self.a = [], [], None, None, False
+
+        def handle_starttag(self, tag, attrs):
+            at = " ".join(f"{k}={v}" for k, v in attrs if v)
+            if tag == "table":
+                self.stack.append({"rows": [], "attr": at})
+            elif tag == "tr" and self.stack:
+                self.row = {"cells": [], "attr": at}
+                self.stack[-1]["rows"].append(self.row)
+            elif tag in ("td", "th") and self.row is not None:
+                self.cell = {"text": "", "link": "", "attr": at}
+                self.row["cells"].append(self.cell)
+            elif tag == "a" and self.cell is not None:
+                self.a = True
+            elif self.cell is not None and at:
+                self.cell["attr"] += " " + at
+
+        def handle_endtag(self, tag):
+            if tag == "table" and self.stack:
+                self.tables.append(self.stack.pop())
+                self.row = self.cell = None
+            elif tag in ("td", "th"):
+                self.cell = None
+            elif tag == "a":
+                self.a = False
+
+        def handle_data(self, data):
+            if self.cell is not None:
+                self.cell["text"] += data
+                if self.a:
+                    self.cell["link"] += data
+
+    p = P()
+    p.feed(html)
+    out = {}
+    m = re.search(r"NBA Lineups for \w+ (\d{1,2}/\d{1,2})", html)
+    if m:
+        out["_date"] = m.group(1)
+    team_re = re.compile(r"^@?\s*([A-Z]{2,4})$")
+    for t in p.tables:
+        rows = [[(" ".join(c["text"].split()), " ".join(c["link"].split()), c["attr"]) for c in r["cells"]] for r in t["rows"]]
+        head, cols = None, []
+        for i, r in enumerate(rows):
+            cs = [(j, team_re.match(c[0]).group(1)) for j, c in enumerate(r) if team_re.match(c[0]) and c[0].strip("@ ") not in BM_POS]
+            if len(cs) == 2:
+                head, cols = i, cs
+                break
+        if head is None:
+            continue
+        for j, ab in cols:
+            ab = BM_ABBR.get(ab, ab)
+            pl = []
+            for r in rows[head + 1:]:
+                if not r or r[0][0].upper() not in BM_POS or j >= len(r):
+                    continue
+                txt, link = r[j][0], r[j][1]
+                name = link or txt
+                note = txt.replace(link, "").strip(" ()") if link else ""
+                if name:
+                    pl.append([name, r[0][0].upper(), note])
+            # verified or projected: told apart by the page's styling; anything that names "verif"/"confirm" counts as verified
+            attrs = " ".join([rows[head][j][2]] + [r[j][2] for r in rows[head + 1:] if j < len(r)]).lower()
+            if len(pl) >= 5:
+                out[ab] = {"v": ("verif" in attrs or "confirm" in attrs), "pl": pl[:5], "cls": rows[head][j][2][:80]}
+    return out
+
+
+def load_bm(cache="pbp_cache", every=30):
+    """Basketball Monster's lineups page, read at most every half hour (kept in the play-by-play cache)."""
+    path = os.path.join(cache, "bm.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            old = json.load(f)
+        if (datetime.now(timezone.utc) - datetime.fromisoformat(old["at"])).total_seconds() < every * 60:
+            return old["r"]
+    except Exception:
+        old = None
+    try:
+        req = urllib.request.Request(BM_URL, headers={"User-Agent": "Mozilla/5.0 (Tip-Off Ledger; personal dashboard)", "Accept": "text/html"})
+        with urllib.request.urlopen(req, timeout=30, context=CTX or ssl_context()) as r:
+            html = r.read().decode("utf-8", "replace")
+        got = parse_bm(html)
+        n = len([k for k in got if not k.startswith("_")])
+        print(f"basketball monster: {n} lineups ({sum(1 for k, v in got.items() if not k.startswith('_') and v['v'])} verified)"
+              + (f"; header styles seen: {sorted({v['cls'] for k, v in got.items() if not k.startswith('_')})[:4]}" if n else ""), flush=True)
+        if n:
+            os.makedirs(cache, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"at": datetime.now(timezone.utc).isoformat(), "r": got}, f)
+            return got
+    except Exception as e:
+        print(f"basketball monster unavailable: {e}", file=sys.stderr, flush=True)
+    return old["r"] if old else {}
+
+
+def apply_bm(sched, players, games, rost=None):
+    """Better five starters before teams confirm. Order: the NBA's confirmed lineup (or the box score), then Basketball
+    Monster verified, then Basketball Monster projected, then the NBA's expected. Each game records where its five came from."""
+    now = datetime.now(ET)
+    todo = [u for u in sched if not u.get("lv") and u.get("ts") and 0 < (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60 <= 720]
+    if not todo:
+        return
+    bm = load_bm()
+    last = {}
+    for g in games:
+        for t in (g["h"], g["a"]):
+            for x in (g.get("b3") or {}).get(t, []):
+                last[x[0]] = t
+            for p in g["st"].get(t, []):
+                last[p] = t
+    by = {}
+    for pid, nm in players.items():
+        by.setdefault(name_key(nm), []).append(int(pid))
+    for u in todo:
+        md = f"{int(u['d'][5:7])}/{int(u['d'][8:10])}"
+        known = {}
+        for k in ("lu", "ex"):
+            for t, L in (u.get(k) or {}).items():
+                for x in L.get("st", []) + L.get("out", []):
+                    known.setdefault(name_key(x[1]), []).append(int(x[0]))
+        src = {}
+        for t in (u["h"], u["a"]):
+            if t in (u.get("lu") or {}):
+                src[t] = "nba"
+                continue
+            B = bm.get(t) if bm.get("_date") in (None, md) else None
+            st = []
+            for name, pos, note in (B or {}).get("pl", []):
+                k = name_key(name)
+                c = list(dict.fromkeys(known.get(k, []) + by.get(k, [])))
+                pick = [p for p in c if last.get(p) == t] or [p for p in known.get(k, [])] or (c if len(c) == 1 else [])
+                if pick:
+                    st.append([pick[0], players.get(str(pick[0])) or players.get(pick[0]) or name, pos])
+            if B and len(st) == 5:
+                L = {"st": st, "out": ((u.get("ex") or {}).get(t) or {}).get("out", [])}
+                if B.get("v"):
+                    u.setdefault("lu", {})[t] = L
+                    (u.get("ex") or {}).pop(t, None)
+                    src[t] = "bm-v"
+                else:
+                    u.setdefault("ex", {})[t] = L
+                    src[t] = "bm-p"
+            elif t in (u.get("ex") or {}):
+                src[t] = "nba-e"
+        if u.get("ex") == {}:
+            del u["ex"]
+        if src:
+            u["src"] = src
+
+
 def load_github(season):
     frames = []
     for name, po in ((f"cdnnba_{season}", 0), (f"cdnnba_po_{season}", 1)):
@@ -1049,6 +1222,10 @@ def make(source, season, prev=False, html=None):
         rost = load_rosters()
         if rost:
             out["rost"] = rost
+        try:
+            apply_bm(sched, players, games, rost)
+        except Exception as e:
+            print(f"basketball monster lineups skipped: {e}", file=sys.stderr)
         out["flags"] = remember_flags(sched, inj, old, games)
         out["odds"] = remember_odds(sched, old)
         try:  # picks and game numbers locked at tip by lock_picks.js; carried along so the page has them even if that step is skipped
