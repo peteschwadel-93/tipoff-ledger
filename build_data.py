@@ -126,6 +126,46 @@ def load_injuries():
         return None
 
 
+ESPN_TEAMS = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams"
+
+
+def load_rosters(cache="pbp_cache", every=120):
+    """Every team's current roster from ESPN, {TEAM: ["D. Bane", ...]}, so a player who changed teams is listed with his new
+    team from the first day, long before lineups post. Kept in the play-by-play cache and refreshed every two hours."""
+    path = os.path.join(cache, "rosters.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            old = json.load(f)
+        if (datetime.now(timezone.utc) - datetime.fromisoformat(old["at"])).total_seconds() < every * 60:
+            return old["r"]
+    except Exception:
+        old = None
+    try:
+        teams = json.loads(get(ESPN_TEAMS))["sports"][0]["leagues"][0]["teams"]
+        out = {}
+        for t in teams:
+            tm = t.get("team") or {}
+            ab = ESPN_ABBR.get(tm.get("abbreviation"), tm.get("abbreviation"))
+            try:
+                doc = json.loads(get(f"{ESPN_TEAMS}/{tm['id']}/roster", timeout=30))
+            except Exception:
+                continue
+            ath = doc.get("athletes") or []
+            if ath and isinstance(ath[0], dict) and "items" in ath[0]:  # grouped by position in some sports
+                ath = [x for grp in ath for x in grp.get("items") or []]
+            names = [a.get("shortName") or a.get("displayName") for a in ath if a.get("shortName") or a.get("displayName")]
+            if ab and names:
+                out[ab] = names
+        if len(out) >= 25:
+            os.makedirs(cache, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"at": datetime.now(timezone.utc).isoformat(), "r": out}, f)
+            return out
+    except Exception as e:
+        print(f"rosters unavailable: {e}", file=sys.stderr)
+    return old["r"] if old else None
+
+
 def lineup(gid):
     """Starters and inactive players from the NBA box score, once it is posted shortly before tip."""
     try:
@@ -265,9 +305,10 @@ def load_nba(season, cache="pbp_cache"):
     daily = {}
     for u in upcoming:
         # Starters: the NBA's lineups page first (confirmed there as soon as a team announces), then the box score,
-        # which shows them from about half an hour before tip. Looked for from three hours out; each attempt is logged.
+        # which shows them from about half an hour before tip. Looked for from twelve hours out (the lineups page lists
+        # expected starters from the morning), each attempt logged.
         mins = (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60
-        if mins <= 180:
+        if mins <= 720:
             if u["d"] not in daily:
                 daily[u["d"]] = daily_lineups(u["d"])
             note = []
@@ -1005,6 +1046,9 @@ def make(source, season, prev=False, html=None):
         inj = load_injuries()
         if inj is not None:
             out["inj"] = inj
+        rost = load_rosters()
+        if rost:
+            out["rost"] = rost
         out["flags"] = remember_flags(sched, inj, old, games)
         out["odds"] = remember_odds(sched, old)
         try:  # picks and game numbers locked at tip by lock_picks.js; carried along so the page has them even if that step is skipped

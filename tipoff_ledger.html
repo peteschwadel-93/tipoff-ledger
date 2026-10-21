@@ -627,7 +627,8 @@ function topShooters(t,day,m){
   var l3=prev.slice(-3);l3.forEach(function(g){att(g,t).slice(0,3).forEach(function(s){var x=r(s[0]);x.n++;if(s[2])x.made++})});
   // who is expected to start: the posted lineup if there is one, otherwise recent starters who are not listed out
   if(u&&u.st.length)u.st.forEach(function(x){cand[x[0]]=1;if(!P[x[0]])r(x[0]).name=D.players[x[0]]||x[1]});
-  else prev.slice(-5).forEach(function(g){(g.st[t]||[]).forEach(function(p){var i=c&&injOf(c,t,p);if(!(i&&/^out/i.test(i.st)))cand[p]=1})});
+  else{prev.slice(-5).forEach(function(g){(g.st[t]||[]).forEach(function(p){var i=c&&injOf(c,t,p);if(!(i&&/^out/i.test(i.st)))cand[p]=1})});
+    var RS=rostSet(t);if(RS)Object.keys(cand).forEach(function(p){if(!RS[normName(D.players[p])])delete cand[p]})}
   var rows=Object.keys(cand).map(function(p){var x=r(+p);x.rate=(x.c+3)/(x.st+5);return x}).sort(function(a,b){return b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)});
   topShooters.all=rows;rows=rows.slice(0,3);
   var cs=CATS.filter(function(k){return S.ft||k!=="Free throws"});
@@ -1016,6 +1017,12 @@ function glChip(m){var L=glOf(m);if(!L)return "";var r=blowRisk(m);return '<span
    lock step missed it) gets an empty one, so games already under way never get picks worked out after tip. Days before
    locks existed have none, and are worked out from the data as before (the back-test). lock_picks.js sets lockOff. */
 function lkOf(day){if(S.lockOff)return null;var L=(D.locks||{})[day];if(L)return L;return day>=todayET()?{}:null}
+/* current rosters (ESPN, refreshed by the build every two hours): who is on each team today, so a player who moved is
+   counted with his new team, and dropped from his old one, before lineups post */
+function rostSet(t){var R=D.rost&&D.rost[t];if(!R||!R.length)return null;D._rk=D._rk||{};if(D._rk[t])return D._rk[t];var o={};R.forEach(function(n){var w=normName(n).split(" ");o[w[0].charAt(0)+" "+w.slice(1).join(" ")]=1});return D._rk[t]=o} // "E.J. Liddell" -> "e liddell", the same key the page uses
+function rostId(k,t){var X=t3Index(),c=Object.keys(D.players).filter(function(p){return normName(D.players[p])===k}).map(Number);if(c.length<2)return c[0]||null;
+  var on=c.filter(function(p){var l=X.L[p];return l&&l.length&&l[l.length-1].t===t});if(on.length===1)return on[0];
+  c.sort(function(a,b){return ((X.L[b]||[]).length)-((X.L[a]||[]).length)});return c[0]}
 function t3Day(day){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day);
   var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g}});
   var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
@@ -1031,6 +1038,11 @@ function t3Day(day){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day);
         var lu=c&&c.lu&&c.lu[t]&&c.lu[t].st.length>=5?c.lu[t]:null,ex=!lu&&m.ex&&m.ex[t]&&m.ex[t].st.length>=5?m.ex[t]:null,five=lu||ex;conf=!!lu;
         Object.keys(cnt).map(Number).forEach(function(p){var i=c&&injOf(c,t,p);if(cnt[p]>=3&&!(i&&/^out/i.test(i.st)))pool[p]={st:five?false:(stc[p]||0)>=3}});
         if(five){five.st.forEach(function(x){pool[x[0]]={st:true}});(five.out||[]).forEach(function(x){delete pool[x[0]]})}
+        var RS=rostSet(t);if(RS){var inFive={};(five?five.st:[]).forEach(function(x){inFive[x[0]]=1});
+          var OK=od&&od["_"+C.k],RO=rostSet(opp);
+          Object.keys(pool).forEach(function(p){var n=normName(D.players[p]);if(!inFive[p]&&!RS[n]&&!(OK&&OK[n]&&!(RO&&RO[n])))delete pool[p]}); // moved to another team (kept if a book lists him in this game and the other roster does not have him: a name spelt differently)
+          if(OK)Object.keys(OK).forEach(function(k){if(!RS[k])return;var id=rostId(k,t);if(!id||pool[id]||(five&&(five.out||[]).some(function(x){return x[0]===id})))return;
+            var i=c&&injOf(c,t,id);if(!(i&&/^out/i.test(i.st)))pool[id]={st:false}})} // priced players on today's roster: new signings, and anyone who missed the end of last season
         var gone={};if(five)(five.out||[]).forEach(function(x){gone[x[0]]=1});
         mi=t3Miss(t,day,sy,function(p){var i=c&&injOf(c,t,p);return !!gone[p]||!!(i&&/^out/i.test(i.st))})}
       Object.keys(pool).map(Number).forEach(function(p){var pr=pool[p].fz?t3Thaw(pool[p].fz):statProj(p,day,pool[p].st,opp,sy,mi.v);if(!pr)return;if(!pool[p].fz){var rf=restF(t,opp,day)*absF(p,t,day)*((HOMEF[SK]||{h:1,a:1})[t===m.h?"h":"a"])*lineF(m,pool[p].st,pr.pmin);if(rf!==1){pr.mu*=rf;pr.att*=rf;pr.rf=rf}pr.gap=absGap(p,t,day)}if(!pool[p].fz)pr.mwho=mi.who;
