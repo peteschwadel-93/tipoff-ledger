@@ -939,13 +939,20 @@ def backfill_odds(season, html, max_credits=0, reserve=300):
     print(f"done: prices for {got} games, {empty} without, {used:.0f} credits used" + (f", {left:.0f} left on the key" if left is not None else ""))
 
 
+MARKETS = {"p": "player_first_basket", "ft": "player_first_team_basket", "mf": "player_method_of_first_basket",
+           "t3": "player_threes", "t3a": "player_threes_alternate", "rb": "player_rebounds", "rba": "player_rebounds_alternate",
+           "as": "player_assists", "asa": "player_assists_alternate"}
+
+
 def remember_odds(sched, old):
     """First-basket prices for today's games from The Odds API, kept in odds.json so each game is asked for at most three times.
 
     Needs the key in the ODDS_API_KEY environment variable; without it this only returns what is already stored.
     Each request covers nine markets (first basket, first team basket, method of first basket, and made threes,
     rebounds and assists with their alternates) and costs up to nine credits; a game is fetched once inside twelve hours of tip, again inside two hours, and a last
-    time inside 25 minutes, after the lineups are posted: about twenty-seven credits a game. Fetching stops when fewer than 300 credits remain on the key.
+    time inside 25 minutes, after the lineups are posted: about twenty-seven credits a game. A market missing at the first look (method of
+    first basket often goes up later in the day) is asked for on its own every hour until the two-hour look. Fetching stops when fewer
+    than 300 credits remain on the key.
     """
     store = dict((old or {}).get("odds") or {})
     try:
@@ -958,7 +965,7 @@ def remember_odds(sched, old):
         return {k: v for k, v in store.items() if not k.startswith("_")}
     before = json.dumps(store, sort_keys=True)
     now = datetime.now(ET)
-    want = []
+    want, fill = [], []
     for u in sched:
         if u.get("lv") or not u.get("ts"):
             continue
@@ -975,6 +982,52 @@ def remember_odds(sched, old):
         again = has and 0 < mins and ((n < 2 and mins <= 120 and since >= 45) or (n < 3 and mins <= 25 and since >= 15))
         if (not has and 0 < mins <= 720 and rec.get("tries", 0) < 20 and waited) or again:
             want.append((k, u))
+        elif has and 120 < mins <= 720:
+            # fill-in: a market that was not posted yet at the first look (the books put method of first basket and some
+            # alternates up later in the day) is asked for on its own every hour until the two-hour look, up to six times;
+            # only the missing markets are requested, so a fill costs a credit per market that comes back
+            miss = [m for m in MARKETS if not rec.get(m)]
+            since_fill = (now - datetime.fromisoformat(rec["flt"]).replace(tzinfo=ET)).total_seconds() / 60 if rec.get("flt") else 1e9
+            if miss and rec.get("fl", 0) < 6 and since_fill >= 60 and since >= 60:
+                fill.append((k, u, miss))
+    if fill:
+        try:
+            events = json.loads(get(f"{ODDS_API}/events?apiKey={key}"))
+            ids = {(TEAM_NAMES.get(e.get("away_team")), TEAM_NAMES.get(e.get("home_team"))): e["id"] for e in events}
+            for k, u, miss in fill:
+                eid = ids.get((u["a"], u["h"]))
+                if not eid:
+                    continue
+                req = urllib.request.Request(f"{ODDS_API}/events/{eid}/odds?apiKey={key}&regions=us&markets={','.join(MARKETS[m] for m in miss)}&oddsFormat=american", headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=60, context=CTX or ssl_context()) as r:
+                    left = r.headers.get("x-requests-remaining")
+                    doc = json.loads(r.read())
+                got = {}
+                for m in miss:
+                    if m == "p":
+                        got[m] = parse_first_basket(doc)
+                    elif m == "ft":
+                        got[m] = parse_first_basket(doc, "player_first_team_basket")
+                    elif m == "mf":
+                        got[m] = parse_method(doc)
+                    else:
+                        main, alt = {"t3": ("player_threes", "player_threes_alternate"), "t3a": ("player_threes", "player_threes_alternate"),
+                                     "rb": ("player_rebounds", "player_rebounds_alternate"), "rba": ("player_rebounds", "player_rebounds_alternate"),
+                                     "as": ("player_assists", "player_assists_alternate"), "asa": ("player_assists", "player_assists_alternate")}[m]
+                        x, y = parse_threes(doc, main, alt)
+                        got[m] = y if m.endswith("a") and m != "as" else x
+                rec = store.get(k) or {}
+                for m, v in got.items():
+                    if v:
+                        rec[m] = v
+                rec["fl"] = rec.get("fl", 0) + 1
+                rec["flt"] = now.strftime("%Y-%m-%dT%H:%M")
+                store[k] = rec
+                print(f"odds fill {k}: asked for {', '.join(miss)}; got {', '.join(m for m, v in got.items() if v) or 'nothing yet'}", flush=True)
+                if left is not None and float(left) < 300:
+                    break
+        except Exception as e:
+            print(f"odds fill unavailable: {str(e).replace(key, '***')}", file=sys.stderr)
     if want:
         try:
             events = json.loads(get(f"{ODDS_API}/events?apiKey={key}"))   # listing events is free
