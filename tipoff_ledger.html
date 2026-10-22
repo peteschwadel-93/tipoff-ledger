@@ -1641,7 +1641,7 @@ function vBets(){BCH={};S.bsel=S.bsel||{};
     all.forEach(function(x){var q=days[x.b.d]||(days[x.b.d]={w:0,l:0,p:0,u:0,o:0,n:0});q.n++;if(x.g.st==="void")return;if(x.g.pl==null){q.o++;return}q.u+=x.g.pl;if(x.g.w>0)q.w++;else if(x.g.w<0)q.l++;else q.p++});
     ord.forEach(function(x,i){x.first=i>0&&ord[i-1].b.d!==x.b.d;x.last=!ord[i+1]||ord[i+1].b.d!==x.b.d;x.day=days[x.b.d]})}
   cols.push({k:"rec",l:"Night",v:function(x){return x.b.d+x.b.at},f:function(x){var q=x.day;if(!byN||!x.last||!q)return "";var st=q.w+q.l+q.p;
-    return '<span class="brec"><span class="o">'+fmtD(x.b.d)+'</span> '+(st?q.w+'–'+q.l+(q.p?'–'+q.p:'')+' <b class="'+(q.u>0?"bup":q.u<0?"bdn":"")+'">'+sg(q.u)+'u</b>':'')+(q.o?' <span class="o">'+(st?"· ":"")+q.o+' open</span>':'')+'</span>'}});
+    return '<span class="brec">'+(st?q.w+'–'+q.l+(q.p?'–'+q.p:'')+' <b class="'+(q.u>0?"bup":q.u<0?"bdn":"")+'">'+sg(q.u)+'u</b>':'')+(q.o?' <span class="o">'+(st?"· ":"")+q.o+' open</span>':'')+'</span>'}});
   var F=S.bform||{},N=betNames();
   var form='<section class="panel"><div class="phead"><h2>Add a bet by hand</h2><span class="tag">for anything without a listed price</span></div><div class="bform" id="betAdd">'+
     '<label class="f">Night <input type="date" id="bfDay" class="pxin" style="width:150px;text-align:left" value="'+esc(F.d||todayET())+'"></label>'+
