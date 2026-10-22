@@ -41,7 +41,8 @@ jobs:
           restore-keys: pbp-
 
       # Pull new games and the schedule from the NBA API into the page.
-      # If the API cannot be reached, publish the page as it is rather than nothing.
+      # If the API cannot be reached, nothing below runs and the site keeps the last page that built properly
+      # (the uploaded file still carries old data, so publishing it would roll the site back).
       - name: Refresh data
         id: build
         continue-on-error: true
@@ -53,6 +54,7 @@ jobs:
       # lock each game's picks and numbers when it tips off, and log what moved since the last run (Movers tab).
       - name: Lock picks and log movers
         id: lock
+        if: steps.build.outcome == 'success'
         continue-on-error: true
         run: node lock_picks.js tipoff_ledger.html picks.json movers.json
 
@@ -60,6 +62,7 @@ jobs:
       # and the movers log (movers.json) in the repository.
       - name: Save pre-tip flags, prices, picks and movers
         id: save
+        if: steps.build.outcome == 'success'
         continue-on-error: true
         run: |
           if [ -n "$(git status --porcelain flags.json odds.json picks.json movers.json)" ]; then
@@ -72,6 +75,7 @@ jobs:
           fi
 
       - name: Assemble site
+        if: steps.build.outcome == 'success'
         run: |
           mkdir -p _site
           cp tipoff_ledger.html _site/index.html
@@ -79,10 +83,13 @@ jobs:
           touch _site/.nojekyll
 
       - uses: actions/configure-pages@v5
+        if: steps.build.outcome == 'success'
       - uses: actions/upload-pages-artifact@v3
+        if: steps.build.outcome == 'success'
         with:
           path: _site
       - id: deploy
+        if: steps.build.outcome == 'success'
         uses: actions/deploy-pages@v4
 
       - name: Report a failed save
@@ -100,5 +107,5 @@ jobs:
       - name: Report a failed refresh
         if: steps.build.outcome == 'failure'
         run: |
-          echo "The NBA refresh failed; the page was published with its previous data." >> "$GITHUB_STEP_SUMMARY"
+          echo "The NBA refresh failed; nothing was published, so the site still shows the last good build." >> "$GITHUB_STEP_SUMMARY"
           exit 1
