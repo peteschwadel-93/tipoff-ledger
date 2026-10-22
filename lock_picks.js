@@ -84,7 +84,8 @@ function lockStat(sk) {
 
   /* Ladder watch: each ladder's rungs, prices and stake split as of the last run before his game starts. */
   const lw = (prev[C.lw] || []).filter(gone);
-  api.t3LadderList(T.rows.filter(r => !started(r.m))).filter(r => r.lad.priced).slice(0, Math.max(0, 8 - lw.length))
+  const lwGames = lw.map(e => e.a + "@" + e.h), lwOpen = api.t3LadderList(T.rows.filter(r => !started(r.m))).filter(r => r.lad.priced);
+  (api.ladFill ? api.ladFill(lwOpen, Math.max(0, T.cap - lw.length), lwGames) : lwOpen.slice(0, Math.max(0, 8 - lw.length)))   // one for every two games, at most five, two a game
     .forEach(r => lw.push(Object.assign(api.t3LadOut(r), { at: stamp })));
 
   /* Game numbers: every player's projection as of the last run before his game starts. Games still to start are
