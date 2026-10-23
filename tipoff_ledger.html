@@ -521,7 +521,7 @@ function jumperSelect(id,t,val){var tt=teamTipAll(t);
   return '<select id="'+id+'">'+tt.map(function(j){return '<option value="'+j.p+'"'+(j.p===val?' selected':'')+'>'+nmT(j.p)+" ("+season(j.p).w+"–"+(season(j.p).n-season(j.p).w)+")</option>"}).join("")+'</select>'}
 function teamTipAll(t){var keep=S.n;S.n=0;var o=teamTip(t);S.n=keep;return o.jl}
 
-function todayET(){try{return new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York"}).format(new Date())}catch(_){return new Date().toISOString().slice(0,10)}}
+var ETF=null;function todayET(){try{return (ETF||(ETF=new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York"}))).format(new Date())}catch(_){return new Date().toISOString().slice(0,10)}}
 function firstAtt(g){var x=att(g,g.h)[0],y=att(g,g.a)[0];if(!x&&!y)return null;return (!y||(x&&x[6]<y[6]))?{s:x,t:g.h}:{s:y,t:g.a}}
 function teamFirstScore(g,t){var l=att(g,t);for(var i=0;i<l.length;i++)if(l[i][2])return l[i];return null}
 function attText(s){return s?nm(s[0])+' <span class="o">'+method(s)+'</span> '+result(s):"–"}
@@ -587,14 +587,14 @@ function injReport(m){ // every listed designation for both teams, plus posted s
   return o?'<h3>'+(c.past?(c.actual?"Lineups · who actually started":"Availability as flagged before tip"):"Availability")+'</h3>'+o:""}
 /* ---- which jumper to rate: the usual one, unless availability says otherwise ---- */
 function teamJumpersBefore(t,day){ // most likely jumpers first: by how many of the team's last 30 tips they took, ties to the more recent
-  var l=[];D.games.forEach(function(g){var tp=g.tip;if(g.d>=day||!tp)return;var p=tp.wt===t?tp.w:(tp.lt===t?tp.l:null);if(p)l.push(p)});
+  var l=before(gIdx().tip[t]||[],day).map(function(x){return x[1]});
   l=l.slice(-30);var c={},last={};l.forEach(function(p,i){c[p]=(c[p]||0)+1;last[p]=i});
   return Object.keys(c).map(Number).sort(function(a,b){return c[b]-c[a]||last[b]-last[a]})}
 function startShareAny(j,day){ // his last 10 starts for any team: how many opening tips he took
-  var l=[];D.games.forEach(function(g){if(g.d>=day)return;[g.h,g.a].forEach(function(t){if((g.st[t]||[]).indexOf(j)<0)return;var tp=g.tip,p=tp?(tp.wt===t?tp.w:(tp.lt===t?tp.l:null)):null;if(p)l.push(p===j?1:0)})});
+  var l=before(gIdx().sp[j]||[],day).map(function(x){return x[1]});
   l=l.slice(-10);var w=0;l.forEach(function(x){w+=x});return{w:w,k:l.length,split:l.length>=5&&w/l.length<.8}}
 function startShare(t,j,day){ // of this player's last 10 starts for the team, how many opening tips he took
-  var l=[];D.games.forEach(function(g){if(g.d>=day||(g.h!==t&&g.a!==t)||(g.st[t]||[]).indexOf(j)<0)return;var tp=g.tip,p=tp?(tp.wt===t?tp.w:(tp.lt===t?tp.l:null)):null;if(p)l.push(p===j?1:0)});
+  var l=before(gIdx().st[t+"|"+j]||[],day).map(function(x){return x[1]});
   l=l.slice(-10);var w=0;l.forEach(function(x){w+=x});return{w:w,k:l.length,split:l.length>=5&&w/l.length<.8}}
 function shareTag(t,j,day){if(!j)return "";var s=startShare(t,j,day);if(!s.k)return '<span class="tag q">NO STARTS ON RECORD</span>';
   return '<span class="tag '+(s.split||s.k<5?"q":"")+'" title="Backtest, when he started: took every tip in his last 10 starts, jumped again 99% of the time; 80 to 99%, about 92%; under 60%, about 65%.">'+(s.split?"SPLIT ROLE · ":"")+"JUMPED IN "+s.w+" OF LAST "+s.k+(s.k===1?" START":" STARTS")+'</span>'}
@@ -870,10 +870,10 @@ function vLineups(){
       '<div class="lteams">'+a.html+b.html+'</div></div>'}).join("");
   var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
   Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
-  view.innerHTML=diagHtml(day)+'<section class="panel"><div class="phead"><h2>Daily lineups</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
+  view.innerHTML='<section class="panel"><div class="phead"><h2>Daily lineups</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+
     (nUp?'<span class="tag '+(nLock===nUp?"w":nLock?"q":"")+'">'+nLock+' OF '+nUp+' LOCKED</span>':'')+'</div></div>'+
     '<p class="note">'+(ms.length?'':'No games on this day. ')+'A game lights up once the NBA has posted both starting fives, usually about half an hour before tip. Until then each side shows its expected five: the one on the NBA\'s lineups page when it has one, otherwise the players with the most starts in the team\'s last five games, leaving out anyone listed out. Each five runs point guard down to centre, using the position the NBA lists for a starter in its box scores; a dash means none is on record yet. Injury designations and notes come from the league injury report'+(D.inj?'':' (not available in this copy)')+'. For games already played, the five shown are the players who actually started.</p>'+
-    (cards?'<div class="lgrid">'+cards+'</div>':'')+'</section>'}
+    (cards?'<div class="lgrid">'+cards+'</div>':'')+'</section>'+diagHtml(day)}
 /* ---- threes: projected made threes for every player on the night ----
    Backtested on both seasons, each projection made only from earlier games (27,000 player-games):
      attempts = e^(0.467 + 0.082 if starting + 0.25 x teammates out) x minutes^0.808 x (attempts per minute)^0.95 x opponent^1.0
@@ -929,7 +929,7 @@ function t3Opp(opp,day,s){var X=t3Index(),ck=opp+day+s+SK;X.oc=X.oc||{};if(X.oc[
 function t3Opp0(opp,day,s){var X=t3Index(),h=(X.DEF[opp]||[]).filter(function(x){return x.s===s&&x.d<day}).slice(-25),lg=(X.LG[s]||[]).filter(function(x){return x.d<day}).slice(-400);
   if(lg.length<60||!h.length)return 1;var a=0,b=0,f=SC().of;h.forEach(function(x){a+=x[f]});lg.forEach(function(x){b+=x[f]});b/=lg.length;return ((a/h.length)*h.length+b*10)/(h.length+10)/b}
 function t3Miss(t,day,s,isOut){ // share of the team's usual threes belonging to absent regulars
-  var X=t3Index(),prev=D.games.filter(function(q){return q.d<day&&q.s===s&&q.b3&&(q.h===t||q.a===t)}).slice(-5);if(prev.length<5)return{v:0,who:[]};
+  var X=t3Index(),prev=(gIdx().byT[t]||[]).filter(function(q){return q.d<day&&q.s===s&&q.b3}).slice(-5);if(prev.length<5)return{v:0,who:[]};
   var cnt={};prev.forEach(function(q){(q.b3[t]||[]).forEach(function(x){if(x[3]>=50)cnt[x[0]]=(cnt[x[0]]||0)+1})});
   var tot=0,ms=0,who=[];Object.keys(cnt).map(Number).forEach(function(p){if(cnt[p]<3)return;var l=X.L[p]||[],h=l.slice(Math.max(0,t3Before(l,day)-10),t3Before(l,day)),a=0,f=SC().of;h.forEach(function(x){a+=x[f]});a=h.length?a/h.length:0;
     tot+=a;if(isOut(p)){ms+=a;who.push([p,a])}});
@@ -1046,7 +1046,9 @@ function propOpen(day,kept,openOnly,have){var all=[],nG=0;["t3","rb","as"].forEa
 function propChosen(day,sk,self,openOnly){var key=day+"|"+S.book+"|"+(S.bookOff?1:0)+"|"+(S.lockOff?1:0)+"|"+(openOnly?1:0);if(PT[key])return PT[key];
   var have={},kept=[];["t3","rb","as"].forEach(function(k){var T=k===sk?self:inSK(k,function(){return t3Day(day,1)});have[k]=T;T.lkd.forEach(function(x){kept.push({sk:k,p:x.row.p,a:x.row.m.a,h:x.row.m.h})})});
   var o=propOpen(day,kept,openOnly,have),ids={};Object.keys(o).forEach(function(k){o[k].forEach(function(x){ids[k+"|"+x.row.p+"|"+x.lab]=1})});return PT[key]=ids}
-function t3Day(day,raw){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day);
+var TDC={};
+function t3Day(day,raw){var k=day+"|"+SK+"|"+S.book+"|"+(S.bookOff?1:0)+"|"+(S.lockOff?1:0),T=TDC[k];if(T&&(raw||T.top))return T;return TDC[k]=t3Day0(day,raw)} // remembered until the next redraw or data change
+function t3Day0(day,raw){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day);
   var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g}});
   var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
   var mo=+day.slice(5,7),sy=+day.slice(0,4)-(mo>=9?0:1),rows=[],plays=[];
@@ -1131,7 +1133,8 @@ function t3TrackHtml(){
       '<h3 style="margin:16px 0 8px">Latest plays</h3><div class="tw"><table><thead><tr><th>Date</th><th>Player</th><th>Bet</th><th class="n">Price</th><th class="n">Pick chance</th><th class="n">'+(CNT()?"Got":"Made")+'</th><th>Result</th><th class="n">Units</th></tr></thead><tbody>'+
       R.list.slice(-30).reverse().map(function(e){var x=e.x,r=x.row;return '<tr><td>'+fmtD(e.d)+'</td><td>'+tmL(r.t)+' '+nm(r.p)+'</td><td>'+esc(x.lab)+'</td><td class="n">'+fmtP(x.price)+'</td><td class="n">'+(x.p*100).toFixed(0)+'%</td><td class="n">'+(r.res?r.res[SC().col]+(SK==="t3"?' of '+r.res[1]:''):'–')+'</td><td><span class="tag'+(x.hit?" w":"")+'">'+(x.hit?"HIT":"MISS")+'</span></td><td class="n">'+un(e.u)+'</td></tr>'}).join("")+'</tbody></table></div>'
       :'<p class="empty">No '+SC().one+' prices are on record yet. Prices are saved within four hours of each tip from opening night, and this fills in as those games finish.</p>')+'</section>';
-  [sy,sy-1,sy-2].forEach(function(s){var C=t3Calib(s);if(!C.n)return;
+  if(!S.calOpen)out+='<section class="panel" style="margin-top:20px"><div class="phead"><h2>'+SC().nm+' model accuracy</h2><button class="more" id="calOpen">Show the accuracy tables</button></div><p class="note">How the projections did against what happened, season by season, with no prices involved. Worked out on request because it re-runs every projection of three seasons, which takes a few seconds.</p></section>';
+  [sy,sy-1,sy-2].forEach(function(s){if(!S.calOpen)return;var C=t3Calib(s);if(!C.n)return;
     out+='<section class="panel" style="margin-top:20px"><div class="phead"><h2>'+SC().nm+' model · '+lab(s)+' accuracy</h2><span class="tag">'+(s===sy?C.n+' projections so far':'back-test · '+C.n+' projections')+'</span></div>'+
       '<p class="note">No prices involved: every regular-season player projected for '+(CNT()?SC().volShow+" or more "+SC().u:"2.5 or more attempts")+', each projection made only from earlier games, against what he did. It knows who played and who started, as you will once lineups post. A good model\'s “said” and “happened” columns match.</p>'+
       '<div class="kv" style="margin:12px 0">'+(SK==="t3"?'<span>Attempts a player: projected <b>'+(C.pa/C.n).toFixed(2)+'</b>, actual <b>'+(C.aa/C.n).toFixed(2)+'</b></span>':'')+'<span>'+(CNT()?SC().nm:"Makes")+' a player: projected <b>'+(C.pm/C.n).toFixed(2)+'</b>, actual <b>'+(C.am/C.n).toFixed(2)+'</b></span></div>'+
@@ -1329,7 +1332,14 @@ S.win=true;try{if(localStorage.getItem("tolWin")==="0")S.win=false}catch(_){}
 function seasonOf(d){var y=+d.slice(0,4),m=+d.slice(5,7);return m>=9?y:y-1}
 function winEnd(s){D._we=D._we||{};if(D._we[s])return D._we[s];var last=null,po=false;D.games.forEach(function(g){if(g.s!==s)return;if(g.po)po=true;else if(!last||g.d>last)last=g.d});
   var end=po&&last?last:(s+1)+"-04-12",x=new Date(end+"T12:00:00Z");x.setUTCDate(x.getUTCDate()-14);return D._we[s]=x.toISOString().slice(0,10)} // a season still under way is taken to end about April 12
-function inWin(d){var s=seasonOf(d);return d>=s+"-11-01"&&d<=winEnd(s)&&!D.games.some(function(g){return g.d===d&&g.po})}
+/* ---- indexes over the games list, built once per data load (or live update) so look-ups do not scan every game ---- */
+function gIdx(){if(D._gi)return D._gi;var byD={},byT={},po={},tip={},st={},sp={};
+  D.games.forEach(function(g){(byD[g.d]=byD[g.d]||[]).push(g);[g.h,g.a].forEach(function(t){(byT[t]=byT[t]||[]).push(g)});if(g.po)po[g.d]=1;
+    var tp=g.tip;[g.h,g.a].forEach(function(t){var p=tp?(tp.wt===t?tp.w:(tp.lt===t?tp.l:null)):null;if(p)(tip[t]=tip[t]||[]).push([g.d,p]);
+      if(p)(g.st[t]||[]).forEach(function(q){(st[t+"|"+q]=st[t+"|"+q]||[]).push([g.d,p===q?1:0]);(sp[q]=sp[q]||[]).push([g.d,p===q?1:0])})})});
+  return D._gi={byD:byD,byT:byT,po:po,tip:tip,st:st,sp:sp}}
+function before(l,day){var lo=0,hi=l.length;while(lo<hi){var md=(lo+hi)>>1;if(l[md][0]<day)lo=md+1;else hi=md}return l.slice(0,lo)} // entries [date, ...] in date order
+function inWin(d){var s=seasonOf(d);return d>=s+"-11-01"&&d<=winEnd(s)&&!gIdx().po[d]}
 function winOK(d){return !S.win||inWin(d)}
 function winSet(on){S.win=on;try{localStorage.setItem("tolWin",on?"1":"0")}catch(_){}["_trk","_t3r","_ftr","_pzr","_mfr","_mfpr","_parr"].forEach(function(k){delete D[k]});render()}
 function winSeg(){var s=seasonOf(todayET());return '<span class="seg" id="seg-win" title="Your betting window: Nov 1 to two weeks before the regular season ends ('+fmtD(winEnd(s))+' this season), no playoffs"><button data-v="1" aria-pressed="'+S.win+'">Betting window</button><button data-v="0" aria-pressed="'+!S.win+'">All dates</button></span>'}
@@ -1371,8 +1381,10 @@ function vTracker2(){
 /* ---- player page (opens over whatever tab is showing) ---- */
 var TEAM_COL={ATL:"#E03A3E",BOS:"#007A33",BKN:"#3d3d3d",CHA:"#00788C",CHI:"#CE1141",CLE:"#860038",DAL:"#00538C",DEN:"#0E2240",DET:"#C8102E",GSW:"#1D428A",HOU:"#CE1141",IND:"#002D62",LAC:"#C8102E",LAL:"#552583",MEM:"#5D76A9",MIA:"#98002E",MIL:"#00471B",MIN:"#0C2340",NOP:"#0C2340",NYK:"#006BB6",OKC:"#007AC1",ORL:"#0077C0",PHI:"#006BB6",PHX:"#E56020",POR:"#E03A3E",SAC:"#5A2D81",SAS:"#4a4f54",TOR:"#CE1141",UTA:"#3E2680",WAS:"#002B5C"};
 function fbInfo(day,p){ // first-basket chance and price for one player on one night, read from the Picks page's own numbers
-  var key=day+"|"+D.built+"|"+S.book+"|"+S.ft;if(!S._fbi||S._fbi.key!==key){var kv=view,kd=S.day,kl=S.minLv,ky=S._days;view=document.createElement("div");S.day=day;S.minLv=-1;S._conf=null;
-    try{vPicks()}catch(_){}view=kv;S.day=kd;S.minLv=kl;S._days=ky;S._fbi={key:key,list:S._conf&&S._conf.day===day?S._conf.list:[]}}
+  var key=day+"|"+D.built+"|"+S.book+"|"+S.ft;S._fbiM=S._fbiM||{}; // one worked-out night per date, kept, so My bets does not redraw a Picks page per bet
+  if(S._fbiM[key])S._fbi=S._fbiM[key];
+  if(!S._fbi||S._fbi.key!==key){var kv=view,kd=S.day,kl=S.minLv,ky=S._days,kc=S._conf;view=document.createElement("div");S.day=day;S.minLv=-1;S._conf=null;
+    try{vPicks()}catch(_){}view=kv;S.day=kd;S.minLv=kl;S._days=ky;S._fbi=S._fbiM[key]={key:key,list:S._conf&&S._conf.day===day?S._conf.list:[]};S._conf=kc}
   return S._fbi.list.filter(function(s){return s.e.x.p===p})[0]||null}
 function closePlayer(){var m=$("pm");if(m)m.remove();document.body.style.overflow="";S.player=null}
 function showPlayer(p,all){
@@ -1562,7 +1574,7 @@ function addParlay(key){var k=key.split("|"),d=k[1],price=+k[3],legs=k[2].split(
   var nmx=legs.map(function(l){return D.players[l.p]||""}).join(" + ");
   S.bets.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString(),d:d,p:legs[0].p,nm:nmx,t:legs[0].t,opp:"",home:null,m:"par",k:0,legs:legs,key:k[2],price:price,price0:price,book:"Parlay",u:1,res:"auto"});
   saveBets();betCount();toast("Added a "+legs.length+"-leg parlay to My bets at "+fmtP(price)+". Change the price there to match your book.");if(S.tab==="bets")render()}
-function betGame(b){var gs=D.games.filter(function(g){return g.d===b.d}),g=null;
+function betGame(b){var gs=gIdx().byD[b.d]||[],g=null;
   if(b.t)g=gs.filter(function(x){return x.h===b.t||x.a===b.t})[0];
   if(!g&&b.p)g=gs.filter(function(x){return [x.h,x.a].some(function(t){return (x.st[t]||[]).indexOf(b.p)>=0||(x.b3&&(x.b3[t]||[]).some(function(q){return q[0]===b.p}))})})[0];
   return g||null}
@@ -1601,7 +1613,7 @@ function betManual(){var q=function(id){return ($(id)||{}).value||""},N=betNames
   if(g){b.t=[g.h,g.a].filter(function(tm){return (g.st[tm]||[]).indexOf(b.p)>=0||(g.b3&&(g.b3[tm]||[]).some(function(z){return z[0]===b.p}))})[0]||who.t}else b.t=who.t;
   if(sc){b.opp=sc.h===b.t?sc.a:sc.h;b.home=sc.h===b.t?1:0}
   S.bets.push(b);saveBets();betCount();toast("Added to My bets: "+b.nm+" · "+betWhat(b)+" "+fmtP(price));S.bform=null;render()}
-function vBets(){BCH={};S.bsel=S.bsel||{};
+function vBets(){S.bsel=S.bsel||{};
   function sg(u,dp){return (u>=0?"+":"−")+Math.abs(u).toFixed(dp==null?2:dp)}
   function usd(u){return (u<0?"−$":"+$")+Math.abs(u*S.unit).toFixed(2)}
   var all=S.bets.map(function(b){return{b:b,g:betGrade(b)}}),T={n:0,w:0,l:0,p:0,u:0,stk:0,open:0,ostk:0},kinds={fb:{l:"First basket",n:0,w:0,u:0,stk:0},mf:{l:"Method of first basket",n:0,w:0,u:0,stk:0},o:{l:"Threes overs and rungs",n:0,w:0,u:0,stk:0},u:{l:"Threes unders",n:0,w:0,u:0,stk:0},rb:{l:"Rebounds",n:0,w:0,u:0,stk:0},as:{l:"Assists",n:0,w:0,u:0,stk:0},ftb:{l:"First team basket",n:0,w:0,u:0,stk:0},par:{l:"Parlays",n:0,w:0,u:0,stk:0},live:{l:"Live bets",n:0,w:0,u:0,stk:0}},byDay={};
@@ -1942,7 +1954,7 @@ function legChance(l){if(!l||!l.p||!l.d||!l.m)return null;var key=l.d+"|"+(S.boo
 function etOff(d){var y=+d.slice(0,4),sun=function(m,n){var x=new Date(Date.UTC(y,m,1)),w=x.getUTCDay();return 1+((7-w)%7)+7*(n-1)},md=d.slice(5);
   var a=("0"+(3)).slice(-2)+"-"+("0"+sun(2,2)).slice(-2),b=("11")+"-"+("0"+sun(10,1)).slice(-2);return md>=a&&md<b?"-04:00":"-05:00"}
 function tipTsOf(d,t){if(!d||!t)return null;var s=(D.sched||[]).filter(function(x){return x.d===d&&(x.h===t||x.a===t)&&x.ts})[0];if(s)return Date.parse(s.ts);
-  var g=D.games.filter(function(x){return x.d===d&&(x.h===t||x.a===t)})[0],mm=g&&g.t&&/(\d+):(\d+)\s*(AM|PM)/i.exec(g.t);if(!mm)return null;
+  var g=(gIdx().byD[d]||[]).filter(function(x){return x.h===t||x.a===t})[0],mm=g&&g.t&&/(\d+):(\d+)\s*(AM|PM)/i.exec(g.t);if(!mm)return null;
   var h=(+mm[1])%12+(/pm/i.test(mm[3])?12:0);return Date.parse(d+"T"+("0"+h).slice(-2)+":"+mm[2]+":00"+etOff(d))}
 function betIsLive(b){if(!b)return false;if(b.lv===1)return true;if(b.lv===0||!b.at)return false;var at=Date.parse(b.at);
   return (b.m==="par"?b.legs:[b]).some(function(l){var ts=tipTsOf(l.d||b.d,l.t);return ts!=null&&at>ts+60000})}
@@ -2106,7 +2118,7 @@ function vGames(){
 }
 
 function render(){
-  if(!D)return;PT={};
+  if(!D)return;PT={};TDC={};var bk=S.book+"|"+(S.bookOff?1:0);if(BCH._bk!==bk){BCH={};BCH._bk=bk}
   G=D.games.filter(function(g){return (S.po==="all"||String(g.po)===S.po)&&(S.ssn==="all"||String(g.s)===S.ssn)});
   [].forEach.call(document.querySelectorAll("#seg-ssn button"),function(b){b.setAttribute("aria-pressed",b.dataset.v===S.ssn)});
   [].forEach.call(document.querySelectorAll("#tabs button"),function(b){b.setAttribute("aria-selected",b.dataset.tab===S.tab)});
@@ -2166,6 +2178,7 @@ document.addEventListener("click",function(e){
   b=e.target.closest("#seg-trk button");if(b){S.trkConf=+b.dataset.v;return render()}
   if(e.target.id==="trkMore"){S.trkN+=30;return render()}
   if(e.target.id==="t3More"){S.t3All=!S.t3All;return render()}
+  if(e.target.id==="calOpen"){S.calOpen=1;e.target.textContent="Working it out…";e.target.disabled=true;return setTimeout(render,30)}
   if(e.target.id==="alMore"){S.alAll=!S.alAll;return render()}
   b=e.target.closest("#seg-al button");if(b&&!b.disabled){S.alShow=b.dataset.v;return render()}
   if(e.target.id==="ftMore"){S.ftAll=!S.ftAll;return render()}
@@ -2242,7 +2255,7 @@ document.addEventListener("input",function(e){if(e.target.id==="q"){S.q=e.target
 
 /* ---- boot: data embedded in the file if present, otherwise data.json next to the page ---- */
 function start(d){
-  D=d;G=d.games;D._idx=null;
+  D=d;G=d.games;D._idx=null;D._gi=null;TDC={};PT={};BCH={};S._fbiM={};S._fbi=null;
   // players with no game on record yet (rookies, new signings) take their name from the posted or expected lineups
   d.players=d.players||{};(d.sched||[]).forEach(function(u){["lu","ex"].forEach(function(k){var L=u[k]||{};Object.keys(L).forEach(function(t){((L[t]||{}).st||[]).concat((L[t]||{}).out||[]).forEach(function(x){if(x&&x[0]&&x[1]&&(!d.players[x[0]]||/^#/.test(d.players[x[0]])))d.players[x[0]]=x[1]})})})});var last=d.games[d.games.length-1],saved={};
   try{saved=JSON.parse(localStorage.getItem("tol"))||{}}catch(_){}
@@ -2457,9 +2470,9 @@ function lvTick(){if(!D||document.hidden)return;var now=Date.now(),day=todayET()
       var m=ms.filter(function(x){return x.h===h&&x.a===a})[0];if(!m||(state!=="in"&&state!=="post"))return;
       jobs.push(fetch(ESPN+"summary?event="+e.id,{cache:"no-store"}).then(function(r){return r.json()}).then(function(doc){if(lvApply(doc,m,ids))changed=true}).catch(function(){}))})});
     return Promise.all(jobs).then(function(){return jobs.length})}).then(function(n){var el=$("liveMsg");if(el&&n){el.hidden=false;el.textContent="Live stats "+(changed?"updated ":"checked ")+new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}
-      if(!changed)return;PT={};["_trk","_t3r","_ftr","_pzr","_mfr","_mfpr","_parr","_mfd","_ftd","_idx","_tgd"].forEach(function(f){D[f]=null});
+      if(!changed)return;PT={};TDC={};BCH={};["_mfd","_ftd","_idx","_tgd","_gi"].forEach(function(f){D[f]=null});
       var a=document.activeElement,typing=a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);
-      if(!typing&&!$("pm")&&["picks","tonight","threes","rebounds","assists","parlays","bets","tracker"].indexOf(S.tab)>=0){var y=window.scrollY;render();window.scrollTo(0,y)}}).catch(function(){})}
+      if(!typing&&!$("pm")&&["picks","tonight","threes","rebounds","assists","parlays","bets"].indexOf(S.tab)>=0){var y=window.scrollY;render();window.scrollTo(0,y)}}).catch(function(){})}
 if(typeof location!=="undefined"&&/^https?:$/.test(location.protocol)&&typeof fetch==="function"){setInterval(lvTick,60000);setTimeout(lvTick,4000)}
 var emb=$("tipoff-data"),inline=null;
 try{if(emb&&emb.textContent.trim())inline=JSON.parse(emb.textContent)}catch(_){}
