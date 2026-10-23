@@ -87,6 +87,9 @@ function lockStat(sk) {
   const lwGames = lw.map(e => e.a + "@" + e.h), lwOpen = api.t3LadderList(T.rows.filter(r => !started(r.m))).filter(r => r.lad.priced);
   (api.ladFill ? api.ladFill(lwOpen, Math.max(0, T.cap - lw.length), lwGames) : lwOpen.slice(0, Math.max(0, 8 - lw.length)))   // one for every two games, at most five, two a game
     .forEach(r => lw.push(Object.assign(api.t3LadOut(r), { at: stamp })));
+  /* every ladder as first listed, so the page can show the ones that fell off before tip */
+  const lwSeen = prev[C.lw + "seen"] || {};
+  lw.forEach(e => { const id = e.p + "|" + e.a + "|" + e.h; if (!lwSeen[id]) lwSeen[id] = Object.assign({}, e, { at0: stamp }); });
 
   /* Game numbers: every player's projection as of the last run before his game starts. Games still to start are
      rewritten each run; a started game keeps what it had, so the slate does not move while a game is on. */
@@ -94,7 +97,7 @@ function lockStat(sk) {
   ms.filter(m => !started(m)).forEach(m => {
     fz[day + "|" + m.a + "|" + m.h] = { at: stamp, r: T.rows.filter(r => r.m === m && (r.pr.att >= 1 || r.o)).map(api.t3Freeze) };
   });
-  rec[C.lk] = picks; rec[C.seen] = seen; rec[C.lw] = lw; rec[C.fz] = fz;
+  rec[C.lk] = picks; rec[C.seen] = seen; rec[C.lw] = lw; rec[C.lw + "seen"] = lwSeen; rec[C.fz] = fz;
 }
 /* Best plays: one for every two games and at most five a night in each stat. The picks already locked hold their places;
    the rest go to the best value from games still to start. */
