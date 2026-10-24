@@ -54,7 +54,7 @@ ESPN_ABBR = {"GS": "GSW", "NY": "NYK", "SA": "SAS", "NO": "NOP", "UTAH": "UTA", 
 UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.nba.com/", "Accept": "application/json"}
 DIAG = []   # what each data source returned on this run, shown on the page's Lineups tab
 COLS = {"gameId", "orderNumber", "period", "clock", "timeActual", "actionType", "subType", "descriptor",
-        "personId", "playerNameI", "teamTricode", "shotResult", "shotDistance", "scoreHome",
+        "personId", "playerNameI", "teamTricode", "shotResult", "shotDistance", "scoreHome", "scoreAway",
         "jumpBallWonPersonId", "jumpBallLostPersonId", "jumpBallRecoverdPersonId", "assistPersonId"}
 N_SHOTS = 5            # attempts are kept per team until it has N field-goal attempts
 TIP_WINDOW = 690       # opening tip must be logged with >= 11:30 on the Q1 clock
@@ -532,6 +532,16 @@ def pid(v):
     return int(v) if pd.notna(v) and int(v) > 0 else None
 
 
+def final_score(g):
+    """[away, home] points at the last action on record (the live score while a game is on)."""
+    try:
+        h = pd.to_numeric(g["scoreHome"], errors="coerce").dropna()
+        a = pd.to_numeric(g["scoreAway"], errors="coerce").dropna() if "scoreAway" in g.columns else None
+        return [int(a.iloc[-1]), int(h.iloc[-1])] if a is not None and len(a) and len(h) else None
+    except Exception:
+        return None
+
+
 def threes_box(g, home, away):
     """Per team, every player who appeared: [personId, threes attempted, threes made, minutes x10, rebounds, assists].
 
@@ -571,10 +581,12 @@ def threes_box(g, home, away):
     if "assistPersonId" in g.columns:  # the passer is named on the made shot
         ap = pd.to_numeric(g["assistPersonId"], errors="coerce")
         ast = ap[ap > 0].astype(int).value_counts().to_dict()
+    sh = g[(g.shotResult == "Made") & g.actionType.isin(["2pt", "3pt", "freethrow"])]
+    pts = (sh.actionType.map({"2pt": 2, "3pt": 3, "freethrow": 1})).groupby(sh.personId).sum().to_dict()   # for the Scores tab's box score
     box = {home: [], away: []}
     for who, sc in secs.items():
         if team.get(who) in box and sc > 0:
-            box[team[who]].append([who, int(att.get(who, 0)), int(made.get(who, 0)), int(round(sc / 6)), int(reb.get(who, 0)), int(ast.get(who, 0))])
+            box[team[who]].append([who, int(att.get(who, 0)), int(made.get(who, 0)), int(round(sc / 6)), int(reb.get(who, 0)), int(ast.get(who, 0)), int(pts.get(who, 0))])
     for t in box:
         box[t].sort(key=lambda x: -x[3])
     return box
@@ -686,7 +698,7 @@ def build(df):
                 break
         games.append({"id": int(gid), "d": ts.strftime("%Y-%m-%d"), "t": ts.strftime("%I:%M %p ET").lstrip("0"), "po": int(g.po.iloc[0]), "s": int(g.ssn.iloc[0]),
                       "h": home, "a": away, "tip": tip, "fs": shots, "st": starters, "fb": first_fg, "fp": first_pts,
-                      "b3": threes_box(g, home, away)})
+                      "b3": threes_box(g, home, away), "sc": final_score(g)})
         if "live" in g.columns and g.live.iloc[0] == 1:
             games[-1]["lv"] = 1
     used = set()
