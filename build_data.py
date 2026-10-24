@@ -349,7 +349,8 @@ def apply_bm(sched, players, games, rost=None):
     """Better five starters before teams confirm. Order: the NBA's confirmed lineup (or the box score), then Basketball
     Monster verified, then Basketball Monster projected, then the NBA's expected. Each game records where its five came from."""
     now = datetime.now(ET)
-    todo = [u for u in sched if not u.get("lv") and u.get("ts") and 0 < (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60 <= 720]
+    today = now.strftime("%Y-%m-%d")
+    todo = [u for u in sched if not u.get("lv") and u.get("ts") and 0 < (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60 and (u["d"] == today or (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60 <= 720)]
     if not todo:
         return
     bm = load_bm()
@@ -489,10 +490,10 @@ def load_nba(season, cache="pbp_cache"):
     daily = {}
     for u in upcoming:
         # Starters: the NBA's lineups page first (confirmed there as soon as a team announces), then the box score,
-        # which shows them from about half an hour before tip. Looked for from twelve hours out (the lineups page lists
-        # expected starters from the morning), each attempt logged.
+        # which shows them from about half an hour before tip. Looked for all day on game day, and from twelve hours out otherwise (the lineups page lists
+        # expected starters from the morning), each attempt logged. Every game on today's slate counts, however late it tips.
         mins = (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60
-        if mins <= 720:
+        if mins <= 720 or u["d"] == now.strftime("%Y-%m-%d"):
             if u["d"] not in daily:
                 daily[u["d"]] = daily_lineups(u["d"])
             note = []
