@@ -290,6 +290,7 @@ h2.sep{margin-top:12px;color:var(--muted)}
 .rres .hit>span:last-child,.rcard li.hit .rl>span:first-child{color:var(--made);font-weight:600}
 .rcard li.hit .rl>span:first-child:before{color:var(--made)}
 .tag.q{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+.tag.chg{color:#ff9f6b;background:rgba(255,159,107,.12);border-color:rgba(255,159,107,.45);white-space:normal}
 .tag.chk{color:var(--miss);background:rgba(201,141,132,.14);border-color:rgba(201,141,132,.35);cursor:help}
 .rf{display:flex;flex-wrap:wrap;gap:6px;padding-left:1.5em;align-items:center}
 .rf .o{font-size:12px;color:var(--muted)}
@@ -744,6 +745,7 @@ function vPicks(){
       if(od){var v2=valueRows(r,t,al,od);v2.forEach(function(e){slate.push({e:e,t:t,r:r,id:id})});body+=priceTable(t,v2,od.at,m)}});
     return '<section class="panel" id="'+id+'"><div class="phead"><h2>'+vsL(m.a,m.h)+'</h2>'+(glOf(m)?'<span>'+glChip(m)+'</span>':'')+'<span>'+(m.t?'<span class="tag">'+esc(m.t)+'</span> ':(m.g&&m.g.t?'<span class="tag" title="When the game actually tipped off">TIPPED '+esc(m.g.t)+'</span> ':''))+(m.pre?'<span class="tag">PRESEASON</span> ':'')+
       (r.ok?'<span class="edge">'+(r.lv?r.fav+" ":"Even ")+r.abs+'%</span>':'<span class="tag">NO RATING</span>')+'</span></div>'+
+      (chgTag(m,m.a)||chgTag(m,m.h)?'<div style="margin:-4px 0 10px">'+chgTag(m,m.a)+' '+chgTag(m,m.h)+'</div>':'')+
       '<div class="circle">'+side(m.a,r.ja,r.fa,r.ra,"",m,r.na)+advBlock(r.rt,m.a,m.h,r.hh,r.fav&&isOut(m,r.fav,r.fav===m.h?r.jh:r.ja))+side(m.h,r.jh,r.fh,r.rh,"r",m,r.nh)+'</div>'+
       what(m)+injReport(m)+body+'</section>'}
   var cards=picks.map(function(r,i){var h=card(r,"pick-"+i);return pkOn(r.m)?h:""}).join(""); // every card is built (the round-up and slate read from them); only the chosen game is shown
@@ -769,7 +771,7 @@ function vPicks(){
       var inTop=function(p){return r.top.slice(0,3).some(function(s){return s.p===p})},hitShot=!!(fa&&inTop(fa.s[0])),hitScore=!!(fs&&inTop(fs[0]));
       var jOut=isOut(m,r.fav,j);
       var fi=r.fav===m.h?1:0,hhFlag=r.hh&&r.hh[0]+r.hh[1]>=3&&r.hh[1-fi]>r.hh[fi]?'<span class="tag q" title="The favourite trails this head-to-head series '+r.hh[fi]+'–'+r.hh[1-fi]+'. Not part of the rating; in the backtest favourites in this spot won 54% of tips against 62% otherwise.">HEAD TO HEAD FLAG · TRAILS '+r.hh[fi]+'–'+r.hh[1-fi]+'</span>':"";
-      return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+vsL(m.a,m.h)+'</span><span class="edge">'+(r.ok?(r.lv>0?r.fav+' ':'EVEN · '+r.fav+' ')+r.abs+'%':'NO RATING · '+r.fav)+'</span></div>'+
+      return '<div class="rcard'+(hitScore?" win":"")+(jOut?" warn":"")+'" role="button" tabindex="0" data-goto="pick-'+i+'"><div class="rhead"><span class="tm">'+vsL(m.a,m.h)+'</span><span class="edge">'+(r.ok?(r.lv>0?r.fav+' ':'EVEN · '+r.fav+' ')+r.abs+'%':'NO RATING · '+r.fav)+'</span></div>'+(chgTag(m,m.a)||chgTag(m,m.h)?'<div>'+chgTag(m,m.a)+' '+chgTag(m,m.h)+'</div>':'')+
         (m.t?'<div><span class="tag">'+esc(m.t)+'</span>'+(m.pre?' <span class="tag">PRESEASON</span>':'')+' <span class="tag">RESULTS PENDING</span>'+(jOut?' <span class="tag l">CHECK · JUMPER UNAVAILABLE</span>':'')+'</div>':((g&&(g.lv||g.t))||jOut?'<div>'+(g&&g.t?'<span class="tag" title="When the game actually tipped off">TIPPED '+esc(g.t)+'</span> ':'')+(g&&g.lv?'<span class="tag w">LIVE · SO FAR</span> ':'')+(jOut?'<span class="tag l">JUMPER WAS FLAGGED UNAVAILABLE</span>':'')+'</div>':''))+
         '<div class="rblock"><h3>Tip pick</h3><div class="rl"><div class="rname">'+nm(j)+'</div>'+chev(r.lv,false,"sm"+(jOut?" off":""))+'</div>'+(swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+shareTag(r.fav,j,day)+hhFlag?'<div class="rf" style="padding-left:0">'+swapTag(r.fav===m.h?r.nh:r.na,j)+avail(m,r.fav,j)+shareTag(r.fav,j,day)+hhFlag+'</div>':'')+'</div>'+
         '<div class="rblock"><h3>'+r.fav+' shooters</h3><ol>'+[0,1,2].map(function(k){var s=r.top[k];if(!s)return "";
@@ -861,7 +863,7 @@ function vLineups(){
     var inj=(c&&c.inj[t]||[]),rep=inj.map(function(x){return '<div><span>'+esc(x.n)+'</span>'+itag(x)+(x.d?'<span class="o">'+fmtD(x.d)+'</span>':'')+(x.c?'<small>'+esc(x.c)+'</small>':'')+'</div>'}).join("");
     var uo=u||nbaEx,off=uo&&uo.out&&uo.out.length?'<div><span class="o">Inactive tonight</span> '+uo.out.map(function(x){return esc(x[1])+(x[2]?' <span class="o">('+esc(x[2])+')</span>':'')}).join(", ")+'</div>':"";
     var st=fin?'<span class="tag">STARTED</span>':posted?'<span class="tag w"><span class="ldot"></span>LOCKED</span>':'<span class="tag q">'+(nbaEx?"EXPECTED · NBA LINEUPS PAGE":"EXPECTED")+'</span>';
-    return{lock:posted||fin,posted:posted,html:'<div class="lteam"><h3>'+tmL(t)+' '+st+'</h3>'+(rows?'<ol>'+rows+'</ol>':'<p class="note">No earlier games for '+t+' in this data.</p>')+
+    return{lock:posted||fin,posted:posted,html:'<div class="lteam"><h3>'+tmL(t)+' '+st+'</h3>'+(function(){var cg=chgTag(m,t);return cg?'<div style="margin:-4px 0 8px">'+cg+'</div>':''})()+(rows?'<ol>'+rows+'</ol>':'<p class="note">No earlier games for '+t+' in this data.</p>')+
       (rep||off?'<h3>'+(fin?"Flagged before tip":"Injury report")+'</h3><div class="lrep">'+off+rep+'</div>':(c&&!fin&&D.inj?'<p class="note">Nobody listed.</p>':''))+'</div>'}}
   var nLock=0,nUp=0;
   var cards=ms.map(function(m){var c=ctxOf(m),a=team(m,m.a,c),b=team(m,m.h,c),lock=!m.g&&a.posted&&b.posted;
@@ -1342,7 +1344,7 @@ function gIdx(){if(D._gi)return D._gi;var byD={},byT={},po={},tip={},st={},sp={}
 function before(l,day){var lo=0,hi=l.length;while(lo<hi){var md=(lo+hi)>>1;if(l[md][0]<day)lo=md+1;else hi=md}return l.slice(0,lo)} // entries [date, ...] in date order
 function inWin(d){var s=seasonOf(d);return d>=s+"-11-01"&&d<=winEnd(s)&&!gIdx().po[d]}
 function winOK(d){return !S.win||inWin(d)}
-function winSet(on){S.win=on;try{localStorage.setItem("tolWin",on?"1":"0")}catch(_){}["_trk","_t3r","_ftr","_pzr","_mfr","_mfpr","_parr"].forEach(function(k){delete D[k]});render()}
+function winSet(on){S.win=on;try{localStorage.setItem("tolWin",on?"1":"0")}catch(_){}["_trk","_t3r","_ftr","_pzr","_pzmr","_mfr","_mfpr","_parr"].forEach(function(k){delete D[k]});render()}
 function winSeg(){var s=seasonOf(todayET());return '<span class="seg" id="seg-win" title="Your betting window: Nov 1 to two weeks before the regular season ends ('+fmtD(winEnd(s))+' this season), no playoffs"><button data-v="1" aria-pressed="'+S.win+'">Betting window</button><button data-v="0" aria-pressed="'+!S.win+'">All dates</button></span>'}
 function trackGames(season,sim){
   var key=season+"|"+S.ft+"|"+(sim?1:0)+"|"+(S.win?1:0);D._trk=D._trk||{};if(D._trk[key])return D._trk[key];
@@ -1466,6 +1468,7 @@ function t3Card(x,i){var r=x.row,pr=r.pr,m=r.m,l10=t3Last10(x),under=!x.over,vl=
   var GOT=r.res?r.res[SC().col]+(CNT()?" "+SC().tag:" MADE"):"";
   var st=x.hit!=null?'<span class="tag '+(x.hit?"w":"l")+'">'+GOT+' · '+(x.hit?"WON":"LOST")+'</span>':r.dnp?'<span class="tag">DID NOT PLAY · VOID</span>':'';
   if(S._t3lk&&x.hit==null&&!r.dnp)st+=(st?' ':'')+(t3Started(m)?'<span class="tag" title="Fixed when this game tipped off: the price and chances are from the last refresh before tip.">LOCKED</span>':'<span class="tag q" title="This pick can still change until its game tips off.">OPEN'+(m.t?' · LOCKS '+esc(String(m.t).replace(/ ET$/,"")):'')+'</span>');
+  var cg=chgTag(m,r.t)||chgTag(m,r.opp);if(cg)st+=(st?' ':'')+cg;
   if(m.g&&m.g.lv&&x.hit==null&&!r.dnp){var N=r.res?r.res[SC().col]:0,U=CNT()?SC().tag:"MADE",need=x.over?x.k-N:x.k-1-N; // live: what he has so far, and how far from winning (an over) or from losing (an under)
     st+=(st?' ':'')+'<span class="tag q" title="Updates with each refresh while the game is on">LIVE · '+N+' '+U+(x.over?(need>0?' · '+need+' TO GO':''):(need>0?' · '+need+' TO SPARE':need===0?' · ONE MORE LOSES':''))+'</span>'}
   if(x.over&&r.st&&x.hit==null&&blowRisk(m)!=null&&blowRisk(m)>=GL.warn)st+=glTag(m,true);
@@ -1799,6 +1802,7 @@ function mfPicks(day){var rows=mfRows(day),LK=lkOf(day),ms=ftMs(day);
 function mfCard(r,i){var m=r.m,LG=mfLeague(m.g?m.g.d:m.d),mx=mfMix(r.p,m.g?m.g.d:m.d,LG),fb=r.q/(mx[r.mt]||1),vl=r.vs>=3?4:r.vs>=2?3:r.vs>=1?2:1;
   var st=r.res===1?'<span class="tag w">SCORED FIRST · '+MFN[r.mt].toUpperCase()+' · WON</span>':r.res===0?'<span class="tag l">LOST</span>':r.res==="dnp"?'<span class="tag">DID NOT PLAY · VOID</span>':m.g&&m.g.lv?'<span class="tag q">LIVE</span>':'';
   if(r.res==null)st+=(st?' ':'')+(t3Started(m)?'<span class="tag" title="Fixed when this game tipped off.">LOCKED</span>':'<span class="tag q" title="This pick can still change until its game tips off.">OPEN'+(m.t?' · LOCKS '+esc(String(m.t).replace(/ ET$/,"")):'')+'</span>');
+  var cg=chgTag(m,r.t);if(cg)st+=(st?' ':'')+cg;
   function row(a,b){return '<div class="rl"><span class="o">'+a+'</span><span>'+b+'</span></div>'}
   return '<article class="t3c'+(r.res===1?" win":r.res===0?" lost":"")+'"><div class="t3h"><span class="tm">'+lg(r.t)+m.a+' <span class="o">@</span> '+m.h+'</span><span class="bet">1ST · '+MFN[r.mt].toUpperCase()+'</span></div>'+
     '<div class="rl"><span class="o">'+(i+1)+' · '+r.t+'</span><span class="o">'+(m.g&&m.g.t?"TIPPED "+esc(m.g.t):m.t?esc(m.t):"")+'</span></div>'+
@@ -1852,6 +1856,7 @@ function ftPicks(day){var rows=ftDay(day),LK=lkOf(day),ms=ftMs(day);
 function ftCard(r,i){var m=r.m,pos=posOf(r.p),vl=r.vs>=12?4:r.vs>=8?3:r.vs>=4?2:1;
   var st=r.res===1?'<span class="tag w">SCORED FIRST · WON</span>':r.res===0?'<span class="tag l">LOST</span>':r.res==="dnp"?'<span class="tag">DID NOT PLAY · VOID</span>':r.res==="unknown"?'<span class="tag">NOT ON RECORD · SETTLE BY HAND</span>':m.g&&m.g.lv?'<span class="tag q">LIVE</span>':'';
   if(r.res==null||r.res==="unknown")st+=(st?' ':'')+(t3Started(m)?'<span class="tag" title="Fixed when this game tipped off.">LOCKED</span>':'<span class="tag q" title="This pick can still change until its game tips off.">OPEN'+(m.t?' · LOCKS '+esc(String(m.t).replace(/ ET$/,"")):'')+'</span>');
+  var cg=chgTag(m,r.t);if(cg)st+=(st?' ':'')+cg;
   function row(a,b){return '<div class="rl"><span class="o">'+a+'</span><span>'+b+'</span></div>'}
   return '<article class="t3c'+(r.res===1?" win":r.res===0?" lost":"")+'"><div class="t3h"><span class="tm">'+lg(r.t)+m.a+' <span class="o">@</span> '+m.h+'</span><span class="bet">TEAM FIRST</span></div>'+
     '<div class="rl"><span class="o">'+(i+1)+' · '+r.t+(pos?" · "+pos:"")+'</span><span class="o">'+(m.g&&m.g.t?"TIPPED "+esc(m.g.t):m.t?esc(m.t):"")+'</span></div>'+
@@ -1914,6 +1919,13 @@ function pzGrade(z,day){var w=1,open=0,vd=0;z.legs.forEach(function(l){var g=bet
   z.win=w<0?-1:vd?0:open?null:1;z.u=z.win==null?null:z.win>0?payOf(z.price)-1:z.win<0?-1:0;z.units=pzUnits(z);return z}
 function pzIdeas(day){var LK=lkOf(day),sv=(LK||{}).pz,saved=sv&&sv.length;
   var list=saved?sv.map(function(z){return Object.assign({saved:1},JSON.parse(JSON.stringify(z)))}):pzPick(day,[],!!LK); /* with a lock record, legs from games under way are never added after tip */return list.map(function(z){return pzGrade(z,day)})}
+/* More combinations: the next dozen by edge, locked at tip like the Parlay ideas (each one fixed once its first game starts),
+   graded as they settle, and kept out of the parlay record: their own "if you had bet them all" line instead */
+function pzMore(day,ideas,openOnly){return pzCombos(pzLegs(day,openOnly)).filter(function(c){return !ideas.some(function(z){return z.legs.length===c.L.length&&c.L.every(function(l){return z.legs.some(function(q){return q.p===l.p})})})}).slice(0,12).map(function(c){return pzOut(c,day)})}
+function pzMoreList(day,ideas){var LK=lkOf(day),sv=(LK||{}).pzm,raw=sv&&sv.length?sv.map(function(z){return Object.assign({saved:1},JSON.parse(JSON.stringify(z)))}):pzMore(day,ideas,!!LK);return raw.map(function(z){return pzGrade(z,day)})}
+function pzmRecord(){if(D._pzmr)return D._pzmr;var R={n:0,w:0,u:0},kb=S.book;S.book="";
+  Object.keys(D.locks||{}).forEach(function(d){if(!((D.locks[d]||{}).pzm||[]).length||!winOK(d))return;pzMoreList(d,[]).forEach(function(z){if(z.win!==1&&z.win!==-1)return;R.n++;if(z.win>0)R.w++;R.u+=(z.units||0)*z.u})});
+  S.book=kb;return D._pzmr=R}
 function pzLegTxt(l){var C=STAT[l.sk];return /^(Over|Under) /.test(l.lab)?l.lab+" "+C.u:l.lab}
 var PZV=[];
 function pzCard(z,i){var res=z.win==null?(z.legs.some(function(l){return l.st==="live"||l.st==="won"})?'<span class="tag q">LIVE</span>':''):z.win>0?'<span class="tag w">WON</span>':z.win<0?'<span class="tag l">LOST</span>':'<span class="tag">VOID</span>';
@@ -1938,9 +1950,9 @@ function vParlays(){
   var mo2={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo2[k]=mo2[k]||[]).push(d)});
   Object.keys(mo2).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo2[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   var list=pzIdeas(day),R=pzRecord(),legs=pzLegs(day,false),used={};list.forEach(function(z){z.legs.forEach(function(l){used[l.p+":"+l.m+":"+l.k]=1})});
-  var more=pzCombos(legs).filter(function(c){return !list.some(function(z){return z.legs.length===c.L.length&&c.L.every(function(l){return z.legs.some(function(q){return q.p===l.p})})})}).slice(0,12).map(function(c){return pzGrade(pzOut(c,day),day)});
+  var more=pzMoreList(day,list),mg=more.filter(function(z){return z.win===1||z.win===-1}),mu=0,mw=0;mg.forEach(function(z){mu+=(z.units||0)*z.u;if(z.win>0)mw++});var MR=pzmRecord();
   PZV=list.concat(more);var gr=list.filter(function(z){return z.win===1||z.win===-1}),nu=0,nw=0;gr.forEach(function(z){nu+=z.u;if(z.win>0)nw++});
-  var mt=more.length?'<section class="panel"><div class="phead"><h2>More combinations</h2><span class="tag">next '+more.length+' by edge over payout · players can repeat</span></div><div class="tw"><table><thead><tr><th>Legs</th><th>Book</th><th class="n">Price</th><th class="n">Chance</th><th class="n">Fair</th><th class="n">Edge</th><th class="n">Stake</th><th></th></tr></thead><tbody>'+
+  var mt=more.length?'<section class="panel"><div class="phead"><h2>More combinations</h2><span class="nightly">'+(mg.length?nightTag(mu,mw+' of '+mg.length+' won at the stakes shown','If you had bet every settled combination at its suggested stake. Not part of the parlay record.'):'')+(MR.n?'<span class="tag" title="Every settled combination since they were locked, at the suggested stakes">SEASON '+MR.w+' OF '+MR.n+' · '+(MR.u>=0?"+":"−")+Math.abs(MR.u).toFixed(2)+'U</span> ':'')+'<span class="tag">next '+more.length+' by edge over payout · players can repeat · locked at tip</span></span></div><div class="tw"><table><thead><tr><th>Legs</th><th>Book</th><th class="n">Price</th><th class="n">Chance</th><th class="n">Fair</th><th class="n">Edge</th><th class="n">Stake</th><th></th></tr></thead><tbody>'+
     more.map(function(z,j){return '<tr><td>'+z.legs.map(function(l){return '<div><b>'+nm(l.p)+'</b> <span class="o">'+esc(l.t)+'</span> '+esc(pzLegTxt(l))+' <span class="o">'+fmtP(l.price)+' · '+(l.ps*100).toFixed(0)+'%</span>'+(l.st==="won"?' <span class="tag w">HIT</span>':l.st==="lost"?' <span class="tag l">MISS</span>':'')+'</div>'}).join("")+'</td><td>'+esc(z.book)+'</td><td class="n"><b>'+fmtP(z.price)+'</b></td><td class="n">'+(z.P*100).toFixed(1)+'%</td><td class="n">'+fairOdds(z.P)+'</td><td class="n"><span class="tag w">+'+Math.round(z.ev*100)+'%</span></td><td class="n">'+(z.units?z.units.toFixed(2)+'u':'–')+'</td><td>'+(z.win==null?'<button class="btn2 pzadd" data-pz="'+(list.length+j)+'">+ Add</button>':z.win>0?'<span class="tag w">WON</span>':z.win<0?'<span class="tag l">LOST</span>':'<span class="tag">VOID</span>')+'</td></tr>'}).join("")+'</tbody></table></div></section>':'';
   view.innerHTML='<div class="picks"><section class="panel"><div class="phead"><h2>Parlay ideas</h2><div class="pickers">'+(gr.length?nightTag(nu,nw+' of '+gr.length+' won'):'')+'<button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+bookPicker(day)+'</div></div>'+
     '<p class="note">Threes, rebound and assist legs that each beat their own price, one a player and each from a different game, so the book pays the full multiplied price and the legs do not lean on each other. A leg is a main-line over or under with a 45% or better pick chance, or a ladder rung one or two above the line with 30% or better, each 3% to 25% over its price, with the model within 12 points of the market. Each idea is priced at the one book that posts every leg and pays the most, with every leg still beating its price there. The chance multiplies the legs\' chances; edges compound, and so do misses, so the stake is an eighth of Kelly, 0.1u to 0.5u. First basket and first team basket are never used. The ideas lock when their first game starts and are tracked on the Tracker'+(R.n?': <b>'+R.w+' of '+R.n+' won, '+(R.u>=0?"+":"−")+Math.abs(R.u).toFixed(2)+'u</b> at one unit each':'')+'. Every leg here is listed on its own on the Threes, Rebounds or Assists tab.</p>'+
@@ -2432,7 +2444,7 @@ function mvPlayerHtml(p,day0){var M=D.movers||{},cand=[day0,S.day,todayET()].con
       (q&&Math.abs(dq)>=.05?'<span class="'+cl(dq)+'">chance '+(e.b[0]*100).toFixed(1)+'% → '+(e.f[0]*100).toFixed(1)+'%</span>':'')+
       (dv!=null&&Math.abs(dv)>=.05?'<span class="'+cl(dv)+'">value '+(e.b[2]>0?"+":"")+e.b[2].toFixed(1)+' → '+(e.f[2]>0?"+":"")+e.f[2].toFixed(1)+'</span>':'')+'</span></div>'}).join("")+'</div></div>'}
 
-if(typeof window!=="undefined"&&window.__TL_HOOK)window.__TL_HOOK({mfRows:mfRows,mfFill:mfFill,mfOut:mfOut,ftMs2:ftMs,pzPick:pzPick,mvRecord:mvRecord,mvSnap:mvSnap,data:function(){return D},S:S,todayET:todayET,t3Day:t3Day,t3Started:t3Started,t3Freeze:t3Freeze,t3PickOut:t3PickOut,t3LadOut:t3LadOut,t3LadderList:t3LadderList,t3Fill:t3Fill,propOpen:propOpen,propCap:propCap,ladFill:ladFill,inSK:inSK,STAT:STAT,t3AtLeast:t3AtLeast,ftDay:ftDay,ftFill:ftFill,ftOut:ftOut,ftMs:ftMs});
+if(typeof window!=="undefined"&&window.__TL_HOOK)window.__TL_HOOK({mfRows:mfRows,mfFill:mfFill,mfOut:mfOut,ftMs2:ftMs,pzPick:pzPick,mvRecord:mvRecord,mvSnap:mvSnap,data:function(){return D},S:S,todayET:todayET,t3Day:t3Day,t3Started:t3Started,t3Freeze:t3Freeze,t3PickOut:t3PickOut,t3LadOut:t3LadOut,t3LadderList:t3LadderList,t3Fill:t3Fill,pzMore:pzMore,propOpen:propOpen,propCap:propCap,ladFill:ladFill,inSK:inSK,STAT:STAT,t3AtLeast:t3AtLeast,ftDay:ftDay,ftFill:ftFill,ftOut:ftOut,ftMs:ftMs});
 /* ---- live stats, straight from ESPN once a minute while a game is on (the page's own five-minute rebuild runs 5 to 15 minutes behind).
    Fills each live game's box (threes, rebounds, assists, minutes) and its first basket; the next rebuild replaces it with the NBA's own numbers. ---- */
 var LVS={},LVB={},ESPN="https://site.api.espn.com/apis/site/v2/sports/basketball/nba/",LVAB={GS:"GSW",NY:"NYK",SA:"SAS",NO:"NOP",UTAH:"UTA",WSH:"WAS",PHO:"PHX"};
@@ -2488,6 +2500,39 @@ function lvTick(){if(!D||document.hidden)return;var now=Date.now(),day=todayET()
       var a=document.activeElement,typing=a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);
       if(!typing&&!$("pm")&&["picks","tonight","threes","rebounds","assists","parlays","bets"].indexOf(S.tab)>=0){var y=window.scrollY;render();window.scrollTo(0,y)}}).catch(function(){})}
 if(typeof location!=="undefined"&&/^https?:$/.test(location.protocol)&&typeof fetch==="function"){setInterval(lvTick,60000);setTimeout(lvTick,4000)}
+/* ---- starting lineups the moment they post, read by the page itself once a minute (the five-minute rebuild, GitHub's
+   delays and the site's ten-minute cache can add up to a quarter of an hour). From 90 minutes before each tip until both
+   fives are in: the NBA's lineups page (confirmed fives) and the game's box score (starters, about half an hour out). ---- */
+/* a late lineup change: the confirmed five (or the actual starters) against the last expected five before it */
+function luChange(m,t){if(!m||!t)return null;var d=m.d||(m.g&&m.g.d),f=(D.flags||{})[d+"|"+m.a+"|"+m.h]||{},ex=(m.exPrev&&m.exPrev[t])||(f.ex&&f.ex[t]);if(!ex||ex.length<5)return null;
+  var lu=m.g?(m.g.st[t]||[]):(m.lu&&m.lu[t]&&m.lu[t].st.length>=5?m.lu[t].st.map(function(x){return x[0]}):null);if(!lu||lu.length<5)return null;
+  var out=ex.filter(function(p){return lu.indexOf(p)<0}),inn=lu.filter(function(p){return ex.indexOf(p)<0});return out.length||inn.length?{out:out,inn:inn}:null}
+function chgTag(m,t){var c=luChange(m,t);if(!c)return "";var nmx=function(p){return esc(D.players[p]||"#"+p)};
+  return '<span class="tag chg" title="The confirmed '+t+' five differs from the expected one: check jumpers, first-basket shooters and minutes">LINEUP CHANGE · '+t+': '+(c.out.length?c.out.map(nmx).join(", ")+' out':'')+(c.out.length&&c.inn.length?', ':'')+(c.inn.length?c.inn.map(nmx).join(", ")+' in':'')+'</span>'}
+function luRefresh(){PT={};TDC={};BCH={};S._fbiM={};S._fbi=null;["_mfd","_ftd","_idx","_gi"].forEach(function(f){D[f]=null});
+  var a=document.activeElement,typing=a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);if(!typing&&!$("pm")){var y=window.scrollY;render();window.scrollTo(0,y)}}
+function luSet(u,ab,st,off,src){if(!ab||(ab!==u.h&&ab!==u.a)||st.length<5)return false;if(u.lu&&u.lu[ab]&&u.lu[ab].st.length>=5)return false;
+  u.lu=u.lu||{};u.lu[ab]={st:st,out:off||((u.ex||{})[ab]||{}).out||[]};if(u.ex&&u.ex[ab]&&(u.ex[ab].st||[]).length>=5)(u.exPrev=u.exPrev||{})[ab]=u.ex[ab].st.map(function(x){return x[0]});if(u.ex)delete u.ex[ab];(u.src=u.src||{})[ab]=src;
+  st.concat(off||[]).forEach(function(x){if(x[0]&&x[1]&&!D.players[x[0]])D.players[x[0]]=x[1]});return true}
+function luTick(){if(!D||document.hidden)return;var now=Date.now(),want=(D.sched||[]).filter(function(u){if(!u.gid||!u.ts||u.lv)return false;var mins=(Date.parse(u.ts)-now)/6e4,lu=u.lu||{};
+    return mins<=90&&mins>-20&&!(lu[u.h]&&lu[u.a]&&lu[u.h].st.length>=5&&lu[u.a].st.length>=5)});
+  if(!want.length)return;var changed=false,days={};want.forEach(function(u){days[u.d]=1});
+  var jobs=Object.keys(days).map(function(d){return fetch("https://stats.nba.com/js/data/leaders/00_daily_lineups_"+d.replace(/-/g,"")+".json",{cache:"no-store"}).then(function(r){return r.json()}).then(function(doc){
+      (doc.games||[]).forEach(function(g){var u=want.filter(function(x){return x.gid===String(g.gameId)})[0];if(!u)return;["homeTeam","awayTeam"].forEach(function(side){var t=g[side]||{},st=[],ok=true;
+        (t.players||[]).forEach(function(p){var pos=String(p.position||"").toUpperCase();if(pos&&String(p.rosterStatus||"").toLowerCase()!=="inactive"){st.push([+p.personId,(p.firstName?p.firstName.charAt(0)+". "+p.lastName:p.playerName)||"",pos]);ok=ok&&String(p.lineupStatus||"").toLowerCase()==="confirmed"}});
+        if(ok&&luSet(u,t.teamAbbreviation,st,null,"nba"))changed=true})})}).catch(function(){})}).concat(want.map(function(u){
+    return fetch("https://cdn.nba.com/static/json/liveData/boxscore/boxscore_"+u.gid+".json",{cache:"no-store"}).then(function(r){return r.json()}).then(function(doc){var g=doc.game||{};
+      ["homeTeam","awayTeam"].forEach(function(side){var t=g[side]||{},ps=t.players||[];
+        var st=ps.filter(function(p){return String(p.starter)==="1"}).map(function(p){return[+p.personId,p.nameI||p.name||"",String(p.position||"").toUpperCase()]}),
+          off=ps.filter(function(p){return p.status==="INACTIVE"}).map(function(p){return[+p.personId,p.nameI||p.name||"",p.notPlayingDescription||""]});
+        if(luSet(u,t.teamTricode,st,off,"nba"))changed=true})}).catch(function(){})}));
+  Promise.all(jobs).then(function(){if(changed)luRefresh()})}
+/* the page's own data: when a newer build is on the site, load it in place (checked every four minutes while the page is open) */
+function dataTick(){if(!D||document.hidden)return;
+  fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"}).then(function(r){return r.text()}).then(function(h){var tg='<script id="tipoff-'+'data" type="application/json">',i=h.indexOf(tg),j=h.indexOf("<\/script>",i);if(i<0||j<0)return;
+    var d=JSON.parse(h.slice(i+tg.length,j));if(!d||!d.built||d.built===D.built||d.built<D.built)return;
+    var a=document.activeElement,typing=a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);if(typing||$("pm"))return;var y=window.scrollY;start(d);window.scrollTo(0,y)}).catch(function(){})}
+if(typeof location!=="undefined"&&/^https?:$/.test(location.protocol)&&typeof fetch==="function"){setInterval(luTick,60000);setTimeout(luTick,6000);setInterval(dataTick,240000)}
 var emb=$("tipoff-data"),inline=null;
 try{if(emb&&emb.textContent.trim())inline=JSON.parse(emb.textContent)}catch(_){}
 if(inline)start(inline);

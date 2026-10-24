@@ -517,7 +517,7 @@ def load_nba(season, cache="pbp_cache"):
                 u["ex"] = ex
             print(f"lineup {u['a']} @ {u['h']} ({mins:+.0f} min to tip): " + "; ".join(note), flush=True)
             DIAG.append(f"{u['a']} @ {u['h']}: " + "; ".join(note))
-        del u["gid"]
+        # the game id stays with the schedule: the page uses it to read the NBA box score for starters the moment they post
     return (pd.DataFrame(rows) if rows else None), upcoming
 
 
@@ -1219,6 +1219,10 @@ def remember_flags(sched, inj, old, games=None):
             rec["inj"] = {t: [[x["n"], x["st"], x["ty"]] for x in inj.get(t, [])] for t in (u["a"], u["h"]) if inj.get(t)}
         if u.get("lu"):
             rec["lu"] = u["lu"]
+        # the last expected five for each team before it was confirmed, so the page can flag a late lineup change
+        for t, L in (u.get("ex") or {}).items():
+            if len(L.get("st") or []) >= 5 and t not in (u.get("lu") or {}) and not u.get("lv"):
+                rec.setdefault("ex", {})[t] = [x[0] for x in L["st"]]
         if rec:
             flags[key] = rec
     try:
