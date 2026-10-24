@@ -115,7 +115,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,tr[tabindex]:focus
 .bets tbody tr.bwon>td:not(:last-child),.bets tbody tr.bwon:nth-child(odd)>td:not(:last-child){background:rgba(99,210,180,.09)}.bets tbody tr.bwon>td:first-child{box-shadow:inset 3px 0 0 var(--made)}
 .bty{font:500 13.5px var(--body);color:var(--soft)}.bty::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:8px;vertical-align:1px;background:var(--made)}.bty.bu::before{background:#f5c542}.bty.bg::before{background:var(--accent)}
 .bty.bp::before{background:#7cc4ff}
-.sbc .sbh{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.sbt2{font:600 18px var(--display);letter-spacing:.03em;display:flex;align-items:center;gap:8px}.sbt2 .tlogo{width:22px;height:22px}.sbs{font:700 22px var(--mono);color:var(--ink);margin:0 6px}.sbm{display:flex;flex-direction:column;gap:4px;margin:10px 0 4px}.sbl{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:6px 10px;border-radius:8px;background:var(--sunk);font-size:13.5px}.sbl.w{background:color-mix(in srgb,var(--made) 14%,var(--sunk))}.sbl.l{background:color-mix(in srgb,#e8705f 10%,var(--sunk))}.tag.sbt{font-size:9.5px;padding:1px 6px}.sbo{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}.sbo .o{margin-right:4px}.sbx td,.sbx th{padding:4px 8px;font-size:13px}.sbx tr.sbme td{background:color-mix(in srgb,var(--accent) 10%,transparent)}.sbc .tw{margin-top:8px}
+
 .lvtag{font:700 10.5px var(--body);letter-spacing:.06em;color:#ff9f6b;background:rgba(255,159,107,.12);border:1px solid rgba(255,159,107,.45);border-radius:999px;padding:2px 8px;margin-left:6px;cursor:pointer;vertical-align:1px}
 .lvtag.off{color:var(--muted);background:none;border-color:var(--line);font-weight:500;letter-spacing:0}
 .lvck{display:flex;align-items:center;gap:6px;cursor:pointer}
@@ -339,7 +339,6 @@ h2.sep{margin-top:12px;color:var(--muted)}
     <div class="tabs" role="tablist" id="tabs">
       <button role="tab" data-tab="picks" id="tab-picks">Picks</button>
       <button role="tab" data-tab="tonight" id="tab-tonight">Tonight</button>
-      <button role="tab" data-tab="scores" id="tab-scores">Scores</button>
       <button role="tab" data-tab="lineups" id="tab-lineups">Lineups</button>
       <button role="tab" data-tab="threes" id="tab-threes">Threes</button>
       <button role="tab" data-tab="rebounds" id="tab-rebounds">Rebounds</button>
@@ -1224,57 +1223,6 @@ function chkTag(r){if(!r.chk)return "";var x=(r.cand||[]).filter(function(q){ret
 /* the night's running result, one pill per section: units (and dollars at your unit size), coloured by sign */
 function nightTag(u,detail,title){var sg=u>0?"+":u<0?"−":"+",d=S.unit?' · '+sg+'$'+Math.abs(u*S.unit).toFixed(0):'';
   return '<span class="tag nt'+(u>0?" w":u<0?" l":"")+'"'+(title?' title="'+esc(title)+'"':'')+'>'+sg+Math.abs(u).toFixed(2)+'u'+d+(detail?' · '+detail:'')+'</span> '}
-/* ---- Scores: each game's score and clock, your bets and the night's picks with their live progress, the opening sequence
-   (tip, first shot, first basket and how, each team's first basket) and the full box score behind a tap. Live from the
-   once-a-minute feed while the page is open; the NBA's own numbers once the game is rebuilt. ---- */
-S.sbOpen={};
-function vScores(){var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={};
-  sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
-  var up=Object.keys(sd).sort(),past=Object.keys(pd).sort().reverse().filter(function(d){return !sd[d]}),days=up.slice().reverse().concat(past);
-  if(days.indexOf(S.day)<0)S.day=sd[today]?today:(up.length?up[0]:days[0]);
-  var day=S.day,at=days.indexOf(day);S._days=days;
-  var mo={},opts="";days.forEach(function(d){var k=sd[d]?"Scheduled":fmtD(d).slice(0,3)+" "+d.slice(0,4);(mo[k]=mo[k]||[]).push(d)});
-  Object.keys(mo).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
-  var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g,d:day,t:g.t}});
-  var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
-  // what you have riding on each game: your bets (parlay legs one by one) and the night's picks
-  var mine={},seen={};
-  function gk(t){var m=ms.filter(function(x){return x.h===t||x.a===t})[0];return m?m.a+"@"+m.h:null}
-  function add(o,tag){var k=gk(o.t);if(!k||!o.p||o.p<0)return;var id=o.p+"|"+o.m+"|"+o.k;if(seen[k+id]){seen[k+id].tags.indexOf(tag)<0&&seen[k+id].tags.push(tag);return}
-    var e={p:o.p,t:o.t,m:o.m,k:o.k||0,tags:[tag]};seen[k+id]=e;(mine[k]=mine[k]||[]).push(e)}
-  S.bets.filter(function(b){return b.d===day}).forEach(function(b){if(b.m==="par")b.legs.forEach(function(l){add(l,"PARLAY LEG")});else add(b,"BET")});
-  try{tnItems(day).forEach(function(x){if(x.code!=="par")add({p:x.p,t:x.t,m:x.code,k:x.k},"PICK")})}catch(_){}
-  function line(e){var q=betGrade({d:day,p:e.p,t:e.t,m:e.m,k:e.k,res:"auto",price:100,u:1}),c0=e.m.charAt(0),bm=/^[RA]/.test(e.m)?e.m.slice(1):e.m,u=c0==="R"?" REB":c0==="A"?" AST":/^[our]$/.test(e.m)?" 3PM":"";
-    var prog="";if(q.act!=null&&u){prog=q.act+u;if(q.st!=="won"&&q.st!=="lost"){if(bm==="u")prog+=' · '+(e.k-1-q.act>0?(e.k-1-q.act)+" to spare":"one more loses");else if(e.k-q.act>0)prog+=' · '+(e.k-q.act)+" to go"}}
-    else if(q.note&&/fb|ftb|mf/.test(e.m))prog=q.note;
-    var st=q.st==="won"?'<span class="tag w">✓ WON</span>':q.st==="lost"?'<span class="tag l">✗ LOST</span>':q.st==="void"?'<span class="tag">VOID</span>':q.st==="live"?'<span class="tag q">LIVE</span>':'';
-    return '<div class="sbl'+(q.st==="won"?" w":q.st==="lost"?" l":"")+'"><span><b>'+nm(e.p)+'</b> <span class="o">'+esc(betWhat(e))+'</span> '+e.tags.map(function(t){return '<span class="tag sbt">'+t+'</span>'}).join(" ")+'</span><span class="o">'+esc(prog)+'</span>'+st+'</div>'}
-  function opening(g){if(!g)return "";var fa=firstAtt(g),fs=firstScore(g),fm=mfFirst(g),out=[];
-    out.push('<span><span class="o">Tip</span> '+esc(tipLine(g))+'</span>');
-    if(fa)out.push('<span><span class="o">First shot</span> '+nm(fa.s[0])+' <span class="o">('+fa.t+', '+(fa.s[2]?"made":"missed")+')</span></span>');
-    if(fs)out.push('<span><span class="o">First basket</span> <b>'+nm(fs[0])+'</b> <span class="o">('+fs[1]+(fm&&fm[0]===fs[0]?' · '+MFN[mfCat(fm)]:'')+')</span></span>');
-    [g.a,g.h].forEach(function(t){var f=ftFirst(g,t);if(f)out.push('<span><span class="o">'+t+' first</span> '+nm(f)+'</span>')});
-    return '<div class="sbo">'+out.join("")+'</div>'}
-  function box(m,key){var L=LVB[key],g=m.g,tm=[m.a,m.h];
-    var T=tm.map(function(t){var rows=L&&L[t]?L[t].map(function(r){return r}):(g&&g.b3?(g.b3[t]||[]).map(function(x){return{p:x[0],n:"",st:(g.st[t]||[]).indexOf(x[0])>=0,mn:Math.round(x[3]/10),pts:x[6]!=null?x[6]:null,r:x[4],a:x[5],m3:x[2],a3:x[1]}}):[]);
-      rows.sort(function(a,b){return (b.st-a.st)||(b.mn-a.mn)});var hasP=rows.some(function(r){return r.pts!=null});
-      if(!rows.length)return "";
-      return '<div class="tw"><table class="nosort sbx"><thead><tr><th>'+tmL(t)+'</th><th class="n">MIN</th>'+(hasP?'<th class="n">PTS</th>':'')+'<th class="n">REB</th><th class="n">AST</th><th class="n">3PM</th></tr></thead><tbody>'+
-        rows.map(function(r){var mineP=(mine[key]||[]).some(function(e){return e.p===r.p});return '<tr'+(mineP?' class="sbme"':'')+'><td>'+(r.p?nm(r.p):esc(r.n))+(r.st?' <span class="o">S</span>':'')+'</td><td class="n">'+r.mn+'</td>'+(hasP?'<td class="n"><b>'+(r.pts==null?"–":r.pts)+'</b></td>':'')+'<td class="n">'+r.r+'</td><td class="n">'+r.a+'</td><td class="n">'+r.m3+'-'+r.a3+'</td></tr>'}).join("")+'</tbody></table></div>'}).join("");
-    return T||'<p class="note">No box score yet.</p>'}
-  function rank(m){var l=mine[m.a+"@"+m.h]||[],key=day+"|"+m.a+"|"+m.h,L=LVS[key],st=L?L.st:(m.g?(m.g.lv?"LIVE":"FINAL"):"");
-    return (l.some(function(e){return e.tags.some(function(t){return t!=="PICK"})})?0:l.length?10:20)+(st==="LIVE"?0:st==="FINAL"?2:1)} // your bets first, then picks; live games before ones to come, finished last
-  ms.sort(function(x,y){return rank(x)-rank(y)||String(x.ts||x.t||"").localeCompare(String(y.ts||y.t||""))});
-  var cards=ms.map(function(m){var key=day+"|"+m.a+"|"+m.h,k=m.a+"@"+m.h,L=LVS[key],g=m.g,sc=L?L.sc:(g&&g.sc?g.sc:null),st=L?L.st:(g?(g.lv?"LIVE":"FINAL"):""),det=L?L.det:(g&&!g.lv?"Final":(m.t||""));
-    var lst=(mine[k]||[]),open=!!S.sbOpen[key];
-    return '<section class="panel sbc"><div class="sbh"><span class="sbt2">'+lg(m.a)+' <b>'+m.a+'</b> '+(sc?'<span class="sbs">'+sc[0]+'</span>':'')+'<span class="o"> @ </span>'+(sc?'<span class="sbs">'+sc[1]+'</span> ':'')+'<b>'+m.h+'</b> '+lg(m.h)+'</span>'+
-      '<span>'+(st==="LIVE"?'<span class="tag q">LIVE · '+esc(det)+'</span>':st==="FINAL"?'<span class="tag">FINAL</span>':'<span class="tag">'+esc(det||"")+'</span>')+'</span></div>'+
-      (lst.length?'<div class="sbm">'+lst.map(line).join("")+'</div>':'<p class="note" style="margin:6px 0">Nothing riding on this game.</p>')+
-      opening(g)+
-      '<button class="more" data-sbopen="'+esc(key)+'" style="margin-top:8px">'+(open?"Hide":"Show")+' box score</button>'+(open?box(m,key):'')+'</section>'}).join("");
-  view.innerHTML='<div class="picks"><section class="panel"><div class="phead"><h2>Scores</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button></div></div>'+
-    '<p class="note">Games you have something on come first. Each shows your bets (parlay legs one by one) and the night\'s picks with how they stand, the opening sequence that settles first basket, first team basket and method, and the full box score behind its button. While a game is on it updates about once a minute with the page open; the NBA\'s own numbers take over a few minutes after the final.</p></section>'+
-    (cards||'<section class="panel"><p class="note">No games on this day.</p></section>')+'</div>'}
 function vMatchup(){
   var a=S.a,b=S.b;if(a===b)b=teams().filter(function(t){return t!==a})[0];
   if(!S.ja||!teamTipAll(a).some(function(j){return j.p===S.ja}))S.ja=likelyJumper(a);
@@ -2190,7 +2138,7 @@ function render(){
   [].forEach.call(document.querySelectorAll("#seg-ft button"),function(b){b.setAttribute("aria-pressed",+b.dataset.v===S.ft)});
   if(!G.length){view.innerHTML='<p class="empty">No games match these filters.</p>';return}
   var keep=document.activeElement&&document.activeElement.id,pos=keep==="q"?document.activeElement.selectionStart:null;
-  ({picks:vPicks,tonight:vTonight,scores:vScores,lineups:vLineups,threes:vThrees,rebounds:function(){inSK("rb",vThrees)},assists:function(){inSK("as",vThrees)},parlays:vParlays,movers:vMovers,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,bets:vBets,games:vGames,model:vModel})[S.tab]();
+  ({picks:vPicks,tonight:vTonight,lineups:vLineups,threes:vThrees,rebounds:function(){inSK("rb",vThrees)},assists:function(){inSK("as",vThrees)},parlays:vParlays,movers:vMovers,matchup:vMatchup,tips:vTips,shots:vShots,leaders:vLeaders,tracker:vTracker,bets:vBets,games:vGames,model:vModel})[S.tab]();
   if(S.tab==="picks")dsApplyAll();else if(S.tab==="threes"||S.tab==="rebounds"||S.tab==="assists")dsApplyAll("table.alad");
   if(keep&&$(keep)){$(keep).focus();if(pos!=null)$(keep).setSelectionRange(pos,pos)}
   if(S.tab!=="bets")betCount();
@@ -2241,7 +2189,6 @@ document.addEventListener("click",function(e){
   b=e.target.closest("#seg-trk button");if(b){S.trkConf=+b.dataset.v;return render()}
   if(e.target.id==="trkMore"){S.trkN+=30;return render()}
   if(e.target.id==="t3More"){S.t3All=!S.t3All;return render()}
-  var sbo=e.target.closest("[data-sbopen]");if(sbo){S.sbOpen[sbo.dataset.sbopen]=!S.sbOpen[sbo.dataset.sbopen];return render()}
   if(e.target.id==="calOpen"){S.calOpen=1;e.target.textContent="Working it out…";e.target.disabled=true;return setTimeout(render,30)}
   if(e.target.id==="alMore"){S.alAll=!S.alAll;return render()}
   b=e.target.closest("#seg-al button");if(b&&!b.disabled){S.alShow=b.dataset.v;return render()}
@@ -2331,7 +2278,7 @@ function start(d){
     if(S.ssn!=="all"&&ss.map(String).indexOf(S.ssn)<0)S.ssn="all";
     if(!S.booted)S.ssn=nCur>=150?cur:"all"}else S.ssn="all";
   if(!S.booted&&(d.sched||[]).some(function(x){return x.d>=todayET()}))S.tab="picks";
-  if(!S.booted&&["picks","tonight","scores","lineups","threes","rebounds","assists","parlays","movers","matchup","tips","shots","leaders","tracker","bets","games","model"].indexOf(h)>=0)S.tab=h;S.booted=1;
+  if(!S.booted&&["picks","tonight","lineups","threes","rebounds","assists","parlays","movers","matchup","tips","shots","leaders","tracker","bets","games","model"].indexOf(h)>=0)S.tab=h;S.booted=1;
   var top=jumperTable().sort(function(a,b){return b.tips-a.tips})[0];S.jumper=top?top.p:null;
   $("subline").textContent=d.season+" season · opening tips, jumper head-to-heads and first attempts, from NBA play-by-play.";
   $("fresh").innerHTML=d.games.length+" games through "+fmtD(d.through)+", "+d.through.slice(0,4)+"<br>data built "+esc(d.built.replace("T"," ").replace("Z"," UTC"));
@@ -2539,7 +2486,7 @@ function lvTick(){if(!D||document.hidden)return;var now=Date.now(),day=todayET()
     return Promise.all(jobs).then(function(){return jobs.length})}).then(function(n){var el=$("liveMsg");if(el&&n){el.hidden=false;el.textContent="Live stats "+(changed?"updated ":"checked ")+new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}
       if(!changed)return;PT={};TDC={};BCH={};["_mfd","_ftd","_idx","_tgd","_gi"].forEach(function(f){D[f]=null});
       var a=document.activeElement,typing=a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);
-      if(!typing&&!$("pm")&&["picks","tonight","threes","rebounds","assists","parlays","bets","scores"].indexOf(S.tab)>=0){var y=window.scrollY;render();window.scrollTo(0,y)}}).catch(function(){})}
+      if(!typing&&!$("pm")&&["picks","tonight","threes","rebounds","assists","parlays","bets"].indexOf(S.tab)>=0){var y=window.scrollY;render();window.scrollTo(0,y)}}).catch(function(){})}
 if(typeof location!=="undefined"&&/^https?:$/.test(location.protocol)&&typeof fetch==="function"){setInterval(lvTick,60000);setTimeout(lvTick,4000)}
 var emb=$("tipoff-data"),inline=null;
 try{if(emb&&emb.textContent.trim())inline=JSON.parse(emb.textContent)}catch(_){}
