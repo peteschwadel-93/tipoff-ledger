@@ -152,6 +152,26 @@ const OPEN = (() => {
       const fresh = api.pzMore(day, rec.pz, true).filter(z => !have.has(key(z)));
       rec.pzm = keptM.concat(fresh.slice(0, Math.max(0, 12 - keptM.length)));
     }
+    /* The same ideas worked out at each single book, so choosing a book on the page shows parlays you can place there,
+       locked the same way. The Tracker's record stays on the best-price ideas above. */
+    if (api.booksOn && api.S) {
+      const S = api.S, kb = S.book, ko = S.bookOff, lockedAt = e => e.ts && Date.parse(e.ts) <= now;
+      const key = z => z.legs.map(l => l.p + ":" + l.m + ":" + l.k).sort().join(";");
+      rec.pzb = {}; rec.pzmb = {};
+      try {
+        api.booksOn(day).forEach(bk => {
+          S.book = bk; S.bookOff = 0;
+          const kept = ((prev.pzb || {})[bk] || []).filter(lockedAt).map(e => Object.assign(e, { lk: 1 }));
+          const ideas = kept.concat(api.pzPick(day, kept, true));
+          if (ideas.length) rec.pzb[bk] = ideas;
+          if (api.pzMore) {
+            const keptM = ((prev.pzmb || {})[bk] || []).filter(lockedAt).map(e => Object.assign(e, { lk: 1 })), have = new Set(keptM.map(key));
+            const more = keptM.concat(api.pzMore(day, ideas, true).filter(z => !have.has(key(z))).slice(0, Math.max(0, 12 - keptM.length)));
+            if (more.length) rec.pzmb[bk] = more;
+          }
+        });
+      } finally { S.book = kb; S.bookOff = ko; }
+    }
   } catch (e) { console.error("parlay ideas: " + e.message); }
 })();
 if (ms.length) {
