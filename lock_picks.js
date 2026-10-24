@@ -146,6 +146,12 @@ const OPEN = (() => {
   try {
     const kept = (prev.pz || []).filter(e => e.ts && Date.parse(e.ts) <= now).map(e => Object.assign(e, { lk: 1 }));
     rec.pz = kept.concat(api.pzPick(day, kept, true));
+    if (api.pzMore) {   // More combinations: kept once their first game starts, the rest refilled from games still to start, a dozen in all
+      const key = z => z.legs.map(l => l.p + ":" + l.m + ":" + l.k).sort().join(";");
+      const keptM = (prev.pzm || []).filter(e => e.ts && Date.parse(e.ts) <= now).map(e => Object.assign(e, { lk: 1 })), have = new Set(keptM.map(key));
+      const fresh = api.pzMore(day, rec.pz, true).filter(z => !have.has(key(z)));
+      rec.pzm = keptM.concat(fresh.slice(0, Math.max(0, 12 - keptM.length)));
+    }
   } catch (e) { console.error("parlay ideas: " + e.message); }
 })();
 if (ms.length) {
