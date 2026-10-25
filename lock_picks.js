@@ -111,6 +111,9 @@ function openOf(P) {
   }));
   return api.propOpen ? api.propOpen(day, kept, true) : {};
 }
+/* picks already listed before this run: they stay listed while they hold 2 points above break-even (new ones need 3) */
+const stickyFrom = P => { const o = {}; ["t3", "rb", "as"].forEach(sk => { const C = api.STAT[sk], m = o[sk] = {}; (P[C.lk] || []).forEach(k => { m[k.p + "|" + k.lab] = 1; }); }); return o; };
+S._sticky = stickyFrom(prev);
 const OPEN = openOf(prev);
 ["t3", "rb", "as"].forEach(sk => api.inSK(sk, () => lockStat(sk, prev, rec, OPEN)));
 /* The same Best plays and Ladder watch worked out at each single book and locked the same way, so choosing a book on the
@@ -120,13 +123,15 @@ if (api.booksOn) {
   try {
     api.booksOn(day).forEach(bk => {
       S.book = bk; S.bookOff = 0;
-      const P = (prev.bk || {})[bk] || {}, R = {}, OP = openOf(P);
+      const P = (prev.bk || {})[bk] || {}, R = {};
+      S._sticky = stickyFrom(P);
+      const OP = openOf(P);
       ["t3", "rb", "as"].forEach(sk => api.inSK(sk, () => lockStat(sk, P, R, OP, false)));
       if (["t3", "rb", "as", "lw", "rlw", "alw", "seen", "rseen", "aseen"].some(k => Object.keys(R[k] || {}).length)) out[bk] = R;
     });
     rec.bk = out;
   } catch (e) { console.error("per-book picks: " + e.message); }
-  finally { S.book = kb; S.bookOff = ko; }
+  finally { S.book = kb; S.bookOff = ko; S._sticky = stickyFrom(prev); }
 }
 /* First team basket picks lock the same way: kept once their game starts, the rest refilled from games still to start. */
 (function lockFtb() {

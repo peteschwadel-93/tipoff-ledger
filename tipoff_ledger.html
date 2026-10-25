@@ -1035,6 +1035,10 @@ function lkOf(day){if(S.lockOff)return null;var L=(D.locks||{})[day];if(L)return
 /* Best plays and Ladder watch at a chosen book: that book's own locked list when the night has one (the lock script keeps one
    per book); otherwise the main best-price list, shown at the chosen book's prices. */
 function pkLK(LK){var bk=pzBk();return LK&&bk&&LK.bk?(LK.bk[bk]||{}):LK}
+/* Picks already listed (and not yet locked) stay listed while they hold 2 points above break-even and an 18% chance, so a
+   pick sitting on the 3-point bar does not drop off and come back with every small wobble in the model. New picks still need 3. */
+var PK_IN=.03,PK_HOLD=.02,PK_MIN=.2,PK_HMIN=.18;
+function stickyOf(day,C){if(S.lockOff)return (S._sticky||{})[C.k]||{};var L=pkLK(lkOf(day))||{},o={};(L[C.lk]||[]).forEach(function(k){o[k.p+"|"+k.lab]=1});return o}
 /* current rosters (ESPN, refreshed by the build every two hours): who is on each team today, so a player who moved is
    counted with his new team, and dropped from his old one, before lineups post */
 function rostSet(t){var R=D.rost&&D.rost[t];if(!R||!R.length)return null;D._rk=D._rk||{};if(D._rk[t])return D._rk[t];var o={};R.forEach(function(n){var w=normName(n).split(" ");o[w[0].charAt(0)+" "+w.slice(1).join(" ")]=1});return D._rk[t]=o} // "E.J. Liddell" -> "e liddell", the same key the page uses
@@ -1056,7 +1060,7 @@ function propChosen(day,sk,self,openOnly){var key=day+"|"+S.book+"|"+(S.bookOff?
   var o=propOpen(day,kept,openOnly,have),ids={};Object.keys(o).forEach(function(k){o[k].forEach(function(x){ids[k+"|"+x.row.p+"|"+x.lab]=1})});return PT[key]=ids}
 var TDC={};
 function t3Day(day,raw){var k=day+"|"+SK+"|"+S.book+"|"+(S.bookOff?1:0)+"|"+(S.lockOff?1:0),T=TDC[k];if(T&&(raw||T.top))return T;return TDC[k]=t3Day0(day,raw)} // remembered until the next redraw or data change
-function t3Day0(day,raw){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day),PL=pkLK(LK);
+function t3Day0(day,raw){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day),PL=pkLK(LK),STK=stickyOf(day,C);
   var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g}});
   var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
   var mo=+day.slice(5,7),sy=+day.slice(0,4)-(mo>=9?0:1),rows=[],plays=[];
@@ -1096,7 +1100,7 @@ function t3Day0(day,raw){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day),P
           // CHECK: the model more than 12 points from the market on his main line keeps the player out of picks, ladders and parlays for this stat
           row.chk=cand.some(function(x){return !x.rg&&x.gap>.12});row.best=row.chk?null:cand.filter(function(x){return x.ev>0&&x.gap<=.12})[0]||null;
           // a Best play: plus money, at least 3 points above break-even, a real chance, the model near the market, and a shooter with volume
-          var pl=cand.filter(function(x){return x.price>=100&&x.p-1/x.pay>=.03&&x.gap<=.12&&x.p>=.2})[0];if(pl&&row.chk)pl=null;if(pl&&pl.over&&pr.st&&(blowRisk(m)||0)>=GL.skip)pl=null;if(pl&&pr.att>=C.volMin)plays.push(pl)}
+          var hold=function(x){return STK[p+"|"+x.lab]&&x.p-1/x.pay>=PK_HOLD&&x.p>=PK_HMIN},pl=cand.filter(function(x){return x.price>=100&&x.gap<=.12&&((x.p-1/x.pay>=PK_IN&&x.p>=PK_MIN)||hold(x))})[0];if(pl&&row.chk)pl=null;if(pl&&pl.over&&pr.st&&(blowRisk(m)||0)>=GL.skip)pl=null;if(pl&&pr.att>=C.volMin)plays.push(pl)}
         row.lad=row.chk||(pr.st&&(blowRisk(m)||0)>=GL.skip)?null:t3LadderOf(row);
         rows.push(row)})})});
   rows.sort(function(a,b){return b.pr.mu-a.pr.mu});plays.sort(function(a,b){return b.vs-a.vs});
@@ -1168,7 +1172,7 @@ function vThrees(){
   Object.keys(mo2).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo2[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   var hd='<section class="panel"><div class="phead"><h2>'+SC().nm+'</h2><div class="pickers"><button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+bookPicker(day)+'</div></div>'+
     '<p class="note">'+(S.book?'<b>Showing '+esc(S.book)+' prices only.</b> Lines, edges, Best plays and Ladder watch are worked out at that book and lock at tip the same way; a player it has not posted has no price. The Tracker and the season record stay on the best price across all books. ':'')+(ms.length?'':'No games on this day. ')+(CNT()?'Projected '+SC().u+' for every player expected to play: his recent minutes in tonight\'s role times his '+SC().u+' per minute, adjusted for how many '+SC().u+' teams get against this opponent and for regulars on his own team who are out (the “% OUT” tag; for games not yet played it counts only players listed out). Heavy-minute players are steadier night to night, and the chances allow for that. In the backtest those chances matched what happened at every line from '+SC().range+' and beat both a player\'s season and last-10 hit rates. ':'Projected made threes for every player expected to play: his recent minutes in tonight\'s role, times how often he shoots a three per minute, times his accuracy, adjusted for how many threes the opponent allows and for regular shooters on his own team who are out (the “% OUT” tag; for games not yet played it counts only players listed out, so it can change late). Each chance (1+, 2+, 3+ and so on) is what that projection implies. In the backtest those chances matched what happened at every line and beat both a player\'s season hit rate and his last-10 hit rate. ')+
-    (T.lk?'<b>Each pick locks when its own game tips off.</b> From then on its price, chances and the game\'s numbers stay as they were at the last refresh before tip; picks tagged OPEN can still change. ':'')+(anyOdds?'For picks, the model\'s chance is averaged half and half with the market\'s own chance (the price with the books\' margin removed), and edges are measured on that pick chance. They have not been tested against real prices yet.':'No '+SC().one+' prices are on record for this day, so there are no value plays; compare the break-even odds with your book by eye.')+'</p></section>';
+    (T.lk?'<b>Each pick locks when its own game tips off.</b> A listed pick stays on while it holds 2 points above break-even and an 18% chance; a new one needs 3 points and 20%. From then on its price, chances and the game\'s numbers stay as they were at the last refresh before tip; picks tagged OPEN can still change. ':'')+(anyOdds?'For picks, the model\'s chance is averaged half and half with the market\'s own chance (the price with the books\' margin removed), and edges are measured on that pick chance. They have not been tested against real prices yet.':'No '+SC().one+' prices are on record for this day, so there are no value plays; compare the break-even odds with your book by eye.')+'</p></section>';
   var picksTbl='<section class="panel"><div class="phead"><h2>Best plays</h2><span class="nightly">'+(nDone?nightTag(units,nHit+' of '+nDone+' hit'+(top.length>nDone?' · '+(top.length-nDone)+' to go':''),'One unit a pick. An over wins the moment he reaches it; everything else is settled at the final.'):'')+(function(){var R=t3Record().all;return R.n?'<span class="tag">SEASON '+R.h+' OF '+R.n+'</span> <span class="tag nu '+(R.u>0?"up":R.u<0?"dn":"")+'">'+(R.u>0?"+":R.u<0?"−":"")+Math.abs(R.u).toFixed(1)+'U</span> ':''})()+'<span class="tag">'+(top.length?top.length+' of '+T.cap+' picks · plus money only':'no plays')+'</span></span></div>'+
     (top.length?'<div class="t3cards">'+top.map(t3Card).join("")+'</div>'+t3DroppedHtml(T,day)
       :'<p class="note">'+(anyOdds?'No play clears the bar tonight: plus money, a pick chance at least 3 points above break-even and 20% or better, the model within 12 points of the market, and a player projected for 4 or more '+(CNT()?SC().u:"attempts")+'.':'Plays appear here once '+SC().one+' prices are on record. Prices are fetched within four hours of each tip from opening night.')+'</p>')+'</section>';
@@ -2364,9 +2368,10 @@ function mvSnap(day){var out={};
     cf.list.forEach(function(s){var r=s.r,m=r.m,e=s.e;put("fb",m,s.t,e.x.p,{q:mvR(e.p,4),pr:s.price==null?null:s.price,bk:s.book||"",v:mvR(s.vs,2),j:(s.t===m.h?r.jh:r.ja)||0,jo:(s.t===m.h?r.ja:r.jh)||0,
       w:five[m.a+m.h+s.t].slice().sort(function(a,b){return a-b}),n:e.x.st})})}
   ftDay(day).forEach(function(r){put("ftb",r.m,r.t,r.p,{q:mvR(r.p2,4),pr:r.price==null?null:r.price,bk:r.book||"",v:mvR(r.vs,2),n:r.x.gs})});
-  ["t3","rb","as"].forEach(function(sk){inSK(sk,function(){t3Day(day).rows.forEach(function(r){var pr=r.pr;if(pr.att<STAT[sk].volShow&&!r.o)return; // the deep bench only when he has a price
-    var c=r.cand||[],ov=c.filter(function(x){return /^Over /.test(x.lab)})[0],un=c.filter(function(x){return /^Under /.test(x.lab)})[0],b=c[0];
-    put(sk,r.m,r.t,r.p,{q:ov?mvR(ov.p,4):null,mu:mvR(pr.mu,2),ln:r.ln?r.ln[1]:null,po:ov?ov.price:null,pu:un?un.price:null,bk:ov?ov.book:"",v:b?mvR(b.vs,2):null,vl:b?b.lab:"",st:pr.st?1:0,
+  ["t3","rb","as"].forEach(function(sk){inSK(sk,function(){var T=t3Day(day),pk={};(T.top||[]).forEach(function(x){pk[x.row.p]=x.lab});T.rows.forEach(function(r){var pr=r.pr;if(pr.att<STAT[sk].volShow&&!r.o)return; // the deep bench only when he has a price
+    var c=r.cand||[],ov=c.filter(function(x){return /^Over /.test(x.lab)})[0],un=c.filter(function(x){return /^Under /.test(x.lab)})[0],b=c[0],rg={};
+    c.forEach(function(x){if(x.rg&&x.price>=100&&x.p>=.1)rg[x.k]=[x.price,mvR(x.p,4)]}); // the plus-money ladder rungs, so a move there is logged too
+    put(sk,r.m,r.t,r.p,{pk:pk[r.p]||"",rg:rg,q:ov?mvR(ov.p,4):null,mu:mvR(pr.mu,2),ln:r.ln?r.ln[1]:null,po:ov?ov.price:null,pu:un?un.price:null,bk:ov?ov.book:"",v:b?mvR(b.vs,2):null,vl:b?b.lab:"",st:pr.st?1:0,
       w:(pr.mwho||[]).map(function(x){return x[0]}).sort(function(a,b){return a-b}),n:pr.n})})})});
   return out}
 function mvCauses(b,f){var c=[],P=function(x){return x==null?"–":fmtP(x)};
@@ -2382,6 +2387,9 @@ function mvCauses(b,f){var c=[],P=function(x){return x==null?"–":fmtP(x)};
   if(b.po!=null&&b.po!==f.po)c.push(["Best over price",P(b.po),P(f.po)]);
   if(b.pu!=null&&b.pu!==f.pu)c.push(["Best under price",P(b.pu),P(f.pu)]);
   if(b.pr!=null&&b.pr!==f.pr)c.push(["Best price",P(b.pr),P(f.pr)]);
+  if(b.pk!=null&&f.pk!=null&&b.pk!==f.pk)c.push([!f.pk?"Dropped from Best plays":!b.pk?"Added to Best plays":"Best play changed",b.pk||"",f.pk||""]);
+  if(b.rg&&f.rg)Object.keys(Object.assign({},b.rg,f.rg)).sort(function(x,y){return x-y}).forEach(function(k){var x=b.rg[k],y=f.rg[k],U=(STAT[f.mk]||{}).tag||"";U=U?" "+U:"";
+    if(x&&y){if(x[0]!==y[0])c.push([k+"+"+U+" price",P(x[0]),P(y[0])]);else if(Math.abs(x[1]-y[1])>=.005)c.push([k+"+"+U+" chance",(x[1]*100).toFixed(1)+"%",(y[1]*100).toFixed(1)+"%"])}});
   return c}
 function mvDayAdd(d,n){var x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
 function mvRecord(st,stamp,day0){st=st||{};st.snap=st.snap||{};st.log=st.log||{};var today=day0||todayET(),days=[today],nx=null;
