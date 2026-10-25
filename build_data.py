@@ -316,7 +316,7 @@ def parse_bm(html):
 
 
 def load_bm(cache="pbp_cache", every=30):
-    """Basketball Monster's lineups page, read at most every half hour (kept in the play-by-play cache)."""
+    """Basketball Monster's lineups page, read at most every `every` minutes (kept in the play-by-play cache)."""
     path = os.path.join(cache, "bm.json")
     try:
         with open(path, encoding="utf-8") as f:
@@ -353,7 +353,8 @@ def apply_bm(sched, players, games, rost=None):
     todo = [u for u in sched if not u.get("lv") and u.get("ts") and 0 < (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60 and (u["d"] == today or (datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60 <= 720)]
     if not todo:
         return
-    bm = load_bm()
+    soon = any((datetime.fromisoformat(u["ts"]) - now).total_seconds() / 60 <= 120 for u in todo)
+    bm = load_bm(every=4 if soon else 20)   # every run in the two hours before a tip, when lineups get verified
     last = {}
     for g in games:
         for t in (g["h"], g["a"]):
