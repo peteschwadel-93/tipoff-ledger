@@ -54,7 +54,7 @@ const started = m => api.t3Started(m);
 const stamp = new Date(now).toISOString(), prev = store[day] || {}, rec = Object.assign({}, prev);
 
 /* Threes and rebounds lock the same way, each under its own keys in the night's record. */
-function lockStat(sk) {
+function lockStat(sk, P, R, OP, main = true) {
   const C = api.STAT[sk], T = api.t3Day(day);
   ms = T.ms;
   if (!ms.length) return;
@@ -63,13 +63,13 @@ function lockStat(sk) {
 
   /* Best plays. A pick whose game has started is kept exactly as saved and holds its place for good; the remaining
      places go to the best plays from games still to start; a player whose game has started can no longer become one. */
-  const kept = (prev[C.lk] || []).filter(gone).map(k => Object.assign(k, { lk: 1 }));
+  const kept = (P[C.lk] || []).filter(gone).map(k => Object.assign(k, { lk: 1 }));
   const taken = new Set(kept.map(k => k.p));
-  const open = (OPEN[sk] || []).filter(x => !taken.has(x.row.p)).map(api.t3PickOut);   // this stat's open places (worked out below)
+  const open = (OP[sk] || []).filter(x => !taken.has(x.row.p)).map(api.t3PickOut);   // this stat's open places (worked out below)
   const picks = kept.concat(open).sort((a, b) => b.vs - a.vs);
 
   /* Every pick as it was first listed, and the last price on that same bet before its game started. */
-  const seen = prev[C.seen] || {};
+  const seen = P[C.seen] || {};
   picks.forEach(k => {
     const id = k.p + "|" + k.lab;
     if (!seen[id]) seen[id] = { p: k.p, n: k.n, t: k.t, o: k.o, a: k.a, h: k.h, ts: k.ts, lab: k.lab, k: k.k, over: k.over, price0: k.price, book0: k.book, at0: stamp };
@@ -83,33 +83,51 @@ function lockStat(sk) {
   });
 
   /* Ladder watch: each ladder's rungs, prices and stake split as of the last run before his game starts. */
-  const lw = (prev[C.lw] || []).filter(gone);
+  const lw = (P[C.lw] || []).filter(gone);
   const lwGames = lw.map(e => e.a + "@" + e.h), lwOpen = api.t3LadderList(T.rows.filter(r => !started(r.m))).filter(r => r.lad.priced);
   (api.ladFill ? api.ladFill(lwOpen, Math.max(0, T.cap - lw.length), lwGames) : lwOpen.slice(0, Math.max(0, 8 - lw.length)))   // one for every two games, at most five, two a game
     .forEach(r => lw.push(Object.assign(api.t3LadOut(r), { at: stamp })));
   /* every ladder as first listed, so the page can show the ones that fell off before tip */
-  const lwSeen = prev[C.lw + "seen"] || {};
+  const lwSeen = P[C.lw + "seen"] || {};
   lw.forEach(e => { const id = e.p + "|" + e.a + "|" + e.h; if (!lwSeen[id]) lwSeen[id] = Object.assign({}, e, { at0: stamp }); });
 
+  R[C.lk] = picks; R[C.seen] = seen; R[C.lw] = lw; R[C.lw + "seen"] = lwSeen;
+  if (!main) return;   // the per-book records share the main record's game numbers
   /* Game numbers: every player's projection as of the last run before his game starts. Games still to start are
      rewritten each run; a started game keeps what it had, so the slate does not move while a game is on. */
-  const fz = Object.assign({}, prev[C.fz] || {});
+  const fz = Object.assign({}, P[C.fz] || {});
   ms.filter(m => !started(m)).forEach(m => {
     fz[day + "|" + m.a + "|" + m.h] = { at: stamp, r: T.rows.filter(r => r.m === m && (r.pr.att >= 1 || r.o)).map(api.t3Freeze) };
   });
-  rec[C.lk] = picks; rec[C.seen] = seen; rec[C.lw] = lw; rec[C.lw + "seen"] = lwSeen; rec[C.fz] = fz;
+  R[C.fz] = fz;
 }
 /* Best plays: one for every two games and at most five a night in each stat. The picks already locked hold their places;
    the rest go to the best value from games still to start. */
-const OPEN = (() => {
+function openOf(P) {
   const kept = [];
   ["t3", "rb", "as"].forEach(sk => api.inSK(sk, () => {
     const C = api.STAT[sk], T = api.t3Day(day, 1);
-    (prev[C.lk] || []).filter(k => { const m = T.ms.find(x => x.a === k.a && x.h === k.h); return !m || started(m); }).forEach(k => kept.push({ sk, p: k.p, a: k.a, h: k.h }));
+    (P[C.lk] || []).filter(k => { const m = T.ms.find(x => x.a === k.a && x.h === k.h); return !m || started(m); }).forEach(k => kept.push({ sk, p: k.p, a: k.a, h: k.h }));
   }));
   return api.propOpen ? api.propOpen(day, kept, true) : {};
-})();
-["t3", "rb", "as"].forEach(sk => api.inSK(sk, () => lockStat(sk)));
+}
+const OPEN = openOf(prev);
+["t3", "rb", "as"].forEach(sk => api.inSK(sk, () => lockStat(sk, prev, rec, OPEN)));
+/* The same Best plays and Ladder watch worked out at each single book and locked the same way, so choosing a book on the
+   page shows picks you can place there. The Tracker and the main picks stay on the best price across all books. */
+if (api.booksOn) {
+  const kb = S.book, ko = S.bookOff, out = {};
+  try {
+    api.booksOn(day).forEach(bk => {
+      S.book = bk; S.bookOff = 0;
+      const P = (prev.bk || {})[bk] || {}, R = {}, OP = openOf(P);
+      ["t3", "rb", "as"].forEach(sk => api.inSK(sk, () => lockStat(sk, P, R, OP, false)));
+      if (["t3", "rb", "as", "lw", "rlw", "alw", "seen", "rseen", "aseen"].some(k => Object.keys(R[k] || {}).length)) out[bk] = R;
+    });
+    rec.bk = out;
+  } catch (e) { console.error("per-book picks: " + e.message); }
+  finally { S.book = kb; S.bookOff = ko; }
+}
 /* First team basket picks lock the same way: kept once their game starts, the rest refilled from games still to start. */
 (function lockFtb() {
   const fms = api.ftMs(day);
