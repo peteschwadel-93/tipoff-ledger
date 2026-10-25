@@ -2467,6 +2467,42 @@ if(typeof window!=="undefined"&&window.__TL_HOOK)window.__TL_HOOK({mfRows:mfRows
 var LVS={},LVB={},ESPN="https://site.api.espn.com/apis/site/v2/sports/basketball/nba/",LVAB={GS:"GSW",NY:"NYK",SA:"SAS",NO:"NOP",UTAH:"UTA",WSH:"WAS",PHO:"PHX"};
 function lvAb(a){a=String(a||"").toUpperCase();return LVAB[a]||a}
 function lvKey(full){var n=normName(full).split(" ");return n.length>1?n[0].charAt(0)+" "+n.slice(1).join(" "):n[0]}
+/* the NBA's own live box score and play-by-play (cdn.nba.com): the same player ids the page uses, so nothing has to be matched
+   by name. Tried first for every game under way; ESPN is the fallback. */
+var LVNB="https://cdn.nba.com/static/json/liveData/",LVSIG={},LVERR="";
+function lvClk(c){var m=String(c||"").match(/PT(\d+)M([\d.]+)S/);return m?(+m[1])*60+Math.floor(+m[2]):0}
+function lvMin(c){var m=String(c||"").match(/PT(\d+)M([\d.]+)S/);return m?+m[1]+(+m[2]>=30?1:0):(parseInt(c,10)||0)}
+function lvGameFor(m,b3,st){var g=D.games.filter(function(q){return q.d===m.d&&q.h===m.h&&q.a===m.a})[0];
+  if(g&&!g.lv)return null; // the rebuild already has the final: leave it
+  if(!g){g={id:9e8+D.games.length,d:m.d,t:m.t||"",po:0,s:seasonOf(m.d),h:m.h,a:m.a,tip:null,fs:{},st:st,fb:null,fp:null,b3:b3,lv:1,esp:1};D.games.push(g)}
+  else{g.b3=b3;[m.h,m.a].forEach(function(t){if(!(g.st[t]||[]).length)g.st[t]=st[t]||[]})}
+  return g}
+function lvNbaPlays(g,m,acts){var kind=function(a){var s=String(a.subType||"")+" "+String(a.descriptor||"");return a.actionType==="freethrow"?"Free Throw":/dunk/i.test(s)?"DUNK":/layup/i.test(s)?"Layup":/hook/i.test(s)?"Hook":"Jump Shot"};
+  var shots=acts.filter(function(a){return (a.actionType==="2pt"||a.actionType==="3pt"||a.actionType==="freethrow")&&a.personId&&(a.teamTricode===m.h||a.teamTricode===m.a)});
+  var elOf=function(a){var per=+a.period||1,left=lvClk(a.clock);return per<=4?(per-1)*720+720-left:2880+(per-5)*300+300-left};
+  if(g.esp){var fs={},nf={},ord=0;fs[m.h]=[];fs[m.a]=[];nf[m.h]=0;nf[m.a]=0;
+    shots.forEach(function(a){var t=a.teamTricode,pid=+a.personId,ft=a.actionType==="freethrow",made=a.shotResult==="Made"?1:0,val=ft?1:a.actionType==="3pt"?3:2,el=elOf(a),L=fs[t],last=L[L.length-1];
+      if(ft&&last&&last[1]===1&&last[0]===pid&&last[5]===el){last[2]+=made;last[8]++;return}
+      if(nf[t]>=10&&!ft)return;if(!ft)nf[t]++;ord++;L.push([pid,val,made,null,kind(a),el,ord,null,1,null])});
+    g.fs=fs}
+  else{var mo=0;[m.h,m.a].forEach(function(t){(g.fs[t]||[]).forEach(function(x){if(x[6]>mo)mo=x[6]})});
+    [m.h,m.a].forEach(function(t){g.fs[t]=g.fs[t]||[];if(g.fs[t].some(function(x){return x[2]>0&&x[1]!==1}))return;
+      var a=shots.filter(function(q){return q.teamTricode===t&&q.actionType!=="freethrow"&&q.shotResult==="Made"})[0];if(!a)return;
+      g.fs[t].push([+a.personId,a.actionType==="3pt"?3:2,1,null,kind(a),99999,++mo,null,1,null])})}
+  shots.filter(function(a){return a.shotResult==="Made"}).forEach(function(a){var pid=+a.personId,t=a.teamTricode;if(!g.fp)g.fp=[pid,t];if(!g.fb&&a.actionType!=="freethrow")g.fb=[pid,t]})}
+function lvNba(m){if(!m.gid)return Promise.resolve(0);var lk=m.d+"|"+m.a+"|"+m.h;
+  return fetch(LVNB+"boxscore/boxscore_"+m.gid+".json",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("box "+r.status);return r.json()}).then(function(doc){var G=doc.game||{};if(!(+G.gameStatus>=2))return 0;
+    var b3={},st={},seen=0;LVB[lk]={};
+    ["homeTeam","awayTeam"].forEach(function(side){var T=G[side]||{},t=T.teamTricode;if(t!==m.h&&t!==m.a)return;b3[t]=[];st[t]=[];var bx=LVB[lk][t]=[];
+      (T.players||[]).forEach(function(p){var x=p.statistics||{},pid=+p.personId;if(!pid||String(p.played)!=="1")return;var mn=lvMin(x.minutes),nmx=p.nameI||p.name||"";if(!D.players[pid]&&nmx)D.players[pid]=nmx;
+        var r=+x.reboundsTotal||0,a=+x.assists||0,m3=+x.threePointersMade||0,a3=+x.threePointersAttempted||0,pts=+x.points||0,s0=String(p.starter)==="1";
+        bx.push({p:pid,n:nmx,st:s0,mn:mn,pts:pts,r:r,a:a,m3:m3,a3:a3});b3[t].push([pid,a3,m3,mn*10,r,a,pts]);if(s0)st[t].push(pid);seen++})});
+    if(!seen)return 0;
+    var fin=+G.gameStatus===3,sc=[+(G.awayTeam||{}).score||0,+(G.homeTeam||{}).score||0];LVS[lk]={sc:sc,st:fin?"FINAL":"LIVE",det:G.gameStatusText||""};
+    var g=lvGameFor(m,b3,st);if(!g)return 0;
+    return fetch(LVNB+"playbyplay/playbyplay_"+m.gid+".json",{cache:"no-store"}).then(function(r){return r.json()}).then(function(pd){lvNbaPlays(g,m,((pd.game||{}).actions)||[])}).catch(function(){})
+      .then(function(){var sig=JSON.stringify(b3)+"|"+JSON.stringify(g.fp)+"|"+sc.join("-");if(LVSIG[lk]===sig)return 1;LVSIG[lk]=sig;return 2})})
+    .catch(function(e){LVERR="NBA: "+(e&&e.message||"no answer");return 0})}
 function lvIds(){ // short name -> player ids, with each player's latest team so two players with the same short name can be told apart
   var X=t3Index(),by={};Object.keys(D.players||{}).forEach(function(p){var k=normName(D.players[p]),l=X.L[p],t=l&&l.length?l[l.length-1].t:null;(by[k]=by[k]||[]).push({p:+p,t:t})});
   (D.sched||[]).forEach(function(u){["lu","ex"].forEach(function(k){var L=u[k]||{};Object.keys(L).forEach(function(t){((L[t]||{}).st||[]).forEach(function(x){var q=by[normName(D.players[x[0]]||x[1])];if(q)q.forEach(function(e){if(e.p===x[0])e.t=t})})})})});
@@ -2505,14 +2541,18 @@ function lvApply(doc,m,ids){var bs=(doc.boxscore||{}).players||[],b3={},st={},se
   return true}
 function lvTick(){if(!D||document.hidden)return;var now=Date.now(),day=todayET();
   var ms=(D.sched||[]).filter(function(m){return m.ts&&Date.parse(m.ts)<now+3e5&&Date.parse(m.ts)>now-864e5*.3}).filter(function(m){var g=D.games.filter(function(q){return q.d===m.d&&q.h===m.h&&q.a===m.a})[0];return !g||g.lv});
-  if(!ms.length)return;var dates={};ms.forEach(function(m){dates[m.d.replace(/-/g,"")]=1});var ids=lvIds(),changed=false;
-  Promise.all(Object.keys(dates).map(function(d){return fetch(ESPN+"scoreboard?dates="+d,{cache:"no-store"}).then(function(r){return r.json()})})).then(function(boards){var jobs=[];
+  if(!ms.length)return;var ids=lvIds(),changed=false,nbaN=0,done={};LVERR="";
+  Promise.all(ms.map(function(m){return lvNba(m).then(function(k){if(k){done[m.d+"|"+m.a+"|"+m.h]=1;nbaN++;if(k===2)changed=true}})})).then(function(){
+    var rest=ms.filter(function(m){return !done[m.d+"|"+m.a+"|"+m.h]}),dates={};rest.forEach(function(m){dates[m.d.replace(/-/g,"")]=1});ms=rest;
+    return Promise.all(Object.keys(dates).map(function(d){return fetch(ESPN+"scoreboard?dates="+d,{cache:"no-store"}).then(function(r){return r.json()})}))}).then(function(boards){var jobs=[];
     boards.forEach(function(b){(b.events||[]).forEach(function(e){var c=(e.competitions||[])[0]||{},ty=(c.status||e.status||{}).type||{},state=ty.state,h=null,a=null,hs=0,as=0;
       (c.competitors||[]).forEach(function(x){var ab=lvAb((x.team||{}).abbreviation);if(x.homeAway==="home"){h=ab;hs=+x.score||0}else{a=ab;as=+x.score||0}});
       var m=ms.filter(function(x){return x.h===h&&x.a===a})[0];if(!m||(state!=="in"&&state!=="post"))return;
       var lk=m.d+"|"+m.a+"|"+m.h,old=LVS[lk];LVS[lk]={sc:[as,hs],st:state==="post"?"FINAL":"LIVE",det:ty.shortDetail||ty.detail||""};if(!old||old.sc[0]!==as||old.sc[1]!==hs||old.det!==LVS[lk].det)changed=true;
       jobs.push(fetch(ESPN+"summary?event="+e.id,{cache:"no-store"}).then(function(r){return r.json()}).then(function(doc){if(lvApply(doc,m,ids))changed=true}).catch(function(){}))})});
-    return Promise.all(jobs).then(function(){return jobs.length})}).then(function(n){var el=$("liveMsg");if(el&&n){el.hidden=false;el.textContent="Live stats "+(changed?"updated ":"checked ")+new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}
+    return Promise.all(jobs).then(function(){return jobs.length})},function(e){LVERR=(LVERR?LVERR+" · ":"")+"ESPN: "+(e&&e.message||"no answer");return 0}).then(function(n){var el=$("liveMsg"),tm=new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+      if(el&&(n||nbaN)){el.hidden=false;el.textContent="Live stats "+(changed?"updated ":"checked ")+tm+" · "+(nbaN?"NBA"+(n?" + ESPN":""):"ESPN")}
+      else if(el&&LVERR){el.hidden=false;el.textContent="Live stats unavailable "+tm+" ("+LVERR+")"}
       if(!changed)return;PT={};TDC={};BCH={};["_mfd","_ftd","_idx","_tgd","_gi"].forEach(function(f){D[f]=null});
       var a=document.activeElement,typing=a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);
       if(!typing&&!$("pm")&&["picks","tonight","threes","rebounds","assists","parlays","bets"].indexOf(S.tab)>=0){var y=window.scrollY;render();window.scrollTo(0,y)}}).catch(function(){})}
