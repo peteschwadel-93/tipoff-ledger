@@ -1084,15 +1084,16 @@ function t3Day0(day,raw){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day),P
         mi=t3Miss(t,day,sy,function(p){var i=c&&injOf(c,t,p);return !!gone[p]||!!(i&&/^out/i.test(i.st))})}
       Object.keys(pool).map(Number).forEach(function(p){var pr=pool[p].fz?t3Thaw(pool[p].fz):statProj(p,day,pool[p].st,opp,sy,mi.v);if(!pr)return;if(!pool[p].fz){var rf=restF(t,opp,day)*absF(p,t,day)*((HOMEF[SK]||{h:1,a:1})[t===m.h?"h":"a"])*lineF(m,pool[p].st,pr.pmin);if(rf!==1){pr.mu*=rf;pr.att*=rf;pr.rf=rf}pr.gap=absGap(p,t,day)}if(!pool[p].fz)pr.mwho=mi.who;
         var d=sDist(pr),o=od&&od["_"+C.k][normName(D.players[p])],row={p:p,t:t,opp:opp,m:m,st:pool[p].st,conf:conf,pr:pr,d:d,res:pool[p].res||null,o:o&&o.n<=1?o:null,best:null,dnp:!!(pool[p].fz&&g&&!g.lv&&!pool[p].res)};
-        if(row.o){var cand=[],one=S.book&&!S.bookOff?S.book:null,ln=row.o.line,allO=null,allU=null;
+        if(row.o){var cand=[],one=S.book&&!S.bookOff?S.book:null,ln=row.o.line,ln0=ln,allO=null,allU=null;
           if(ln&&one&&ln[6]){var q1=ln[6][one];ln=q1?[ln[0],q1[0],q1[1],one,q1[2],one,ln[6]]:null}
           if(ln&&ln[6]){allO={};allU={};Object.keys(ln[6]).forEach(function(bk){var q=ln[6][bk],key=q[0]===ln[1]?bk:bk+" · "+q[0];if(q[1]!=null)allO[key]=q[1];if(q[2]!=null)allU[key]=q[2]})}
-          row.ln=ln;var kk=ln?Math.floor(ln[1])+1:0,io=ln&&ln[2]!=null?1/payOf(ln[2]):0,iu=ln&&ln[4]!=null?1/payOf(ln[4]):0,two=io&&iu,mo=two?io/(io+iu):io?io/1.07:0;
+          row.ln=ln;var kk=ln?Math.floor(ln[1])+1:0,mln=ln&&ln0&&ln0[1]===ln[1]?ln0:ln, /* the market's chance comes from every book's best prices (their margin is smallest), so a chosen book changes the price, not the market's view */
+            io=mln&&mln[2]!=null?1/payOf(mln[2]):0,iu=mln&&mln[4]!=null?1/payOf(mln[4]):0,two=io&&iu,mo=two?io/(io+iu):io?io/1.07:0;
           if(ln){var po=t3AtLeast(d,kk);
             if(ln[2]!=null)cand.push({lab:"Over "+ln[1],k:kk,over:1,sk:SK,pm:po,mk:mo,two:two,price:ln[2],book:ln[3],all:allO});
             if(ln[4]!=null)cand.push({lab:"Under "+ln[1],k:kk,over:0,sk:SK,pm:1-po,mk:two?1-mo:iu/1.07,two:two,price:ln[4],book:ln[5],all:allU})}
-          Object.keys(row.o.k).map(Number).forEach(function(k){var v=row.o.k[k];if(one&&v[2]){if(v[2][one]==null)return;v=[v[2][one],one,v[2]]}if(ln&&k===kk&&ln[2]!=null&&ln[2]>=v[0])return;
-            cand.push({lab:k+"+"+C.rg,k:k,over:1,rg:1,sk:SK,pm:t3AtLeast(d,k),mk:two&&k===kk?mo:1/payOf(v[0])/1.07,two:two&&k===kk,price:v[0],book:v[1],all:v[2]})});
+          Object.keys(row.o.k).map(Number).forEach(function(k){var v=row.o.k[k],v0=v[0];if(one&&v[2]){if(v[2][one]==null)return;v=[v[2][one],one,v[2]]}if(ln&&k===kk&&ln[2]!=null&&ln[2]>=v[0])return;
+            cand.push({lab:k+"+"+C.rg,k:k,over:1,rg:1,sk:SK,pm:t3AtLeast(d,k),mk:two&&k===kk?mo:1/payOf(v0)/1.07,two:two&&k===kk,price:v[0],book:v[1],all:v[2]})});
           // the pick chance is the model and the market averaged half and half; a gap over 12 points usually means news the model has not seen
           cand.forEach(function(x){x.pay=payOf(x.price);x.gap=Math.abs(x.pm-x.mk);x.p=(x.pm+x.mk)/2;x.ev=x.p*x.pay-1;x.vs=valScore(x.p,x.pay);x.row=row;
             x.hit=t3Hit(x,row)});
