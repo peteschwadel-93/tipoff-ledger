@@ -642,13 +642,13 @@ function topShooters(t,day,m){
   else{prev.slice(-5).forEach(function(g){(g.st[t]||[]).forEach(function(p){var i=c&&injOf(c,t,p);if(!(i&&/^out/i.test(i.st)))cand[p]=1})});
     var RS=rostSet(t);if(RS)Object.keys(cand).forEach(function(p){if(!RS[normName(D.players[p])])delete cand[p]})}
   var rows=Object.keys(cand).map(function(p){var x=r(+p);x.rate=(x.c+3)/(x.st+5);return x}).sort(function(a,b){return b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)});
-  topShooters.all=rows;rows=rows.slice(0,3);
+  rows=rows.filter(function(x){return onRoster(t,x.p)});topShooters.all=rows;rows=rows.slice(0,3);
   var cs=CATS.filter(function(k){return S.ft||k!=="Free throws"});
   topShooters.rows=rows;topShooters.games=win.length;topShooters.season=sp.length>=5;
   if(!rows.length)return '<p class="note">No earlier games for '+t+' in this data.</p>';
   // the table lists the ten highest on the roster; the three picks above are unchanged and marked
   var pk={};rows.forEach(function(x){pk[x.p]=1});
-  var ten=Object.keys(P).map(function(p){var x=P[p];x.rate=(x.c+3)/(x.st+5);return x}).filter(function(x){return x.c||cand[x.p]})
+  var ten=Object.keys(P).map(function(p){var x=P[p];x.rate=(x.c+3)/(x.st+5);return x}).filter(function(x){return (x.c||cand[x.p])&&onRoster(t,x.p)})
     .sort(function(a,b){return (b.st>0)-(a.st>0)||b.rate-a.rate||b.n-a.n||a.name.localeCompare(b.name)});
   // order: the three picks, then the other expected starters, then the next five players by rate
   ten=rows.concat((topShooters.all||[]).filter(function(x){return !pk[x.p]}),ten.filter(function(x){return !pk[x.p]&&!cand[x.p]}).slice(0,5));
