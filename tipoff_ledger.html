@@ -1964,6 +1964,35 @@ function pzRecord(){if(D._pzr)return D._pzr;var days={},kb=S.book,R={n:0,w:0,u:0
   Object.keys(days).sort().forEach(function(d){if(!winOK(d)||!D.games.some(function(g){return g.d===d}))return;var l=pzIdeas(d).filter(function(z){return z.win===1||z.win===-1});if(!l.length)return;var x={d:d,n:l.length,w:0,u:0};
     l.forEach(function(z){R.n++;x.u+=z.u;if(z.win>0){R.w++;x.w++}});R.u+=x.u;R.days.push(x)});
   S.book=kb;return D._pzr=R}
+/* ---- +100 likely: a weekly-bet list for fun, not value. The most likely 2- and 3-leg combinations of threes, rebound and
+   assist legs (main lines only, one per player, each from a different game, the model within 12 points of the market)
+   whose combined price lands between +100 and +200 at one book. No edge filter. Worked out fresh each time, dropping
+   games once they tip; not locked, not tracked, not part of any record. ---- */
+function likelyLegs(day){var out=[],kb=S.book,ko=S.bookOff;S.book="";S.bookOff=1;
+  try{["t3","rb","as"].forEach(function(sk){inSK(sk,function(){var C=SC();t3Day(day).rows.forEach(function(r){
+    if(!r.o||!r.cand||!r.ln||r.chk||r.pr.att<C.volShow||t3Started(r.m))return;
+    r.cand.forEach(function(x){if(x.rg||!/^(Over|Under) /.test(x.lab)||x.p<.5||x.gap>.12)return;
+      var bk={};Object.keys(x.all||{}).forEach(function(b){if(b.indexOf(" · ")<0&&x.all[b]!=null)bk[b]=x.all[b]});if(!Object.keys(bk).length&&x.book)bk[x.book]=x.price;
+      if(Object.keys(bk).length)out.push({sk:sk,x:x,r:r,p:r.p,g:r.m.a+"@"+r.m.h,ts:r.m.ts||null,ps:x.p,bk:bk})})})})})}
+  finally{S.book=kb;S.bookOff=ko}
+  var best={};out.forEach(function(c){if(!best[c.p]||c.ps>best[c.p].ps)best[c.p]=c});
+  return Object.keys(best).map(function(p){return best[p]}).sort(function(a,b){return b.ps-a.ps}).slice(0,24)}
+function likelyCombos(day){var L=likelyLegs(day),found=[];
+  function add(ix){var Ls=ix.map(function(i){return L[i]}),gs={},ps={},P=1;
+    for(var i=0;i<Ls.length;i++){if(gs[Ls[i].g]||ps[Ls[i].p])return;gs[Ls[i].g]=1;ps[Ls[i].p]=1;P*=Ls[i].ps}
+    var books=Object.keys(Ls[0].bk),best=null;
+    books.forEach(function(b){var pay=1,ok=true;Ls.forEach(function(l){var pr=l.bk[b];if(pr==null){ok=false;return}pay*=payOf(pr)});
+      if(ok&&pay>=2&&pay<=3&&(!best||pay>best.pay))best={book:b,pay:pay}});
+    if(best)found.push({L:Ls,P:P,pay:best.pay,book:best.book,ev:P*best.pay-1,ks:P})}
+  for(var i=0;i<L.length;i++)for(var j=i+1;j<L.length;j++){add([i,j]);for(var k=j+1;k<L.length;k++)add([i,j,k])}
+  found.sort(function(a,b){return b.P-a.P});
+  return found.slice(0,12).map(function(c){return pzOut(c,day)})}
+function likelyCard(z,i){return '<div class="pzc"><div class="pzh"><b>'+z.legs.length+'-leg</b> <span class="o">at</span> '+esc(z.book)+' <b class="pzp">'+fmtP(z.price)+'</b></div>'+
+  '<div class="pzl">'+z.legs.map(function(l){return '<div><b>'+nm(l.p)+'</b> <span class="o">'+esc(l.t)+'</span> <span>'+esc(pzLegTxt(l))+'</span> <span class="o">'+fmtP(l.price)+' · '+(l.ps*100).toFixed(1)+'%</span></div>'}).join("")+'</div>'+
+  '<div class="pzf"><span>Chance <b>'+(z.P*100).toFixed(1)+'%</b></span><span>Fair <b>'+fairOdds(z.P)+'</b></span><button class="btn2 pzadd" data-pz="'+i+'">+ Add to My bets</button></div></div>'}
+function likelySection(lk,off){return '<section class="panel" style="margin-top:20px"><div class="phead"><h2>+100 likely</h2><span class="tag">'+lk.length+' combination'+(lk.length===1?'':'s')+' · 2 or 3 legs · priced +100 to +200</span></div>'+
+  '<p class="note">For the weekly bet with friends. No value filter: the most likely combinations of threes, rebound and assist legs (main lines only, one a player, each from a different game) whose combined price lands between +100 and +200 at one book, sorted by chance. Games drop off once they tip. Not locked, not tracked and not part of any record.</p>'+
+  (lk.length?'<div class="pzgrid">'+lk.map(function(z,j){return likelyCard(z,off+j)}).join("")+'</div>':'<p class="empty">No combination of tonight\'s legs lands between +100 and +200 at one book.</p>')+'</section>'}
 function vParlays(){
   var all=D.games,sched=D.sched||[],today=todayET(),sd={},pd={};sched.forEach(function(x){if(x.d>=today)sd[x.d]=1});all.forEach(function(g){pd[g.d]=1});
   var up=Object.keys(sd).sort(),past=Object.keys(pd).sort().reverse().filter(function(d){return !sd[d]}),days=up.slice().reverse().concat(past);
@@ -1972,12 +2001,12 @@ function vParlays(){
   Object.keys(mo2).forEach(function(k){opts+='<optgroup label="'+k+'">'+mo2[k].map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+", "+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</optgroup>'});
   var list=pzIdeas(day),R=pzRecord(),legs=pzLegs(day,false),used={};list.forEach(function(z){z.legs.forEach(function(l){used[l.p+":"+l.m+":"+l.k]=1})});
   var more=pzMoreList(day,list),mg=more.filter(function(z){return z.win===1||z.win===-1}),mu=0,mw=0;mg.forEach(function(z){mu+=(z.units||0)*z.u;if(z.win>0)mw++});var MR=pzmRecord();
-  PZV=list.concat(more);var gr=list.filter(function(z){return z.win===1||z.win===-1}),nu=0,nw=0;gr.forEach(function(z){nu+=z.u;if(z.win>0)nw++});
+  var lk=likelyCombos(day),lkOff=list.length+more.length;PZV=list.concat(more,lk);var gr=list.filter(function(z){return z.win===1||z.win===-1}),nu=0,nw=0;gr.forEach(function(z){nu+=z.u;if(z.win>0)nw++});
   var mt=more.length?'<section class="panel"><div class="phead"><h2>More combinations</h2><span class="nightly">'+(mg.length?nightTag(mu,mw+' of '+mg.length+' won at the stakes shown','If you had bet every settled combination at its suggested stake. Not part of the parlay record.'):'')+(MR.n?'<span class="tag" title="Every settled combination since they were locked, at the suggested stakes">SEASON '+MR.w+' OF '+MR.n+' · '+(MR.u>=0?"+":"−")+Math.abs(MR.u).toFixed(2)+'U</span> ':'')+'<span class="tag">next '+more.length+' by edge over payout · players can repeat · locked at tip</span></span></div><div class="tw"><table><thead><tr><th>Legs</th><th>Book</th><th class="n">Price</th><th class="n">Chance</th><th class="n">Fair</th><th class="n">Edge</th><th class="n">Stake</th><th></th></tr></thead><tbody>'+
     more.map(function(z,j){return '<tr><td>'+z.legs.map(function(l){return '<div><b>'+nm(l.p)+'</b> <span class="o">'+esc(l.t)+'</span> '+esc(pzLegTxt(l))+' <span class="o">'+fmtP(l.price)+' · '+(l.ps*100).toFixed(0)+'%</span>'+(l.st==="won"?' <span class="tag w">HIT</span>':l.st==="lost"?' <span class="tag l">MISS</span>':'')+'</div>'}).join("")+'</td><td>'+esc(z.book)+'</td><td class="n"><b>'+fmtP(z.price)+'</b></td><td class="n">'+(z.P*100).toFixed(1)+'%</td><td class="n">'+fairOdds(z.P)+'</td><td class="n"><span class="tag w">+'+Math.round(z.ev*100)+'%</span></td><td class="n">'+(z.units?z.units.toFixed(2)+'u':'–')+'</td><td>'+(z.win==null?'<button class="btn2 pzadd" data-pz="'+(list.length+j)+'">+ Add</button>':z.win>0?'<span class="tag w">WON</span>':z.win<0?'<span class="tag l">LOST</span>':'<span class="tag">VOID</span>')+'</td></tr>'}).join("")+'</tbody></table></div></section>':'';
   view.innerHTML='<div class="picks"><section class="panel"><div class="phead"><h2>Parlay ideas</h2><div class="pickers">'+(gr.length?nightTag(nu,nw+' of '+gr.length+' won'):'')+'<button class="more" id="dayPrev"'+(at>=days.length-1?" disabled":"")+'>Earlier day</button><label class="f">Day <select id="selDay">'+opts+'</select></label><button class="more" id="dayNext"'+(at<=0?" disabled":"")+'>Later day</button>'+bookPicker(day)+'</div></div>'+
     '<p class="note">Threes, rebound and assist legs that each beat their own price, one a player and each from a different game, so the book pays the full multiplied price and the legs do not lean on each other. A leg is a main-line over or under with a 45% or better pick chance, or a ladder rung one or two above the line with 30% or better, each 3% to 25% over its price, with the model within 12 points of the market. Each idea is priced at the one book that posts every leg and pays the most (or only at your chosen book when one is picked above), with every leg still beating its price there. The chance multiplies the legs\' chances; edges compound, and so do misses, so the stake is an eighth of Kelly, 0.1u to 0.5u. First basket and first team basket are never used. The ideas lock when their first game starts and are tracked on the Tracker'+(R.n?': <b>'+R.w+' of '+R.n+' won, '+(R.u>=0?"+":"−")+Math.abs(R.u).toFixed(2)+'u</b> at one unit each':'')+'. Every leg here is listed on its own on the Threes, Rebounds or Assists tab.</p>'+
-    (list.length?'<div class="pzgrid">'+list.map(pzCard).join("")+'</div>':'<p class="empty">'+(legs.length<2?'Parlay ideas need prices for at least two legs from different games. '+(legs.length?'Tonight there is one.':'Tonight there are none yet, usually because prices are not on record yet; the first look is about twelve hours before tip.'):'No combination of tonight\'s legs beats its price at a single book.')+'</p>')+'</section>'+mt+'</div>'}
+    (list.length?'<div class="pzgrid">'+list.map(pzCard).join("")+'</div>':'<p class="empty">'+(legs.length<2?'Parlay ideas need prices for at least two legs from different games. '+(legs.length?'Tonight there is one.':'Tonight there are none yet, usually because prices are not on record yet; the first look is about twelve hours before tip.'):'No combination of tonight\'s legs beats its price at a single book.')+'</p>')+'</section>'+mt+likelySection(lk,lkOff)+'</div>'}
 
 /* ---- value checker for My bets: the chance the page gives each bet, its fair price and the edge at your odds ----
    First basket: the Picks page's chance. First team basket: its own chance. Threes, rebounds and assists: the pick chance
