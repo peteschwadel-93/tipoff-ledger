@@ -602,8 +602,15 @@ function shareTag(t,j,day){if(!j)return "";var s=startShare(t,j,day);if(!s.k)ret
   return '<span class="tag '+(s.split||s.k<5?"q":"")+'" title="Backtest, when he started: took every tip in his last 10 starts, jumped again 99% of the time; 80 to 99%, about 92%; under 60%, about 65%.">'+(s.split?"SPLIT ROLE · ":"")+"JUMPED IN "+s.w+" OF LAST "+s.k+(s.k===1?" START":" STARTS")+'</span>'}
 function recBefore(p,day){var r=[];D.games.forEach(function(g){var t=g.tip;if(g.d>=day||!t)return;if(t.w===p)r.push(1);else if(t.l===p)r.push(0)});
   function s(l){var w=0;l.forEach(function(x){w+=x});return{w:w,n:l.length}}return{full:s(r),l15:s(r.slice(-15))}}
+function onRoster(t,p){ // a player counts for a team only while the current roster (ESPN, from the build) lists him there
+  var R=rostSet(t);return !R||!p||!!R[lvKey(D.players[p]||"")]}
+function recentFive(t,day){ // no five posted or expected yet: the five he started most often in the team's last five games
+  var gs=D.games.filter(function(g){return g.d<day&&(g.h===t||g.a===t)}).sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0}).slice(-5),n={},last={};
+  gs.forEach(function(g,i){(g.st[t]||[]).forEach(function(p){n[p]=(n[p]||0)+1;last[p]=i})});
+  return Object.keys(n).map(Number).sort(function(a,b){return n[b]-n[a]||last[b]-last[a]}).slice(0,5)}
 function pickJumper(c,t,j,day){ // returns the jumper to rate, or null when nobody suitable is known
-  var u=(c.lu&&c.lu[t])||(c.ex&&c.ex[t]&&(c.ex[t].st||[]).length>=5?c.ex[t]:null),order=teamJumpersBefore(t,day),i; // the confirmed five, else the expected one
+  var u=(c.lu&&c.lu[t])||(c.ex&&c.ex[t]&&(c.ex[t].st||[]).length>=5?c.ex[t]:null),order=teamJumpersBefore(t,day).filter(function(p){return onRoster(t,p)}),i; // the confirmed five, else the expected one; only players on this roster
+  if(!(u&&u.st.length)){var rf=recentFive(t,day).filter(function(p){return onRoster(t,p)});if(rf.length)u={st:rf.map(function(p){return[p,D.players[p]||"",""]})}} // no five on record yet: the likeliest five from recent games, as the lineups tab shows
   if(u&&u.st.length){var st={};u.st.forEach(function(x){st[x[0]]=1});
     // the starter who takes the tip most often when he starts (two phantom starts keep a 1-for-1 newcomer from leading);
     // backtest: right 95% of the time against 92% for whoever took most of the team's recent tips
@@ -611,7 +618,7 @@ function pickJumper(c,t,j,day){ // returns the jumper to rate, or null when nobo
     if(pick)return pick;
     var best=null,bn=0;u.st.forEach(function(x){var n=recBefore(x[0],day).full.n;if(n>bn){bn=n;best=x[0]}});return best} // else the starter with most tips anywhere
   var inj=j&&injOf(c,t,j);
-  if(inj&&/^out/i.test(inj.st)){for(i=0;i<order.length;i++){var q=injOf(c,t,order[i]);if(order[i]!==j&&!(q&&/^out/i.test(q.st)))return order[i]}return null}
+  if(j&&!onRoster(t,j)||inj&&/^out/i.test(inj.st)){for(i=0;i<order.length;i++){var q=injOf(c,t,order[i]);if(order[i]!==j&&!(q&&/^out/i.test(q.st)))return order[i]}return null}
   return j}
 function adjust(o,m,day){ // swap in a replacement jumper where needed, keeping a note of who was replaced (o.na / o.nh)
   var c=ctxOf(m);if(!c)return o;
