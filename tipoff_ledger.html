@@ -322,7 +322,7 @@ h2.sep{margin-top:12px;color:var(--muted)}
 .rup .rbig{font:700 64px/1 var(--display);font-variant-numeric:tabular-nums;margin:8px 0 6px}.rup .rmid{font:700 30px/1 var(--display);font-variant-numeric:tabular-nums;margin:8px 0 6px}
 .rup .rup1{color:var(--made)}.rup .rdn{color:#e8705f}.rup .rzero{color:var(--soft)}.rup .rsub{font-size:13.5px;color:var(--muted)}.rup .rsub b{color:var(--ink);font-weight:500}
 .rup .rcard{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
-.rup .rparts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.rup h3{margin:6px 0 0}
+.rup .rparts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.rup h3{margin:6px 0 0}
 .rup .rwk{width:auto}.rup .rwk td.n,.rup .rwk th.n{white-space:nowrap}
 @media(max-width:900px){.rup .rtop{grid-template-columns:minmax(0,1fr)}.rup .rparts{grid-template-columns:repeat(2,minmax(0,1fr))}.rup .rbig{font-size:48px}}
 @media(max-width:560px){.rup .rparts{grid-template-columns:minmax(0,1fr)}}
@@ -1395,6 +1395,15 @@ function trackTable(rows){
 /* ---- Tracker roundup: big-number summary of every tracked bet, in units, for the season in view. It only reads the records
    below (Best plays for threes, rebounds and assists, first team basket picks, method picks, parlay ideas), so it follows the
    Betting window switch and the best price across books the same way they do. ---- */
+/* one night's Ladder watch for the stat in view, chosen exactly as the Ladder watch panel chooses it; settled ladders only */
+function trkLadNight(d){var kb=S.bookOff;S.bookOff=1;try{var rows=t3Day(d).rows;if(!rows.some(function(r){return r.o}))return null;
+  var A=t3LadderList(rows).filter(function(r){return r.lad.priced}),lkd=A.filter(function(r){return r.lad.lk}),opn=A.filter(function(r){return !r.lad.lk}),nG={};rows.forEach(function(r){nG[r.m.a+"@"+r.m.h]=1});
+  var L=t3LadderList(lkd.concat(ladFill(opn,Math.max(0,propCap(Object.keys(nG).length)-lkd.length),lkd.map(function(r){return r.m.a+"@"+r.m.h})))),a={d:d,n:0,w:0,u:0};
+  L.forEach(function(r){var l=r.lad;if(!l.priced||l.res==null||l.lv)return;a.n++;if(l.res>0)a.w++;a.u+=l.res});return a}finally{S.bookOff=kb}}
+/* first basket picks in 4-chevron games: each of the favoured side's picked shooters, one unit at the price the Picks page showed */
+function trkFb4(sy){var by={};trackGames(sy).forEach(function(x){if(x.lv!==4)return;var g=x.g,fs=firstScore(g);
+    x.top.forEach(function(p){var fi=null;try{fi=fbInfo(g.d,p)}catch(_){}if(!fi||fi.price==null)return;var a=by[g.d]=by[g.d]||{d:g.d,n:0,w:0,u:0},hit=!!(fs&&fs[0]===p);a.n++;if(hit){a.w++;a.u+=payOf(fi.price)-1}else a.u-=1})});
+  return Object.keys(by).sort().map(function(d){return by[d]})}
 function trkRoundup(sy){
   function wkOf(d){var x=new Date(d+"T12:00:00Z"),k=(x.getUTCDay()+6)%7;x.setUTCDate(x.getUTCDate()-k);return x.toISOString().slice(0,10)}
   var parts=[],W={};
@@ -1402,6 +1411,10 @@ function trkRoundup(sy){
       var k=wkOf(x.d),r=W[k]=W[k]||{};r[key]=(r[key]||0)+x.u});parts.push(a);return a}
   ["t3","rb","as"].forEach(function(sk){inSK(sk,function(){var R=t3Record(),by={};R.list.forEach(function(e){var a=by[e.d]=by[e.d]||{d:e.d,n:0,w:0,u:0};a.n++;a.w+=e.x.hit?1:0;a.u+=e.u});
     part(sk,SC().nm,"best plays, 1u each",1,Object.keys(by).map(function(d){return by[d]}))})});
+  var lw=[];["t3","rb","as"].forEach(function(sk){inSK(sk,function(){var C=SC(),dd={};Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&(o[C.li]||o[C.al]))dd[k.split("|")[0]]=1});
+    Object.keys(dd).sort().forEach(function(d){if(!winOK(d))return;var a=trkLadNight(d);if(a&&a.n)lw.push(a)})})});
+  part("lw","Ladder watch","1u split per ladder",1,lw);
+  part("fb","First basket","4-chevron picks, 1u each",1,trkFb4(sy));
   var F=ftRecord();part("ft","First team basket",FTP.u+"u each",FTP.u,Object.keys(F.days).map(function(d){var a=F.days[d];return{d:d,n:a.n,w:a.h,u:a.u}}).filter(function(x){return x.n}));
   var mf=[],kb=S.book;S.book="";var md={};
   try{Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&o.mf&&o.mf.length)md[k.slice(0,10)]=1});Object.keys(D.locks||{}).forEach(function(d){if((D.locks[d]||{}).mf)md[d]=1});
@@ -1409,7 +1422,7 @@ function trkRoundup(sy){
   part("mf","Method picks",MFP.u+"u each",MFP.u,mf);
   part("pz","Parlay ideas","1u each",1,pzRecord().days.map(function(x){return{d:x.d,n:x.n,w:x.w,u:x.u}}));
   function sum(keys){var a={n:0,w:0,u:0,st:0};parts.forEach(function(p){if(keys.indexOf(p.key)>=0){a.n+=p.n;a.w+=p.w;a.u+=p.u;a.st+=p.st}});return a}
-  var T=sum(["t3","rb","as","ft","mf","pz"]),PR=sum(["t3","rb","as"]),FB=sum(["ft","mf"]);
+  var T=sum(["t3","rb","as","lw","fb","ft","mf","pz"]),PR=sum(["t3","rb","as","lw"]),FB=sum(["fb"]);
   var lab=sy+"-"+String(sy+1).slice(2),U=S.unit||10;
   function cl(u){return Math.abs(u)<.005?"rzero":u>0?"rup1":"rdn"}
   function uu(u){return (u>0.004?"+":u<-0.004?"−":"")+Math.abs(u).toFixed(2)+"u"}
@@ -1419,12 +1432,12 @@ function trkRoundup(sy){
   var wks=Object.keys(W).sort(),up=0,run=0;wks.forEach(function(k){var t=0;Object.keys(W[k]).forEach(function(p){t+=W[k][p]});W[k].tot=t;if(t>0)up++});
   var h='<section class="panel rup"><div class="rtop"><div><div class="rlab">All tracked bets · net units · '+lab+'</div><div class="rbig '+cl(T.u)+'">'+(T.n?uu(T.u):"–")+'</div>'+
     '<div class="rsub">'+(T.n?'<b>'+usd(T.u)+'</b> at $'+U+' a unit · '+T.st.toFixed(1)+' units staked · ROI '+roi(T)+' · '+up+' of '+wks.length+' week'+(wks.length===1?'':'s')+' up':'Nothing settled yet'+(S.win?' in the betting window':'')+'.')+'</div></div>'+
-    '<div class="rcard"><div class="rlab">Props total<i>threes, rebounds, assists</i></div><div class="rmid '+cl(PR.u)+'">'+(PR.n?uu(PR.u):"–")+'</div><div class="rsub">'+(PR.n?PR.st.toFixed(1)+'u staked · ROI '+roi(PR)+' · '+usd(PR.u):'nothing settled yet')+'</div></div>'+
-    '<div class="rcard"><div class="rlab">First basket side<i>team basket and method</i></div><div class="rmid '+cl(FB.u)+'">'+(FB.n?uu(FB.u):"–")+'</div><div class="rsub">'+(FB.n?FB.st.toFixed(2).replace(/0$/,"")+'u staked · ROI '+roi(FB)+' · '+usd(FB.u):'nothing settled yet')+'</div></div></div>'+
-    '<div class="rlab" style="margin-top:6px">By part</div><div class="rparts">'+parts.map(function(p){return '<div class="rcard"><div class="rlab">'+esc(p.lab)+'<i>'+esc(p.sub)+'</i></div><div class="rmid '+cl(p.u)+'">'+(p.n?uu(p.u):"–")+'</div><div class="rsub">'+line(p,p.key==="pz"?"parlays":"picks",p.key==="pz"?"won":"hit")+'</div></div>'}).join("")+'</div>';
-  if(wks.length)h+='<div class="rlab" style="margin-top:6px">Week by week</div><div class="tw"><table class="rwk"><thead><tr><th>Week of</th>'+parts.map(function(p){return '<th class="n">'+esc(p.key==="ft"?"Team basket":p.key==="mf"?"Method":p.key==="pz"?"Parlays":p.lab)+'</th>'}).join("")+'<th class="n">Total</th><th class="n rate">Running</th></tr></thead><tbody>'+
+    '<div class="rcard"><div class="rlab">Props total<i>best plays and ladders</i></div><div class="rmid '+cl(PR.u)+'">'+(PR.n?uu(PR.u):"–")+'</div><div class="rsub">'+(PR.n?PR.st.toFixed(1)+'u staked · ROI '+roi(PR)+' · '+usd(PR.u):'nothing settled yet')+'</div></div>'+
+    '<div class="rcard"><div class="rlab">First basket<i>4-chevron picks only</i></div><div class="rmid '+cl(FB.u)+'">'+(FB.n?uu(FB.u):"–")+'</div><div class="rsub">'+(FB.n?FB.st.toFixed(1)+'u staked · ROI '+roi(FB)+' · '+usd(FB.u):'nothing settled yet')+'</div></div></div>'+
+    '<div class="rlab" style="margin-top:6px">By part</div><div class="rparts">'+parts.map(function(p){return '<div class="rcard"><div class="rlab">'+esc(p.lab)+'<i>'+esc(p.sub)+'</i></div><div class="rmid '+cl(p.u)+'">'+(p.n?uu(p.u):"–")+'</div><div class="rsub">'+line(p,p.key==="pz"?"parlays":p.key==="lw"?"ladders":"picks",p.key==="pz"?"won":p.key==="lw"?"in profit":"hit")+'</div></div>'}).join("")+'</div>';
+  if(wks.length)h+='<div class="rlab" style="margin-top:6px">Week by week</div><div class="tw"><table class="rwk"><thead><tr><th>Week of</th>'+parts.map(function(p){return '<th class="n">'+esc(p.key==="ft"?"Team basket":p.key==="mf"?"Method":p.key==="pz"?"Parlays":p.key==="lw"?"Ladders":p.key==="fb"?"1st basket":p.lab)+'</th>'}).join("")+'<th class="n">Total</th><th class="n rate">Running</th></tr></thead><tbody>'+
     wks.map(function(k){var r=W[k];run+=r.tot;return '<tr><td>'+fmtD(k)+'</td>'+parts.map(function(p){var v=r[p.key];return '<td class="n">'+(v==null?'<span class="o">–</span>':'<span class="'+cl(v)+'">'+uu(v)+'</span>')+'</td>'}).join("")+'<td class="n"><b class="'+cl(r.tot)+'">'+uu(r.tot)+'</b></td><td class="n rate"><b class="'+cl(run)+'">'+uu(run)+'</b></td></tr>'}).join("")+'</tbody></table></div>';
-  h+='<p class="note">Every bet this page tracks, settled at the stored price before tip, best price across books: one unit on each Best play for threes, rebounds and assists, '+FTP.u+'u on each first team basket pick, '+MFP.u+'u on each method pick, one unit on each parlay idea. '+(S.win?'Counts the betting window only (switch to All dates below to count everything). ':'Counts every date of the season. ')+'Weeks run Monday to Sunday. Each part has its full record further down this page.</p></section>';
+  h+='<p class="note">Every bet this page tracks, settled at the stored price before tip, best price across books: one unit on each Best play for threes, rebounds and assists, one unit split across each Ladder watch ladder as suggested, one unit on each first basket shooter picked in a 4-chevron game (games at fewer chevrons are left out), '+FTP.u+'u on each first team basket pick, '+MFP.u+'u on each method pick, one unit on each parlay idea. '+(S.win?'Counts the betting window only (switch to All dates below to count everything). ':'Counts every date of the season. ')+'Weeks run Monday to Sunday. Each part has its full record further down this page.</p></section>';
   return h}
 function vTracker(){S.bookOff=1;try{vTracker2()}finally{S.bookOff=0}}
 function vTracker2(){
