@@ -317,6 +317,15 @@ h2.sep{margin-top:12px;color:var(--muted)}
   .big{font-size:38px} th,td{padding:10px 12px}
 }
 @media (prefers-reduced-motion:no-preference){.tabs button,.seg button,.more,.refresh button{transition:background .15s,color .15s,border-color .15s}}
+.rup{margin-bottom:20px}.rup .rtop{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.rup .rlab{font:600 11.5px/1.3 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.rup .rlab i{font-style:normal;letter-spacing:0;text-transform:none;margin-left:6px;color:var(--soft)}
+.rup .rbig{font:700 64px/1 var(--display);font-variant-numeric:tabular-nums;margin:8px 0 6px}.rup .rmid{font:700 30px/1 var(--display);font-variant-numeric:tabular-nums;margin:8px 0 6px}
+.rup .rup1{color:var(--made)}.rup .rdn{color:#e8705f}.rup .rzero{color:var(--soft)}.rup .rsub{font-size:13.5px;color:var(--muted)}.rup .rsub b{color:var(--ink);font-weight:500}
+.rup .rcard{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.rup .rparts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.rup h3{margin:6px 0 0}
+.rup .rwk{width:auto}.rup .rwk td.n,.rup .rwk th.n{white-space:nowrap}
+@media(max-width:900px){.rup .rtop{grid-template-columns:minmax(0,1fr)}.rup .rparts{grid-template-columns:repeat(2,minmax(0,1fr))}.rup .rbig{font-size:48px}}
+@media(max-width:560px){.rup .rparts{grid-template-columns:minmax(0,1fr)}}
 </style>
 
 <div class="wrap">
@@ -1383,12 +1392,46 @@ function trackTable(rows){
   [4,3,2,1,0].forEach(function(L){h+=line(L?chev(L,false,"sm"):'<span class="o">Even</span>',rows.filter(function(x){return x.lv===L}))});
   h+=line("<b>Three or more</b>",rows.filter(function(x){return x.lv>=3}),"on")+line("<b>All rated games</b>",rows);
   return h+'</tbody></table></div>'}
+/* ---- Tracker roundup: big-number summary of every tracked bet, in units, for the season in view. It only reads the records
+   below (Best plays for threes, rebounds and assists, first team basket picks, method picks, parlay ideas), so it follows the
+   Betting window switch and the best price across books the same way they do. ---- */
+function trkRoundup(sy){
+  function wkOf(d){var x=new Date(d+"T12:00:00Z"),k=(x.getUTCDay()+6)%7;x.setUTCDate(x.getUTCDate()-k);return x.toISOString().slice(0,10)}
+  var parts=[],W={};
+  function part(key,lab,sub,stake,days){var a={key:key,lab:lab,sub:sub,n:0,w:0,u:0,st:0};days.forEach(function(x){if(seasonOf(x.d)!==sy)return;a.n+=x.n;a.w+=x.w;a.u+=x.u;a.st+=x.n*stake;
+      var k=wkOf(x.d),r=W[k]=W[k]||{};r[key]=(r[key]||0)+x.u});parts.push(a);return a}
+  ["t3","rb","as"].forEach(function(sk){inSK(sk,function(){var R=t3Record(),by={};R.list.forEach(function(e){var a=by[e.d]=by[e.d]||{d:e.d,n:0,w:0,u:0};a.n++;a.w+=e.x.hit?1:0;a.u+=e.u});
+    part(sk,SC().nm,"best plays, 1u each",1,Object.keys(by).map(function(d){return by[d]}))})});
+  var F=ftRecord();part("ft","First team basket",FTP.u+"u each",FTP.u,Object.keys(F.days).map(function(d){var a=F.days[d];return{d:d,n:a.n,w:a.h,u:a.u}}).filter(function(x){return x.n}));
+  var mf=[],kb=S.book;S.book="";var md={};
+  try{Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&o.mf&&o.mf.length)md[k.slice(0,10)]=1});Object.keys(D.locks||{}).forEach(function(d){if((D.locks[d]||{}).mf)md[d]=1});
+    Object.keys(md).sort().forEach(function(d){if(!winOK(d))return;var a={d:d,n:0,w:0,u:0};mfPicks(d).top.forEach(function(r){if(r.res!==1&&r.res!==0)return;a.n++;if(r.res){a.w++;a.u+=MFP.u*(r.pay-1)}else a.u-=MFP.u});if(a.n)mf.push(a)})}finally{S.book=kb}
+  part("mf","Method picks",MFP.u+"u each",MFP.u,mf);
+  part("pz","Parlay ideas","1u each",1,pzRecord().days.map(function(x){return{d:x.d,n:x.n,w:x.w,u:x.u}}));
+  function sum(keys){var a={n:0,w:0,u:0,st:0};parts.forEach(function(p){if(keys.indexOf(p.key)>=0){a.n+=p.n;a.w+=p.w;a.u+=p.u;a.st+=p.st}});return a}
+  var T=sum(["t3","rb","as","ft","mf","pz"]),PR=sum(["t3","rb","as"]),FB=sum(["ft","mf"]);
+  var lab=sy+"-"+String(sy+1).slice(2),U=S.unit||10;
+  function cl(u){return Math.abs(u)<.005?"rzero":u>0?"rup1":"rdn"}
+  function uu(u){return (u>0.004?"+":u<-0.004?"−":"")+Math.abs(u).toFixed(2)+"u"}
+  function usd(u){var v=Math.round(u*U);return (v>0?"+":v<0?"−":"")+"$"+Math.abs(v).toLocaleString()}
+  function roi(a){return a.st?(a.u>=0?"+":"−")+Math.abs(Math.round(a.u/a.st*100))+"%":"–"}
+  function line(a,noun,won){return a.n?a.n+" "+noun+" · "+a.w+" "+won+" · ROI "+roi(a)+" · "+usd(a.u):"nothing settled yet"}
+  var wks=Object.keys(W).sort(),up=0,run=0;wks.forEach(function(k){var t=0;Object.keys(W[k]).forEach(function(p){t+=W[k][p]});W[k].tot=t;if(t>0)up++});
+  var h='<section class="panel rup"><div class="rtop"><div><div class="rlab">All tracked bets · net units · '+lab+'</div><div class="rbig '+cl(T.u)+'">'+(T.n?uu(T.u):"–")+'</div>'+
+    '<div class="rsub">'+(T.n?'<b>'+usd(T.u)+'</b> at $'+U+' a unit · '+T.st.toFixed(1)+' units staked · ROI '+roi(T)+' · '+up+' of '+wks.length+' week'+(wks.length===1?'':'s')+' up':'Nothing settled yet'+(S.win?' in the betting window':'')+'.')+'</div></div>'+
+    '<div class="rcard"><div class="rlab">Props total<i>threes, rebounds, assists</i></div><div class="rmid '+cl(PR.u)+'">'+(PR.n?uu(PR.u):"–")+'</div><div class="rsub">'+(PR.n?PR.st.toFixed(1)+'u staked · ROI '+roi(PR)+' · '+usd(PR.u):'nothing settled yet')+'</div></div>'+
+    '<div class="rcard"><div class="rlab">First basket side<i>team basket and method</i></div><div class="rmid '+cl(FB.u)+'">'+(FB.n?uu(FB.u):"–")+'</div><div class="rsub">'+(FB.n?FB.st.toFixed(2).replace(/0$/,"")+'u staked · ROI '+roi(FB)+' · '+usd(FB.u):'nothing settled yet')+'</div></div></div>'+
+    '<div class="rlab" style="margin-top:6px">By part</div><div class="rparts">'+parts.map(function(p){return '<div class="rcard"><div class="rlab">'+esc(p.lab)+'<i>'+esc(p.sub)+'</i></div><div class="rmid '+cl(p.u)+'">'+(p.n?uu(p.u):"–")+'</div><div class="rsub">'+line(p,p.key==="pz"?"parlays":"picks",p.key==="pz"?"won":"hit")+'</div></div>'}).join("")+'</div>';
+  if(wks.length)h+='<div class="rlab" style="margin-top:6px">Week by week</div><div class="tw"><table class="rwk"><thead><tr><th>Week of</th>'+parts.map(function(p){return '<th class="n">'+esc(p.key==="ft"?"Team basket":p.key==="mf"?"Method":p.key==="pz"?"Parlays":p.lab)+'</th>'}).join("")+'<th class="n">Total</th><th class="n rate">Running</th></tr></thead><tbody>'+
+    wks.map(function(k){var r=W[k];run+=r.tot;return '<tr><td>'+fmtD(k)+'</td>'+parts.map(function(p){var v=r[p.key];return '<td class="n">'+(v==null?'<span class="o">–</span>':'<span class="'+cl(v)+'">'+uu(v)+'</span>')+'</td>'}).join("")+'<td class="n"><b class="'+cl(r.tot)+'">'+uu(r.tot)+'</b></td><td class="n rate"><b class="'+cl(run)+'">'+uu(run)+'</b></td></tr>'}).join("")+'</tbody></table></div>';
+  h+='<p class="note">Every bet this page tracks, settled at the stored price before tip, best price across books: one unit on each Best play for threes, rebounds and assists, '+FTP.u+'u on each first team basket pick, '+MFP.u+'u on each method pick, one unit on each parlay idea. '+(S.win?'Counts the betting window only (switch to All dates below to count everything). ':'Counts every date of the season. ')+'Weeks run Monday to Sunday. Each part has its full record further down this page.</p></section>';
+  return h}
 function vTracker(){S.bookOff=1;try{vTracker2()}finally{S.bookOff=0}}
 function vTracker2(){
   var today=todayET(),sy=+today.slice(0,4)-(+today.slice(5,7)>=9?0:1),lab=function(y){return y+"-"+String(y+1).slice(2)};
   var cur=trackGames(sy),shown=S.trkConf?cur.filter(function(x){return x.conf}):cur,prev=trackGames(sy-1,true);
   var log=shown.slice().reverse(),more=log.length>S.trkN;
-  view.innerHTML='<section class="panel"><div class="phead"><h2>Tracker · '+lab(sy)+' regular season</h2><span class="pickers">'+winSeg()+' <span class="seg" id="seg-trk"><button data-v="1" aria-pressed="'+(S.trkConf===1)+'">Lineup confirmed</button><button data-v="0" aria-pressed="'+(S.trkConf===0)+'">All games</button></span></span></div>'+
+  view.innerHTML=trkRoundup(sy)+'<section class="panel"><div class="phead"><h2>Tracker · '+lab(sy)+' regular season</h2><span class="pickers">'+winSeg()+' <span class="seg" id="seg-trk"><button data-v="1" aria-pressed="'+(S.trkConf===1)+'">Lineup confirmed</button><button data-v="0" aria-pressed="'+(S.trkConf===0)+'">All games</button></span></span></div>'+
     '<p class="note">'+(S.win?'<b>Betting window:</b> every record on this page counts only Nov 1 to two weeks before the regular season ends ('+fmtD(winEnd(sy))+' this season), with no playoffs, the stretch you bet. Choose All dates to count everything. ':'<b>All dates:</b> every record on this page counts the whole season. ')+'Every finished regular-season game, read as it stood before tip: the favoured side by the rating and its three shooters. "Lineup confirmed" counts only games where the favoured team\'s starting lineup was saved before tip. Results follow the Free throws switch. If the pick rules change, the whole table is recalculated with the new rules.</p>'+
     (shown.length?trackTable(shown):'<p class="empty">'+(cur.length?"No games yet with a lineup saved before tip. Switch to All games to see the "+cur.length+" played so far.":"No "+lab(sy)+" regular-season games have been played yet. Results start here after opening night.")+'</p>')+'</section>'+
     (log.length?'<section class="panel" style="margin-top:20px"><h2>Game by game</h2><div class="tw"><table><thead><tr><th>Date</th><th>Game</th><th>Pick</th><th>Jumper</th><th>Tip</th><th>First-basket attempt</th><th>First '+(S.ft?"score":"basket")+'</th><th>Shooters</th></tr></thead><tbody>'+
