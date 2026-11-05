@@ -1162,6 +1162,7 @@ function t3TrackHtml(){
       '<h3 style="margin:16px 0 8px">Latest plays</h3><div class="tw"><table><thead><tr><th>Date</th><th>Player</th><th>Bet</th><th class="n">Price</th><th class="n">Pick chance</th><th class="n">'+(CNT()?"Got":"Made")+'</th><th>Result</th><th class="n">Units</th></tr></thead><tbody>'+
       R.list.slice(-30).reverse().map(function(e){var x=e.x,r=x.row;return '<tr><td>'+fmtD(e.d)+'</td><td>'+tmL(r.t)+' '+nm(r.p)+'</td><td>'+esc(x.lab)+'</td><td class="n">'+fmtP(x.price)+'</td><td class="n">'+(x.p*100).toFixed(0)+'%</td><td class="n">'+(r.res?r.res[SC().col]+(SK==="t3"?' of '+r.res[1]:''):'–')+'</td><td><span class="tag'+(x.hit?" w":"")+'">'+(x.hit?"HIT":"MISS")+'</span></td><td class="n">'+un(e.u)+'</td></tr>'}).join("")+'</tbody></table></div>'
       :'<p class="empty">No '+SC().one+' prices are on record yet. Prices are saved within four hours of each tip from opening night, and this fills in as those games finish.</p>')+'</section>';
+  out+=t3LadTrackHtml();
   if(!S.calOpen)out+='<section class="panel" style="margin-top:20px"><div class="phead"><h2>'+SC().nm+' model accuracy</h2><button class="more" id="calOpen">Show the accuracy tables</button></div><p class="note">How the projections did against what happened, season by season, with no prices involved. Worked out on request because it re-runs every projection of three seasons, which takes a few seconds.</p></section>';
   [sy,sy-1,sy-2].forEach(function(s){if(!S.calOpen)return;var C=t3Calib(s);if(!C.n)return;
     out+='<section class="panel" style="margin-top:20px"><div class="phead"><h2>'+SC().nm+' model · '+lab(s)+' accuracy</h2><span class="tag">'+(s===sy?C.n+' projections so far':'back-test · '+C.n+' projections')+'</span></div>'+
@@ -1370,7 +1371,7 @@ function gIdx(){if(D._gi)return D._gi;var byD={},byT={},po={},tip={},st={},sp={}
 function before(l,day){var lo=0,hi=l.length;while(lo<hi){var md=(lo+hi)>>1;if(l[md][0]<day)lo=md+1;else hi=md}return l.slice(0,lo)} // entries [date, ...] in date order
 function inWin(d){var s=seasonOf(d);return d>=s+"-11-01"&&d<=winEnd(s)&&!gIdx().po[d]}
 function winOK(d){return !S.win||inWin(d)}
-function winSet(on){S.win=on;try{localStorage.setItem("tolWin",on?"1":"0")}catch(_){}["_trk","_t3r","_ftr","_pzr","_pzmr","_mfr","_mfpr","_parr"].forEach(function(k){delete D[k]});render()}
+function winSet(on){S.win=on;try{localStorage.setItem("tolWin",on?"1":"0")}catch(_){}["_trk","_t3r","_t3l","_ftr","_pzr","_pzmr","_mfr","_mfpr","_parr"].forEach(function(k){delete D[k]});render()}
 function winSeg(){var s=seasonOf(todayET());return '<span class="seg" id="seg-win" title="Your betting window: Nov 1 to two weeks before the regular season ends ('+fmtD(winEnd(s))+' this season), no playoffs"><button data-v="1" aria-pressed="'+S.win+'">Betting window</button><button data-v="0" aria-pressed="'+!S.win+'">All dates</button></span>'}
 function trackGames(season,sim){
   var key=season+"|"+S.ft+"|"+(sim?1:0)+"|"+(S.win?1:0);D._trk=D._trk||{};if(D._trk[key])return D._trk[key];
@@ -1399,7 +1400,26 @@ function trackTable(rows){
 function trkLadNight(d){var kb=S.bookOff;S.bookOff=1;try{var rows=t3Day(d).rows;if(!rows.some(function(r){return r.o}))return null;
   var A=t3LadderList(rows).filter(function(r){return r.lad.priced}),lkd=A.filter(function(r){return r.lad.lk}),opn=A.filter(function(r){return !r.lad.lk}),nG={};rows.forEach(function(r){nG[r.m.a+"@"+r.m.h]=1});
   var L=t3LadderList(lkd.concat(ladFill(opn,Math.max(0,propCap(Object.keys(nG).length)-lkd.length),lkd.map(function(r){return r.m.a+"@"+r.m.h})))),a={d:d,n:0,w:0,u:0};
-  L.forEach(function(r){var l=r.lad;if(!l.priced||l.res==null||l.lv)return;a.n++;if(l.res>0)a.w++;a.u+=l.res});return a}finally{S.bookOff=kb}}
+  a.rn=0;a.rh=0;a.items=[];var CC=SC().col;L.forEach(function(r){var l=r.lad;if(!l.priced||l.res==null||l.lv)return;a.n++;if(l.res>0)a.w++;a.u+=l.res;
+    l.pos.forEach(function(x){a.rn++;if(r.res&&r.res[CC]>=x.k)a.rh++});a.items.push({r:r,l:l})});return a}finally{S.bookOff=kb}}
+function t3LadRecord(){ // every finished night's Ladder watch for the stat in view, settled at the stored prices, one unit split per ladder
+  var C=SC();D._t3l=D._t3l||{};if(D._t3l[SK])return D._t3l[SK];var days={},R={n:0,w:0,u:0,rn:0,rh:0,nights:[]};
+  Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&(o[C.li]||o[C.al]))days[k.split("|")[0]]=1});
+  Object.keys(days).sort().forEach(function(d){if(!winOK(d))return;var a=trkLadNight(d);if(!a||!a.n)return;R.nights.push(a);R.n+=a.n;R.w+=a.w;R.u+=a.u;R.rn+=a.rn;R.rh+=a.rh});
+  return D._t3l[SK]=R}
+function t3LadTrackHtml(){var R=t3LadRecord(),run=0;
+  function un(u){return '<span class="tag nu '+(u>0?"up":u<0?"dn":"")+'">'+(u>0?"+":u<0?"−":"")+Math.abs(u).toFixed(1)+'U</span>'}
+  var h='<section class="panel" style="margin-top:20px"><div class="phead"><h2>'+SC().nm+' · Ladder watch record</h2><span class="tag">'+(R.n?R.n+' settled ladders':'starts with the first ladder prices')+'</span></div>'+
+    '<p class="note">Every ladder shown under Ladder watch on the '+SC().nm+' page, one unit a player split across his shaded rungs as suggested, settled at the price shown. A ladder is in profit when its rungs paid back more than the unit.</p>';
+  if(!R.n)return h+'<p class="empty">No '+SC().one+' ladders have settled yet'+(S.win?' in the betting window':'')+'.</p></section>';
+  h+='<div class="tw"><table><thead><tr><th class="n">Ladders</th><th class="n">In profit</th><th class="n">Rungs hit</th><th class="n">Net units</th><th class="n">Return</th></tr></thead><tbody><tr><td class="n">'+R.n+'</td><td class="n">'+R.w+'</td><td class="n">'+R.rh+' of '+R.rn+'</td><td class="n">'+un(R.u)+'</td><td class="n">'+(R.u/R.n*100).toFixed(0)+'%</td></tr></tbody></table></div>';
+  var rows=R.nights.map(function(a){run+=a.u;return {a:a,run:run}}).reverse();
+  h+='<h3 style="margin:16px 0 8px">Night by night</h3><div class="tw" style="max-height:420px;overflow-y:auto"><table><thead><tr><th>Date</th><th class="n">Ladders</th><th class="n">In profit</th><th class="n">Rungs hit</th><th class="n">Night</th><th class="n rate">Running total</th></tr></thead><tbody>'+
+    rows.map(function(x){var a=x.a;return '<tr><td>'+fmtD(a.d)+', '+a.d.slice(0,4)+'</td><td class="n">'+a.n+'</td><td class="n">'+a.w+'</td><td class="n">'+a.rh+' of '+a.rn+'</td><td class="n">'+un(a.u)+'</td><td class="n rate">'+un(x.run)+'</td></tr>'}).join('')+'</tbody></table></div>';
+  var CC=SC().col,list=[];R.nights.forEach(function(a){a.items.forEach(function(e){list.push({d:a.d,r:e.r,l:e.l})})});
+  h+='<h3 style="margin:16px 0 8px">Latest ladders</h3><div class="tw"><table><thead><tr><th>Date</th><th>Player</th><th>Rungs</th><th class="n">Got</th><th>Result</th><th class="n">Units</th></tr></thead><tbody>'+
+    list.slice(-30).reverse().map(function(e){var r=e.r,l=e.l,got=r.res?r.res[CC]:null;return '<tr><td>'+fmtD(e.d)+'</td><td>'+tmL(r.t)+' '+nm(r.p)+'</td><td>'+l.pos.map(function(x){var hit=got!=null&&got>=x.k;return '<span class="tag'+(hit?' w':'')+'">'+x.k+'+'+SC().rg+' '+fmtP(x.price)+'</span>'}).join(' ')+'</td><td class="n">'+(got==null?'–':got)+'</td><td><span class="tag'+(l.res>0?' w':'')+'">'+(l.res>0?'IN PROFIT':'DOWN')+'</span></td><td class="n">'+un(l.res)+'</td></tr>'}).join('')+'</tbody></table></div></section>';
+  return h}
 /* first basket picks in 4-chevron games: each of the favoured side's picked shooters, one unit at the price the Picks page showed */
 function trkFb4(sy){var by={};trackGames(sy).forEach(function(x){if(x.lv!==4)return;var g=x.g,fs=firstScore(g);
     x.top.forEach(function(p){var fi=null;try{fi=fbInfo(g.d,p)}catch(_){}if(!fi||fi.price==null)return;var a=by[g.d]=by[g.d]||{d:g.d,n:0,w:0,u:0},hit=!!(fs&&fs[0]===p);a.n++;if(hit){a.w++;a.u+=payOf(fi.price)-1}else a.u-=1})});
@@ -1411,8 +1431,7 @@ function trkRoundup(sy){
       var k=wkOf(x.d),r=W[k]=W[k]||{};r[key]=(r[key]||0)+x.u});parts.push(a);return a}
   ["t3","rb","as"].forEach(function(sk){inSK(sk,function(){var R=t3Record(),by={};R.list.forEach(function(e){var a=by[e.d]=by[e.d]||{d:e.d,n:0,w:0,u:0};a.n++;a.w+=e.x.hit?1:0;a.u+=e.u});
     part(sk,SC().nm,"best plays, 1u each",1,Object.keys(by).map(function(d){return by[d]}))})});
-  var lw=[];["t3","rb","as"].forEach(function(sk){inSK(sk,function(){var C=SC(),dd={};Object.keys(D.odds||{}).forEach(function(k){var o=D.odds[k];if(o&&(o[C.li]||o[C.al]))dd[k.split("|")[0]]=1});
-    Object.keys(dd).sort().forEach(function(d){if(!winOK(d))return;var a=trkLadNight(d);if(a&&a.n)lw.push(a)})})});
+  var lw=[];["t3","rb","as"].forEach(function(sk){inSK(sk,function(){lw=lw.concat(t3LadRecord().nights)})});
   part("lw","Ladder watch","1u split per ladder",1,lw);
   part("fb","First basket","4-chevron picks, 1u each",1,trkFb4(sy));
   var F=ftRecord();part("ft","First team basket",FTP.u+"u each",FTP.u,Object.keys(F.days).map(function(d){var a=F.days[d];return{d:d,n:a.n,w:a.h,u:a.u}}).filter(function(x){return x.n}));
@@ -1750,7 +1769,7 @@ function vBets(){S.bsel=S.bsel||{};
     '<label class="f">Odds <input type="text" inputmode="numeric" id="bfOdds" class="pxin" placeholder="+650" value="'+esc(F.odds||"")+'"></label>'+
     '<label class="f">Units <input type="text" inputmode="decimal" id="bfUnits" class="pxin bun" value="'+esc(F.u||"1")+'"></label>'+
     '<label class="f">Book <input type="text" id="bfBook" class="pxin" style="width:120px;text-align:left" placeholder="optional" value="'+esc(F.book||"")+'"></label><label class="f lvck"><input type="checkbox" id="bfLive"'+(F.lv?" checked":"")+'> Live bet</label>'+
-    '<button class="btn2" id="bfAdd">Add bet</button></div><p class="note" style="margin-top:10px">Line is for threes, rebounds and assists: the over/under number (2.5), or for a ladder rung the count (3 for 3+). Leave it empty for a first basket. Tick <b>Live bet</b> for one placed during the game (anything added after tip is marked live anyway): it is graded as usual, but kept out of chance, edge and CLV, and gets its own tile above.</p></section>';
+    '<button class="btn2" id="bfAdd">Add bet</button></div><p class="note" style="margin-top:10px">Line is for threes, rebounds and assists: the over/under number (2.5), or for a ladder rung the count (3 for 3+). Leave it empty for a first basket. Tick <b>Live bet</b> for one placed during the game (anything added after tip is marked live anyway): it is graded as usual, but kept out of chance, edge and CLV, and gets its own tile above. First basket, first team basket and method bets, and parlays with one of them as a leg, are left out of CLV too: they are not value hunts.</p></section>';
   view.innerHTML=head+'<section class="panel bets" style="margin-top:20px"><div class="phead"><h2>My bets · '+S.bets.length+'</h2><div class="pickers"><span class="seg" role="group" aria-label="Which bets">'+[["all","All"],["open","Open"],["done","Settled"]].map(function(o){return '<button data-bf="'+o[0]+'" aria-pressed="'+(f===o[0])+'">'+o[1]+'</button>'}).join("")+'</span>'+
     '<label class="f">One unit = $ <input type="text" inputmode="decimal" class="pxin" id="unitSize" value="'+S.unit+'" aria-label="Dollars per unit"></label><button class="btn2" id="betParlay"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. The ticked bets move into the parlay.">Make parlay'+(nSel?" · "+nSel:"")+'</button><button class="btn2" id="betParlayK"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. Makes the parlay and leaves the ticked bets as singles too.">Parlay + keep singles</button><button class="btn2" id="betExport"'+(S.bets.length?"":" disabled")+'>Export</button><button class="btn2" id="betImport">Import</button><input type="file" id="betFile" accept="application/json,.json" hidden></div></div>'+
     (S.bets.length?table("bets",cols,rows,{k:"d",dir:-1},{row:function(x){var c=(x.g.st==="won"?"bwon":"")+(byN&&x.first?" bday":"");return c?' class="'+c+'"':""}}):'<p class="empty">No bets yet. Click any underlined price on the Picks or Threes tabs, or add one by hand below.</p>')+'</section><div style="margin-top:20px">'+form+'</div>';
@@ -2109,7 +2128,8 @@ function bchRow(d,sk,p){var key=d+"|"+(S.book||"")+"|"+(S.bookOff?1:0),c=BCH[key
 function bchLeg(l){var sk=parSK(l.m),bm=l.m.slice(-1),r=bchRow(l.d,sk,l.p),out={l:l,r:r,by:{}};if(!r)return out;
   var x=(r.cand||[]).filter(function(q){return q.k===l.k&&(bm==="u"?!q.over:bm==="r"?q.over&&q.rg:q.over&&!q.rg)})[0]||(r.cand||[]).filter(function(q){return q.k===l.k&&(bm==="u"?!q.over:q.over)})[0];
   if(x){Object.keys(x.all||{}).forEach(function(b){if(b.indexOf(" · ")<0&&x.all[b]!=null)out.by[b]=x.all[b]});if(!Object.keys(out.by).length&&x.book)out.by[x.book]=x.price}return out}
-function clvOf(b){if(!b||b.man||betIsLive(b))return null;BCH._clv=BCH._clv||{};var ck=b.id+"|"+b.price+"|"+(b.book||"");if(b.id&&BCH._clv[ck]!==undefined)return BCH._clv[ck];var res=clvOf0(b);if(b.id)BCH._clv[ck]=res;return res}
+var CLV_SKIP={fb:1,ftb:1,mf:1}; // first basket, first team basket and method bets are not value hunts, so they stay out of CLV
+function clvOf(b){if(!b||b.man||betIsLive(b))return null;if(CLV_SKIP[b.m]||b.m==="par"&&(b.legs||[]).some(function(l){return CLV_SKIP[l.m]}))return null;BCH._clv=BCH._clv||{};var ck=b.id+"|"+b.price+"|"+(b.book||"");if(b.id&&BCH._clv[ck]!==undefined)return BCH._clv[ck];var res=clvOf0(b);if(b.id)BCH._clv[ck]=res;return res}
 function clvOf0(b){var p0=b.price; /* the odds you got, as typed in the Odds column (a boost counts too) */if(b.m==="par"){var d=1,ok=true;(b.legs||[]).forEach(function(l){var c=closeOf(Object.assign({d:b.d},l,{book:l.book||b.book}));if(!c)ok=false;else d*=payOf(c.price)});if(!ok)return null;var pay0=payOf(p0);return{close:payToAm(d),pct:pay0/d-1,fin:betStarted(b)}}
   var c=closeOf(b);if(!c)return null;return{close:c.price,book:c.book,pct:payOf(p0)/payOf(c.price)-1,fin:betStarted(b)}}
 function betNew(b){return Object.assign({},b,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString()})}
