@@ -147,7 +147,7 @@ if (api.booksOn) {
   rec.ft = picks; rec.ftseen = seen;
   if (!ms.length) ms = fms;
 })();
-/* Method picks: three player-and-method prices a night, kept once their game starts, the rest refilled from games still to start. */
+/* Method picks: the likeliest player-and-method bets, one for every two games and at most four a night, kept once their game starts, the rest refilled from games still to start. */
 (function lockMf() {
   if (!api.mfRows) return;
   try {
@@ -156,8 +156,8 @@ if (api.booksOn) {
     const rows = api.mfRows(day), gameOf = k => fms.find(m => m.a === k.a && m.h === k.h), gone = k => { const m = gameOf(k); return !m || started(m); };
     const kept = (prev.mf || []).filter(gone).map(k => Object.assign(k, { lk: 1 }));
     const held = kept.map(k => k.a + "@" + k.h), taken = new Set(kept.map(k => k.p));
-    const open = api.mfFill(rows.filter(r => !started(r.m) && !taken.has(r.p)), 3 - kept.length, held).map(api.mfOut);
-    const picks = kept.concat(open).sort((a, b) => b.vs - a.vs), seen = prev.mfseen || {};
+    const open = api.mfFill(rows.filter(r => !started(r.m) && !taken.has(r.p)), (api.mfCap ? api.mfCap(day) : 3) - kept.length, held).map(api.mfOut);
+    const picks = kept.concat(open).sort((a, b) => (b.q || 0) - (a.q || 0)), seen = prev.mfseen || {};
     picks.forEach(k => { const id = k.p + "|" + k.mt; if (!seen[id]) seen[id] = { p: k.p, n: k.n, t: k.t, a: k.a, h: k.h, ts: k.ts, mt: k.mt, price0: k.price, book0: k.book, at0: stamp }; if (!k.lk) seen[id].last = stamp; });
     Object.values(seen).forEach(e => { const m = gameOf(e); if (!m || started(m)) return; const r = rows.find(q => q.p === e.p && q.mt === e.mt && q.m.a === e.a && q.m.h === e.h); e.close = r ? r.price : null; });
     rec.mf = picks; rec.mfseen = seen;
