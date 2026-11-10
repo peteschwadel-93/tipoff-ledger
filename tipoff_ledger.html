@@ -572,7 +572,8 @@ function advBlock(rt,leftT,rightT,hh,off){ // centre of a matchup: chevrons, win
 function grade(o){ // rating and favourite from the two jumpers' full records (o.fa away, o.fh home)
   var r=rating(o.fa,o.fh);o.rt=r;o.ok=!!r;o.lv=r?r.lv:-1;o.abs=r?r.pct:-1;o.fav=r?(r.right?o.m.h:o.m.a):null;return o}
 /* ---- availability: ESPN injury designations and, once posted, NBA starting lineups ---- */
-function normName(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z ]/g,"").replace(/\s+(jr|sr|ii|iii|iv)$/,"").replace(/\s+/g," ").trim()}
+var NNM=new Map();function normName(s){var k=s==null?"":s,v=NNM.get(k);if(v===undefined){v=normName0(k);if(NNM.size>200000)NNM.clear();NNM.set(k,v)}return v}
+function normName0(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z ]/g,"").replace(/\s+(jr|sr|ii|iii|iv)$/,"").replace(/\s+/g," ").trim()}
 function ctxOf(m){ // what is known about availability: live feeds for games to come, the saved pre-tip note for played ones
   if(!m.g)return D.inj||m.lu||m.ex?{inj:D.inj||{},lu:m.lu||null,ex:m.ex||null,past:false}:null;
   // played games: that night's actual starters are the lineup, so the jumper and the three shooters match who really started
@@ -1075,7 +1076,14 @@ function propChosen(day,sk,self,openOnly){var key=day+"|"+S.book+"|"+(S.bookOff?
   var have={},kept=[];["t3","rb","as"].forEach(function(k){var T=k===sk?self:inSK(k,function(){return t3Day(day,1)});have[k]=T;T.lkd.forEach(function(x){kept.push({sk:k,p:x.row.p,a:x.row.m.a,h:x.row.m.h})})});
   var o=propOpen(day,kept,openOnly,have),ids={};Object.keys(o).forEach(function(k){o[k].forEach(function(x){ids[k+"|"+x.row.p+"|"+x.lab]=1})});return PT[key]=ids}
 var TDC={};
-function t3Day(day,raw){var k=day+"|"+SK+"|"+S.book+"|"+(S.bookOff?1:0)+"|"+(S.lockOff?1:0),T=TDC[k];if(T&&(raw||T.top))return T;return TDC[k]=t3Day0(day,raw)} // remembered until the next redraw or data change
+/* A night whose games are all final cannot change any more (picks, ladders and prices were locked before tip and the results are in),
+   so its worked-out numbers are kept for the whole visit, across redraws and the page's five-minute data refreshes. */
+var FIN={t3:{},fb:{},tg:{}};
+function dayDone(d){if(!D||!d||d>=todayET())return false;var gs=gIdx().byD[d]||[];if(!gs.length||gs.some(function(g){return g.lv}))return false;
+  return !(D.sched||[]).some(function(u){return u.d===d&&!gs.some(function(g){return g.h===u.h&&g.a===u.a})})}
+function t3Day(day,raw){var k=day+"|"+SK+"|"+S.book+"|"+(S.bookOff?1:0)+"|"+(S.lockOff?1:0),T=TDC[k];if(T&&(raw||T.top))return T;
+  var done=!S.lockOff&&dayDone(day),fk=k+"|"+(S.ft?1:0);if(done){T=FIN.t3[fk];if(T&&(raw||T.top))return TDC[k]=T}
+  T=TDC[k]=t3Day0(day,raw);if(done)FIN.t3[fk]=T;return T} // remembered until the next redraw or data change
 function t3Day0(day,raw){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day),PL=pkLK(LK),STK=stickyOf(day,C);
   var played=all.filter(function(g){return g.d===day}).map(function(g){return{h:g.h,a:g.a,g:g}});
   var ms=played.concat(sched.filter(function(x){return x.d===day&&!played.some(function(p){return p.h===x.h&&p.a===x.a})}));
@@ -1377,13 +1385,14 @@ function trackGames(season,sim){
   var key=season+"|"+S.ft+"|"+(sim?1:0)+"|"+(S.win?1:0);D._trk=D._trk||{};if(D._trk[key])return D._trk[key];
   var IX=pickIndex(),out=[];
   D.games.forEach(function(g){if(g.s!==season||g.po||!g.tip||g.lv||!winOK(g.d))return;
+    var fk=g.id+"|"+S.ft+"|"+(sim?1:0),fv=dayDone(g.d)?FIN.tg[fk]:undefined;if(fv!==undefined){if(fv)out.push(fv);return}
     var e=IX.g[g.id],m={h:g.h,a:g.a,g:g,simLu:!!sim},o={m:g,ja:e.ja,jh:e.jh,ra:e.ra,rh:e.rh,fa:e.fa,fh:e.fh};
-    adjust(o,m,g.d);grade(o);if(!o.ok)return;
+    adjust(o,m,g.d);grade(o);if(!o.ok){if(dayDone(g.d))FIN.tg[fk]=null;return}
     var t=o.fav,j=t===g.h?o.jh:o.ja,f=(D.flags||{})[g.d+"|"+g.a+"|"+g.h],conf=!!sim||!!(f&&f.lu&&f.lu[t]&&f.lu[t].st&&f.lu[t].st.length);
     topShooters(t,g.d,m);var top=(topShooters.rows||[]).map(function(x){return x.p}),l=att(g,t),fo=Infinity,fs=firstScore(g);
     [g.h,g.a].forEach(function(tt){att(g,tt).forEach(function(x){if(x[2]>0&&x[6]<fo)fo=x[6]})});
     var fbaN=top.filter(function(p){return l.some(function(x){return x[0]===p&&x[6]<=fo})}).length,act=g.tip.wt===t?g.tip.w:(g.tip.lt===t?g.tip.l:null);
-    out.push({g:g,t:t,lv:o.lv,pct:o.abs,j:j,conf:conf,tip:g.tip.pos===t,jr:act?act===j:null,n:top.length,fbaN:fbaN,any:fbaN>0,fb:!!(fs&&top.indexOf(fs[0])>=0),top:top})});
+    var row={g:g,t:t,lv:o.lv,pct:o.abs,j:j,conf:conf,tip:g.tip.pos===t,jr:act?act===j:null,n:top.length,fbaN:fbaN,any:fbaN>0,fb:!!(fs&&top.indexOf(fs[0])>=0),top:top};out.push(row);if(dayDone(g.d))FIN.tg[fk]=row});
   return D._trk[key]=out}
 function trackTable(rows){
   function line(lab,k,cls){var n=k.length,pk=0,fn=0,jr=k.filter(function(x){return x.jr!=null});k.forEach(function(x){pk+=x.n;fn+=x.fbaN});
@@ -1476,10 +1485,10 @@ function vTracker2(){
 /* ---- player page (opens over whatever tab is showing) ---- */
 var TEAM_COL={ATL:"#E03A3E",BOS:"#007A33",BKN:"#3d3d3d",CHA:"#00788C",CHI:"#CE1141",CLE:"#860038",DAL:"#00538C",DEN:"#0E2240",DET:"#C8102E",GSW:"#1D428A",HOU:"#CE1141",IND:"#002D62",LAC:"#C8102E",LAL:"#552583",MEM:"#5D76A9",MIA:"#98002E",MIL:"#00471B",MIN:"#0C2340",NOP:"#0C2340",NYK:"#006BB6",OKC:"#007AC1",ORL:"#0077C0",PHI:"#006BB6",PHX:"#E56020",POR:"#E03A3E",SAC:"#5A2D81",SAS:"#4a4f54",TOR:"#CE1141",UTA:"#3E2680",WAS:"#002B5C"};
 function fbInfo(day,p){ // first-basket chance and price for one player on one night, read from the Picks page's own numbers
-  var key=day+"|"+D.built+"|"+S.book+"|"+S.ft;S._fbiM=S._fbiM||{}; // one worked-out night per date, kept, so My bets does not redraw a Picks page per bet
+  var done=dayDone(day),key=day+"|"+(done?"done":D.built)+"|"+S.book+"|"+S.ft;S._fbiM=S._fbiM||{};if(done&&FIN.fb[key])S._fbiM[key]=FIN.fb[key]; // one worked-out night per date, kept, so My bets does not redraw a Picks page per bet
   if(S._fbiM[key])S._fbi=S._fbiM[key];
-  if(!S._fbi||S._fbi.key!==key){var kv=view,kd=S.day,kl=S.minLv,ky=S._days,kc=S._conf;view=document.createElement("div");S.day=day;S.minLv=-1;S._conf=null;
-    try{vPicks()}catch(_){}view=kv;S.day=kd;S.minLv=kl;S._days=ky;S._fbi=S._fbiM[key]={key:key,list:S._conf&&S._conf.day===day?S._conf.list:[]};S._conf=kc}
+  if(!S._fbi||S._fbi.key!==key){var kv=view,kd=S.day,kl=S.minLv,ky=S._days,kc=S._conf;view={innerHTML:""}; /* the Picks page only writes its html here; nothing is drawn */S.day=day;S.minLv=-1;S._conf=null;
+    try{vPicks()}catch(_){}view=kv;S.day=kd;S.minLv=kl;S._days=ky;S._fbi=S._fbiM[key]={key:key,list:S._conf&&S._conf.day===day?S._conf.list:[]};if(done)FIN.fb[key]=S._fbi;S._conf=kc}
   return S._fbi.list.filter(function(s){return s.e.x.p===p})[0]||null}
 function closePlayer(){var m=$("pm");if(m)m.remove();document.body.style.overflow="";S.player=null}
 function showPlayer(p,all){
