@@ -1284,7 +1284,7 @@ function vMatchup(){
 }
 function vTips(){
   var rows=jumperTable().filter(function(r){return r.tips>=S.minTips&&(!S.q||r.name.toLowerCase().indexOf(S.q.toLowerCase())>=0||r.team.toLowerCase()===S.q.toLowerCase())});
-  var jc=[{k:"name",l:"Jumper",v:function(r){return r.name}},{k:"team",l:"Team",v:function(r){return r.team},f:function(r){return '<span class="tm">'+r.team+'</span>'}},
+  var jc=[{k:"team",l:"Team",v:function(r){return r.team},f:function(r){return tmL(r.team)}},{k:"name",l:"Jumper",v:function(r){return r.name}},
     {k:"tips",l:"Tips",num:1,v:function(r){return r.tips}},{k:"w",l:"Won",num:1,v:function(r){return r.w}},{k:"l",l:"Lost",num:1,v:function(r){return r.l}},
     {k:"pct",l:"Win %",num:1,v:function(r){return r.pct},f:function(r){return pct(r.w,r.tips)+meter(r.w,r.tips)}}];
   var all=jumperTable(),sel=all.filter(function(r){return r.p===S.jumper})[0];
@@ -1295,7 +1295,7 @@ function vTips(){
       table("opp",[{k:"name",l:"Opponent",v:function(r){return r.name}},{k:"w",l:"Won",num:1,v:function(r){return r.w}},{k:"l",l:"Lost",num:1,v:function(r){return r.l}},
         {k:"n",l:"Meetings",num:1,v:function(r){return r.w+r.l}},{k:"last",l:"Last met",num:1,v:function(r){return r.last},f:function(r){return fmtD(r.last)}}],orows,{k:"n",dir:-1})+'</section>'}
   var tr=teams().map(teamTip);
-  var tc=[{k:"t",l:"Team",v:function(r){return r.t},f:function(r){return '<span class="tm">'+r.t+'</span>'}},
+  var tc=[{k:"t",l:"Team",v:function(r){return r.t},f:function(r){return tmL(r.t)}},
     {k:"rec",l:"Tips won",num:1,v:function(r){return r.w},f:function(r){return r.w+"–"+(r.n-r.w)}},
     {k:"pct",l:"Win %",num:1,v:function(r){return r.n?r.w/r.n:null},f:function(r){return pct(r.w,r.n)+meter(r.w,r.n)}},
     {k:"h",l:"Home",num:1,v:function(r){return r.hn?r.hw/r.hn:null},f:function(r){return pct(r.hw,r.hn)}},
@@ -1316,7 +1316,7 @@ function vShots(){
     sh.slice(0,3).forEach(function(s,i){var x=lead[s[0]]=lead[s[0]]||{p:s[0],name:D.players[s[0]]||"",team:tm,s1:0,made:0,gfb:0,st:0,a3:0};x.a3++;x.team=tm;if(!i){x.s1++;if(s[2])x.made++}})});
     var fs=firstScore(g);if(fs&&lead[fs[0]])lead[fs[0]].gfb++});
   var lr=Object.keys(lead).map(function(k){return lead[k]}).filter(function(r){return r.st>=10});
-  var lc=[{k:"name",l:"Player",v:function(r){return r.name}},{k:"team",l:"Team",v:function(r){return r.team},f:function(r){return '<span class="tm">'+r.team+'</span>'}},
+  var lc=[{k:"team",l:"Team",v:function(r){return r.team},f:function(r){return tmL(r.team)}},{k:"name",l:"Player",v:function(r){return r.name}},
     {k:"st",l:"Starts",num:1,v:function(r){return r.st}},{k:"s1",l:"Team's 1st attempt",num:1,v:function(r){return r.s1}},
     {k:"rate",l:"Per start",num:1,v:function(r){return r.s1/r.st},f:function(r){return pct(r.s1,r.st)+meter(r.s1,r.st)}},
     {k:"made",l:"Made",num:1,v:function(r){return r.s1?r.made/r.s1:null},f:function(r){return pct(r.made,r.s1)}},
