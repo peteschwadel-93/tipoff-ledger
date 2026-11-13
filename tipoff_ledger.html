@@ -327,7 +327,7 @@ h2.sep{margin-top:12px;color:var(--muted)}
 @media(max-width:900px){.rup .rtop{grid-template-columns:minmax(0,1fr)}.rup .rparts{grid-template-columns:repeat(2,minmax(0,1fr))}.rup .rbig{font-size:48px}}
 @media(max-width:560px){.rup .rparts{grid-template-columns:minmax(0,1fr)}}
 .rkey{margin:16px 0 0;display:grid;grid-template-columns:minmax(180px,max-content) minmax(0,1fr);gap:6px 18px;font-size:13px;line-height:1.5}.rkey dt{color:var(--ink);font-weight:500}.rkey dd{margin:0;color:var(--muted)}@media(max-width:700px){.rkey{grid-template-columns:minmax(0,1fr)}.rkey dd{margin-bottom:6px}}
-.tw{contain:paint}input.pxin{position:relative} /* typing in a box no longer repaints the whole bets table */
+.tw{contain:paint}input.pxin,.tw input,.tw select,.tw button{position:relative}.tw tbody tr{position:relative} /* typing in a box no longer repaints the whole bets table */
 </style>
 
 <div class="wrap">
@@ -1781,9 +1781,9 @@ function vBets(){S.bsel=S.bsel||{};
     '<label class="f">Units <input type="text" inputmode="decimal" id="bfUnits" class="pxin bun" value="'+esc(F.u||"1")+'"></label>'+
     '<label class="f">Book <input type="text" id="bfBook" class="pxin" style="width:120px;text-align:left" placeholder="optional" value="'+esc(F.book||"")+'"></label><label class="f lvck"><input type="checkbox" id="bfLive"'+(F.lv?" checked":"")+'> Live bet</label>'+
     '<button class="btn2" id="bfAdd">Add bet</button></div><p class="note" style="margin-top:10px">Line is for threes, rebounds and assists: the over/under number (2.5), or for a ladder rung the count (3 for 3+). Leave it empty for a first basket. Tick <b>Live bet</b> for one placed during the game (anything added after tip is marked live anyway): it is graded as usual, but kept out of chance, edge and CLV, and gets its own tile above. First basket, first team basket and method bets, and parlays with one of them as a leg, are left out of CLV too: they are not value hunts.</p></section>';
-  view.innerHTML=head+'<section class="panel bets" style="margin-top:20px"><div class="phead"><h2>My bets · '+S.bets.length+'</h2><div class="pickers"><span class="seg" role="group" aria-label="Which bets">'+[["all","All"],["open","Open"],["done","Settled"]].map(function(o){return '<button data-bf="'+o[0]+'" aria-pressed="'+(f===o[0])+'">'+o[1]+'</button>'}).join("")+'</span>'+
+  betPaint(head+'<section class="panel bets" style="margin-top:20px"><div class="phead"><h2>My bets · '+S.bets.length+'</h2><div class="pickers"><span class="seg" role="group" aria-label="Which bets">'+[["all","All"],["open","Open"],["done","Settled"]].map(function(o){return '<button data-bf="'+o[0]+'" aria-pressed="'+(f===o[0])+'">'+o[1]+'</button>'}).join("")+'</span>'+
     '<label class="f">One unit = $ <input type="text" inputmode="decimal" class="pxin" id="unitSize" value="'+S.unit+'" aria-label="Dollars per unit"></label><button class="btn2" id="betParlay"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. The ticked bets move into the parlay.">Make parlay'+(nSel?" · "+nSel:"")+'</button><button class="btn2" id="betParlayK"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. Makes the parlay and leaves the ticked bets as singles too.">Parlay + keep singles</button><button class="btn2" id="betExport"'+(S.bets.length?"":" disabled")+'>Export</button><button class="btn2" id="betImport">Import</button><input type="file" id="betFile" accept="application/json,.json" hidden></div></div>'+
-    (S.bets.length?table("bets",cols,rows,{k:"d",dir:-1},{row:function(x){var c=(x.g.st==="won"?"bwon":"")+(byN&&x.first?" bday":"");return c?' class="'+c+'"':""}}):'<p class="empty">No bets yet. Click any underlined price on the Picks or Threes tabs, or add one by hand below.</p>')+'</section><div style="margin-top:20px">'+form+'</div>';
+    (S.bets.length?table("bets",cols,rows,{k:"d",dir:-1},{row:function(x){var c=(x.g.st==="won"?"bwon":"")+(byN&&x.first?" bday":"");return c?' class="'+c+'"':""}}):'<p class="empty">No bets yet. Click any underlined price on the Picks or Threes tabs, or add one by hand below.</p>')+'</section><div style="margin-top:20px">'+form+'</div>');
   betCount()}
 
 /* ---- first team basket: which starter scores his own team's first points ----
@@ -2166,6 +2166,20 @@ function clvOf(b){if(!b||b.man||betIsLive(b))return null;if(CLV_SKIP[b.m]||b.m==
 function clvOf0(b){var p0=b.price; /* the odds you got, as typed in the Odds column (a boost counts too) */if(b.m==="par"){var d=1,ok=true;(b.legs||[]).forEach(function(l){var c=closeOf(Object.assign({d:b.d},l,{book:l.book||b.book}));if(!c)ok=false;else d*=payOf(c.price)});if(!ok)return null;var pay0=payOf(p0);return{close:payToAm(d),pct:pay0/d-1,fin:betStarted(b)}}
   var c=closeOf(b);if(!c)return null;return{close:c.price,book:c.book,pct:payOf(p0)/payOf(c.price)-1,fin:betStarted(b)}}
 function betNew(b){return Object.assign({},b,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString()})}
+/* ticking a bet only changes the two parlay buttons, so only they are updated (redrawing the whole table took most of a second) */
+function betSelUi(){var n=S.bets.filter(function(b){return S.bsel&&S.bsel[b.id]&&b.m!=="par"}).length,a=$("betParlay"),k=$("betParlayK");
+  if(a){a.textContent="Make parlay"+(n?" · "+n:"");a.disabled=n<2}if(k)k.disabled=n<2}
+/* Editing one bet's odds, units or result used to redraw the whole page, which took seconds with a few hundred bets and
+   swallowed the next click. Now the new page is built off screen and only the totals at the top and that night's rows
+   are swapped in. Anything else (a filter, a sort, a new bet) still redraws in full. */
+function betPaint(html){var P=S._bpatch;S._bpatch=null;var oldP=P&&view.querySelector(".panel.bets");
+  if(oldP){var tpl=document.createElement("template");tpl.innerHTML=html;var newP=tpl.content.querySelector(".panel.bets");
+    if(newP){var heads=[];for(var c=tpl.content.firstChild;c&&c!==newP;c=c.nextSibling)heads.push(c);
+      while(view.firstChild&&view.firstChild!==oldP)view.removeChild(view.firstChild);heads.forEach(function(n){view.insertBefore(n,oldP)});
+      var ok=true;S.bets.filter(function(b){return b.d===P.d}).forEach(function(b){var q='[data-bsel="'+b.id+'"],[data-be^="'+b.id+'|"]',o=oldP.querySelector(q),n=newP.querySelector(q);
+        o=o&&o.closest("tr");n=n&&n.closest("tr");if(o&&n){if(b.id===P.id||o.outerHTML!==n.outerHTML)o.replaceWith(n)}else if(o||n)ok=false});
+      if(ok)return}}
+  view.innerHTML=html}
 function betParlay(keep){var ids=S.bsel||{},legs=S.bets.filter(function(b){return ids[b.id]&&b.m!=="par"&&!b.man});if(legs.length<2){toast("Tick two or more single bets first");return}
   var pay=1,books={},d=legs[0].d;legs.forEach(function(b){pay*=payOf(b.price);books[b.book||""]=1;if(b.d<d)d=b.d});var bk=Object.keys(books),price=payToAm(pay);
   var L=legs.map(function(b){return{p:b.p,d:b.d,t:b.t,opp:b.opp,home:b.home,m:b.m,k:b.k,price:b.price,book:b.book||""}});
@@ -2419,12 +2433,12 @@ document.addEventListener("change",function(e){var id=e.target.id,v=e.target.val
   if(id==="parBook"){PAR.book=v;savePar();return renderSlip()}
   if(id==="parBoost"){var pb=parseFloat(String(v).replace(/[^0-9.]/g,""));PAR.boost=pb>0?pb:0;savePar();return setTimeout(renderSlip,0)}
   if(id==="parUnits"){var pu=parseFloat(String(v).replace(/[^0-9.]/g,""));if(pu>0)PAR.units=Math.round(pu*100)/100;savePar();return setTimeout(renderSlip,0)}
-  if(t.dataset&&t.dataset.bsel){S.bsel=S.bsel||{};if(t.checked)S.bsel[t.dataset.bsel]=1;else delete S.bsel[t.dataset.bsel];return render()}
+  if(t.dataset&&t.dataset.bsel){S.bsel=S.bsel||{};if(t.checked)S.bsel[t.dataset.bsel]=1;else delete S.bsel[t.dataset.bsel];return betSelUi()}
   if(t.dataset&&t.dataset.be){var bp=t.dataset.be.split("|"),bb=S.bets.filter(function(b){return b.id===bp[0]})[0];if(!bb)return;
     if(bp[1]==="price"){var bn=parseInt(String(v).replace(/[^0-9+-]/g,""),10);if(bn&&Math.abs(bn)>=100)bb.price=bn}
     else if(bp[1]==="u"){var bu=parseFloat(String(v).replace(/[^0-9.]/g,""));if(bu>0)bb.u=Math.round(bu*100)/100}
     else if(bp[1]==="res")bb.res=v;
-    saveBets();return render()}
+    saveBets();S._bpatch={id:bb.id,d:bb.d};return render()}
   if(id==="betFile")return betImport(t);
   if(id==="unitSize"){var un=parseFloat(String(v).replace(/[^0-9.]/g,""));if(un>0){S.unit=un;try{localStorage.setItem("tolUnit",un)}catch(_){}}return render()}
   if(t.closest&&t.closest("#betAdd")){bformKeep();return}
