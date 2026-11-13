@@ -327,6 +327,7 @@ h2.sep{margin-top:12px;color:var(--muted)}
 @media(max-width:900px){.rup .rtop{grid-template-columns:minmax(0,1fr)}.rup .rparts{grid-template-columns:repeat(2,minmax(0,1fr))}.rup .rbig{font-size:48px}}
 @media(max-width:560px){.rup .rparts{grid-template-columns:minmax(0,1fr)}}
 .rkey{margin:16px 0 0;display:grid;grid-template-columns:minmax(180px,max-content) minmax(0,1fr);gap:6px 18px;font-size:13px;line-height:1.5}.rkey dt{color:var(--ink);font-weight:500}.rkey dd{margin:0;color:var(--muted)}@media(max-width:700px){.rkey{grid-template-columns:minmax(0,1fr)}.rkey dd{margin-bottom:6px}}
+.tw{contain:paint}input.pxin{position:relative} /* typing in a box no longer repaints the whole bets table */
 </style>
 
 <div class="wrap">
@@ -1649,7 +1650,7 @@ function t3LadderHtml(rows,top,anyOdds){var A=t3LadderList(rows).filter(function
     var lab=RBT?'<span class="lkk">'+k+'+</span>':'';
     if(!x)return '<td class="n lc0'+(mark?" lnm":"")+'">'+lab+'<div class="lc'+(hit?" hit":"")+'">'+(RBT?'<span class="o lkk2">'+k+'+</span>':'')+'<span class="o">'+Math.round(v*100)+'%</span><span class="o">'+fairOdds(v)+'</span></div></td>';
     var good=r.lad.pos.indexOf(x)>=0;
-    return '<td class="n lc0'+(mark?" lnm":"")+'" title="Model '+Math.round(x.pm*100)+'%, market '+Math.round(x.mk*100)+'%, pick chance '+Math.round(x.p*100)+'%, breaks even at '+fairOdds(x.p)+'">'+lab+'<div class="lc'+(good?" good":"")+(hit?" hit":"")+'">'+(RBT?'<span class="o lkk2">'+k+'+</span>':'')+bxc(x,'<b class="'+(good?"":"o")+'">'+fmtP(x.price)+'</b>')+'<span class="'+(x.ev>0?"up":"o")+'">'+(x.ev>0?"+":"")+Math.round(x.ev*100)+'%</span>'+(good?'<span class="stk" title="Suggested share of one unit">'+x.stk.toFixed(2)+'u</span>':'')+'</div></td>'}
+    return '<td class="n lc0'+(mark?" lnm":"")+'" title="Model '+Math.round(x.pm*100)+'%, market '+Math.round(x.mk*100)+'%, pick chance '+Math.round(x.p*100)+'%, breaks even at '+fairOdds(x.p)+'">'+lab+'<div class="lc'+(good?" good":"")+(hit?" hit":"")+'">'+(RBT?'<span class="o lkk2">'+k+'+</span>':'')+bxc(x,'<b class="'+(good?"":"o")+'">'+fmtP(x.price)+'</b>',good?x.stk:0)+'<span class="'+(x.ev>0?"up":"o")+'">'+(x.ev>0?"+":"")+Math.round(x.ev*100)+'%</span>'+(good?'<span class="stk" title="Suggested share of one unit">'+x.stk.toFixed(2)+'u</span>':'')+'</div></td>'}
   var lt={u:0,n:0,w:0,rn:0,rh:0,lv:0};L.forEach(function(r){var l=r.lad;if(!l.priced||l.res==null)return;lt.u+=l.res;if(l.lv)lt.lv++;else{lt.n++;if(l.res>0)lt.w++}l.pos.forEach(function(x){lt.rn++;if(r.res[CC]>=x.k)lt.rh++})});
   return '<section class="panel"><div class="phead"><h2>Ladder watch</h2><span class="nightly">'+(lt.n||lt.lv?nightTag(lt.u,lt.rh+' of '+lt.rn+' rungs hit'+(lt.n?' · '+lt.w+' of '+lt.n+' ladders in profit':'')+(lt.lv?' · '+lt.lv+' still live':''),'One unit a player, split across his shaded rungs. A rung he reaches wins at once; a rung he has not reached loses only when his game ends.'):'')+'<span class="tag">'+(L.length?L.length+' candidate'+(L.length>1?"s":"")+(anyOdds?' · best total edge first':(RBT?' · by '+SC().profK+'+ chance':' · by 4+ chance')):'no candidates')+'</span></span></div>'+
     '<p class="note" style="margin-bottom:14px">'+(anyOdds?(RBT?'Players with two or more rungs from his line up to four above it that each beat their price, reaching at least one past the line; one ladder for every two games, at most five, no more than two from one game.':'Players with two or more rungs between 2+ and 5+ that each beat their price, reaching 3+ or higher; one ladder for every two games, at most five, no more than two from one game.')+' Each cell is the best price and its edge on the pick chance; shaded rungs are the ones to ladder, with a suggested split of one unit underneath (more on the lower rungs, less on the long ones). The orange bar marks his main over/under line, where the ladder starts. Plain cells have no price on record and show the model chance and break-even odds. After the game, every rung he reached is outlined in green. ':(RBT?'No ladder prices on record, so these are the players with a ladder profile: '+SC().profMu+' or more projected '+SC().u+' and at least a 25% chance of '+SC().profK+'+. Each cell is the rung, the model chance and the price it needs. After the game, every rung he reached is outlined in green.':'No ladder prices on record, so these are the shooters with a ladder profile: 7.5 or more projected attempts and at least a 25% chance of 4+. Each cell is the model chance and the price it needs. After the game, every rung he reached is outlined in green. '))+(RBT?'':'The 6+ column is for reference only: the model has run a little high there.')+'</p>'+
@@ -1677,14 +1678,14 @@ function betCount(){var tb=$("tab-bets");if(!tb||!D)return;var n=S.bets.filter(f
 function betWhat(b){var c0=b.m.charAt(0),R=c0==="R"||c0==="A",m=R?b.m.slice(1):b.m,u=c0==="R"?" rebounds":c0==="A"?" assists":" threes";if(b.m==="ftb")return "First team basket";if(b.m==="mf")return "First basket: "+(MFN[MFC[b.k%10]]||"?");if(b.m==="par")return b.legs.length+"-leg parlay: "+b.legs.map(function(l){return betWhat(l)}).join(" + ");return b.m==="fb"?"First basket":m==="u"?"Under "+(b.k-.5)+u:m==="r"?b.k+"+"+u:"Over "+(b.k-.5)+u}
 function toast(t){var el=document.getElementById("toast")||document.body.appendChild(Object.assign(document.createElement("div"),{id:"toast"}));el.setAttribute("role","status");el.textContent=t;el.className="on";clearTimeout(toast.t);toast.t=setTimeout(function(){el.className=""},2600)}
 // a price that can be clicked to add the bet: m is fb (first basket), o (over the line), r (ladder rung) or u (under); k is the number of threes an over needs
-function bx(inner,p,d,t,opp,home,m,k,price,book,all){if(price==null||!p)return inner; /* p is -1 for a method of first basket with no player */var ks=all?Object.keys(all):[];
-  return '<span class="pxb" tabindex="0" role="button" data-nm="'+esc(D.players[p]||"")+'" data-at="'+esc(book||"")+'" data-bk="'+esc((ks.length?ks.map(function(b){return b+":"+all[b]}):[(book||"Book")+":"+price]).join("|"))+'" data-bet="'+esc([p,d,t,opp,home?1:0,m,k||0,price,String(book||"").replace(/\|/g,"/")].join("|"))+'">'+inner+'</span>'}
-function bxc(x,inner){var r=x.row,m=r.m;return bx(inner,r.p,m.g?m.g.d:m.d,r.t,r.opp,r.t===m.h,STAT[x.sk||"t3"].mp+(x.over?(x.rg?"r":"o"):"u"),x.k,x.price,x.book,x.all)}
-function addBet(key,bk2,px2){var k=key.split("|"),p=+k[0],d=k[1],m=k[5],kk=+k[6],price=+k[7],book=k.slice(8).join("|")||"";
+function bx(inner,p,d,t,opp,home,m,k,price,book,all,u){if(price==null||!p)return inner; /* p is -1 for a method of first basket with no player */var ks=all?Object.keys(all):[];
+  return '<span class="pxb" tabindex="0" role="button" data-nm="'+esc(D.players[p]||"")+'" data-at="'+esc(book||"")+'" data-bk="'+esc((ks.length?ks.map(function(b){return b+":"+all[b]}):[(book||"Book")+":"+price]).join("|"))+'" data-bet="'+esc([p,d,t,opp,home?1:0,m,k||0,price,String(book||"").replace(/\|/g,"/")].join("|"))+'"'+(u>0?' data-u="'+(+u).toFixed(2)+'"':'')+'>'+inner+'</span>'} // u: the suggested stake, used when the bet is added to My bets
+function bxc(x,inner,u){var r=x.row,m=r.m;return bx(inner,r.p,m.g?m.g.d:m.d,r.t,r.opp,r.t===m.h,STAT[x.sk||"t3"].mp+(x.over?(x.rg?"r":"o"):"u"),x.k,x.price,x.book,x.all,u)}
+function addBet(key,bk2,px2,u0){var k=key.split("|"),p=+k[0],d=k[1],m=k[5],kk=+k[6],price=+k[7],book=k.slice(8).join("|")||"";
   if(bk2!=null){book=bk2;price=px2;var bl=/^(.*) · (\d+(?:\.\d+)?)$/.exec(book);if(bl){book=bl[1];if(/^[RA]?[ou]$/.test(m))kk=Math.floor(+bl[2])+1}} // a book hanging a different line is listed with its own line: the bet is on that line
   if(S.bets.some(function(x){return x.p===p&&x.d===d&&x.m===m&&x.k===kk&&x.book===book})){toast("Already in My bets. Change the units there to add to it.");return}
-  var b={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString(),d:d,p:p,nm:p<0?"Any player":D.players[p]||("#"+p),t:k[2],opp:k[3],home:+k[4],m:m,k:kk,price:price,price0:price,book:book,u:m==="ftb"?FTP.u:1,res:"auto"};
-  S.bets.push(b);saveBets();betCount();toast("Added to My bets: "+b.nm+" · "+betWhat(b)+" "+fmtP(price)+(book?" · "+book:""));if(S.tab==="bets"||S.tab==="tonight")render()}
+  var b={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString(),d:d,p:p,nm:p<0?"Any player":D.players[p]||("#"+p),t:k[2],opp:k[3],home:+k[4],m:m,k:kk,price:price,price0:price,book:book,u:u0>0?Math.round(u0*100)/100:m==="ftb"?FTP.u:1,res:"auto"};
+  S.bets.push(b);saveBets();betCount();toast("Added to My bets: "+b.nm+" · "+betWhat(b)+" "+fmtP(price)+(book?" · "+book:"")+" · "+b.u+"u");if(S.tab==="bets"||S.tab==="tonight")render()}
 function addParlay(key){var k=key.split("|"),d=k[1],price=+k[3],legs=k[2].split(";").map(function(s){var q=s.split(":");return{p:+q[0],d:d,t:q[1],opp:q[2],home:+q[3],m:q[4],k:+q[5]}});
   if(S.bets.some(function(x){return x.m==="par"&&x.key===k[2]&&x.d===d})){toast("Already in My bets");return}
   var nmx=legs.map(function(l){return D.players[l.p]||""}).join(" + ");
@@ -1914,7 +1915,7 @@ function mfCard(r,i){var m=r.m,LG=mfLeague(m.g?m.g.d:m.d),mx=mfMix(r.p,m.g?m.g.d
   return '<article class="t3c'+(r.res===1?" win":r.res===0?" lost":"")+'"><div class="t3h"><span class="tm">'+lg(r.t)+m.a+' <span class="o">@</span> '+m.h+'</span><span class="bet">1ST · '+MFN[r.mt].toUpperCase()+'</span></div>'+
     '<div class="rl"><span class="o">'+(i+1)+' · '+r.t+'</span><span class="o">'+(m.g&&m.g.t?"TIPPED "+esc(m.g.t):m.t?esc(m.t):"")+'</span></div>'+
     '<div><div class="t3n">'+nm(r.p)+'</div>'+(st?'<div style="margin-top:8px">'+st+'</div>':'')+'</div>'+
-    '<div class="t3b">'+row("Best price",bx('<b class="big px v'+vl+'">'+fmtP(r.price)+'</b>',r.p,m.g?m.g.d:m.d,r.t,r.opp,r.t===m.h,"mf",MFC.indexOf(r.mt),r.price,r.book,r.all)+' <span class="o">'+esc(r.book)+'</span>')+
+    '<div class="t3b">'+row("Best price",bx('<b class="big px v'+vl+'">'+fmtP(r.price)+'</b>',r.p,m.g?m.g.d:m.d,r.t,r.opp,r.t===m.h,"mf",MFC.indexOf(r.mt),r.price,r.book,r.all,MFP.u)+' <span class="o">'+esc(r.book)+'</span>')+
       row("Edge",'<span class="tag'+(r.ev>0?' w':'')+'">'+(r.ev>0?'+':'')+Math.round(r.ev*100)+'%</span>')+row("Edge, chance cut a fifth",'<b>'+(r.q*MFSH*r.pay-1>0?"+":"")+Math.round((r.q*MFSH*r.pay-1)*100)+'%</b>')+row("Chance · fair",(r.q*100).toFixed(1)+'% <span class="o">· '+fairOdds(r.q)+'</span>')+row("Stake",'<b>'+MFP.u+'u</b>')+'</div>'+
     '<div class="t3b sep">'+row("First basket, any way",(fb*100).toFixed(1)+'%')+row(MFN[r.mt]+" share of his",Math.round((mx[r.mt]||0)*100)+'% <span class="o">of '+mx.n+' early makes</span>')+row("Value score",'<b>+'+r.vs.toFixed(1)+'</b>')+'</div></article>'}
 function mfPicksHtml(day){var F=mfPicks(day),priced=mfDay(day).some(function(x){return x.rows.some(function(r){return r.p})});if(!priced&&!F.top.length)return "";
@@ -2248,7 +2249,7 @@ function tnItems(day){var out=[],conf=tnConf(day),seen={};
   // first basket: the three shooters on each game at the chosen rating
   conf.forEach(function(s){var r=s.r;if(!r.fav||s.t!==r.fav||r.lv<S.minLv||!(r.top||[]).slice(0,3).some(function(x){return x.p===s.e.x.p}))return;var k=s.e.x.p+"|fb";if(seen[k])return;seen[k]=1;
     out.push({mk:"First basket",tag:"1B",p:s.e.x.p,t:s.t,opp:s.t===r.m.h?r.m.a:r.m.h,m:r.m,bet:"First basket",code:"fb",k:0,price:s.price,book:s.book,all:s.all,ch:s.e.p,u:1,res:r.m.g?(function(){var fs=firstScore(r.m.g);return fs?(fs[0]===s.e.x.p?1:0):null})():null})});
-  ftPicks(day).top.forEach(function(r){out.push({mk:"First team basket",tag:"FTB",p:r.p,t:r.t,opp:r.opp,m:r.m,bet:"First team basket",code:"ftb",k:0,price:r.price,book:r.book,all:r.all,ch:r.p2,u:1,res:r.res===1||r.res===0?r.res:null})});
+  ftPicks(day).top.forEach(function(r){out.push({mk:"First team basket",tag:"FTB",p:r.p,t:r.t,opp:r.opp,m:r.m,bet:"First team basket",code:"ftb",k:0,price:r.price,book:r.book,all:r.all,ch:r.p2,u:FTP.u,res:r.res===1||r.res===0?r.res:null})});
   ["t3","rb","as"].forEach(function(sk){inSK(sk,function(){t3Day(day).top.forEach(function(x){var r=x.row,C=STAT[sk];
     out.push({mk:C.nm,tag:C.tag||"3PM",p:r.p,t:r.t,opp:r.opp,m:r.m,bet:/^(Over|Under)/.test(x.lab)?x.lab+" "+C.u:x.lab,code:C.mp+(x.over?(x.rg?"r":"o"):"u"),k:x.k,price:x.price,book:x.book,all:x.all,ch:x.p,u:1,res:x.hit===true?1:x.hit===false?0:null})})})});
   mfPicks(day).top.forEach(function(r){out.push({mk:"Method",tag:"MTH",p:r.p,t:r.t,opp:r.opp,m:r.m,bet:"First basket: "+MFN[r.mt],code:"mf",k:MFC.indexOf(r.mt),price:r.price,book:r.book,all:r.all,ch:r.q,u:MFP.u,res:r.res===1||r.res===0?r.res:null})});
@@ -2273,7 +2274,7 @@ function vTonight(){TNC=null;
   var L=tnItems(day),n=L.length,mine=L.filter(function(x){return x.mine}).length,stake=0;L.forEach(function(x){if(x.price!=null)stake+=x.u});
   var opts=days.slice(0,40).map(function(d){return '<option value="'+d+'"'+(d===day?' selected':'')+'>'+fmtD(d)+', '+d.slice(0,4)+(d===today?' · today':'')+'</option>'}).join("");
   var rows=L.map(function(x){var m=x.m,live=m.g&&m.g.lv,tip=m.g&&m.g.t?"tipped "+m.g.t:m.t||"";
-    var price=x.price==null?'<span class="o">no price</span>':(x.code==="par"?'<b>'+fmtP(x.price)+'</b> <span class="o">'+esc(x.book)+'</span>':bx('<b>'+fmtP(x.price)+'</b>',x.p,m.g?m.g.d:m.d||day,x.t,x.opp,x.t===m.h,x.code,x.k,x.price,x.book,x.all)+' <span class="o">'+esc(x.book||"")+'</span>');
+    var price=x.price==null?'<span class="o">no price</span>':(x.code==="par"?'<b>'+fmtP(x.price)+'</b> <span class="o">'+esc(x.book)+'</span>':bx('<b>'+fmtP(x.price)+'</b>',x.p,m.g?m.g.d:m.d||day,x.t,x.opp,x.t===m.h,x.code,x.k,x.price,x.book,x.all,x.u)+' <span class="o">'+esc(x.book||"")+'</span>');
     return '<tr'+(x.res===1?' class="bwon"':'')+'><td class="o">'+esc(tip.replace(/ ET$/,""))+'</td><td><span class="tag">'+x.tag+'</span></td><td>'+(x.p?nm(x.p):'<b>Parlay</b>')+(x.t?' <span class="o">'+x.t+(m.a?' · '+m.a+' @ '+m.h:'')+'</span>':'')+'</td><td>'+esc(x.bet)+(/^[RA]?[or]$/.test(x.code)?glTag(m,true):'')+'</td><td class="n">'+price+'</td><td class="n">'+(x.ch!=null?(x.ch*100).toFixed(1)+'%':'–')+'</td><td class="n">'+(x.ev!=null?'<span class="tag '+(x.ev>0?"w":"")+'">'+(x.ev>0?"+":"")+Math.round(x.ev*100)+'%</span>':'–')+'</td><td class="n">'+x.u+'u</td>'+
       '<td>'+(x.res===1?'<span class="tag w">WON</span>':x.res===0?'<span class="tag l">LOST</span>':live?'<span class="tag q">LIVE</span>':'')+(x.mine?' <span class="tag w" title="Already in My bets">IN MY BETS ✓</span>':x.res==null&&x.price!=null?(x.code==="par"?' <button class="btn2 sm pzadd" data-pz="'+x.pz+'">+ Add</button>':' <span class="o" style="font-size:12px">click the price to add</span>'):'')+'</td></tr>'}).join("");
   var books=booksOn(day),bk=S.bst.book&&books.indexOf(S.bst.book)>=0?S.bst.book:books[0]||"",B=S.bst.pct||0,P=bk&&B?bstPool(day,bk).slice(0,15):[];
@@ -2318,7 +2319,7 @@ function render(){
 /* ---- events ---- */
 document.addEventListener("click",function(e){
   var ap=e.target.closest(".bktip [data-addpar]");if(ap)return parAdd(TIP.bet);
-  var ad=e.target.closest(".bktip [data-add]");if(ad){var ax=ad.dataset.add,ai=ax.lastIndexOf("|");addBet(TIP.bet,ax.slice(0,ai),+ax.slice(ai+1));return hideTip()}
+  var ad=e.target.closest(".bktip [data-add]");if(ad){var ax=ad.dataset.add,ai=ax.lastIndexOf("|");addBet(TIP.bet,ax.slice(0,ai),+ax.slice(ai+1),TIP.u);return hideTip()}
   if(e.target.closest(".bktip"))return;
   if(e.target.id==="slipTog"){PAR.open=true;savePar();return renderSlip()}
   if(e.target.id==="slipX"){PAR.open=false;savePar();return renderSlip()}
@@ -2328,7 +2329,7 @@ document.addEventListener("click",function(e){
   if(e.target.id==="parClear"){PAR.legs=[];savePar();return renderSlip()}
   if(e.target.closest("#slip")&&!e.target.closest("[data-pl]"))return;
   var pp=e.target.closest("[data-par]");if(pp){e.preventDefault();e.stopPropagation();return addParlay(pp.dataset.par)}
-  var pb=e.target.closest(".pxb");if(pb){e.preventDefault();e.stopPropagation();if(pb.dataset.bk.indexOf("|")<0){hideTip();return addBet(pb.dataset.bet)}return showTip(pb,1)}
+  var pb=e.target.closest(".pxb");if(pb){e.preventDefault();e.stopPropagation();if(pb.dataset.bk.indexOf("|")<0){hideTip();return addBet(pb.dataset.bet,null,null,+pb.dataset.u||0)}return showTip(pb,1)}
   if(TIP.pin)hideTip();
   var pzb=e.target.closest("[data-pz]");if(pzb){e.preventDefault();return pzAdd(+pzb.dataset.pz)}
   if(e.target.id==="betParlay")return betParlay();
@@ -2375,8 +2376,8 @@ document.addEventListener("click",function(e){
 });
 document.addEventListener("keydown",function(e){
   if((e.key==="Enter"||e.key===" ")&&e.target.dataset&&e.target.dataset.par){e.preventDefault();return addParlay(e.target.dataset.par)}
-  if((e.key==="Enter"||e.key===" ")&&e.target.classList&&e.target.classList.contains("pxb")){e.preventDefault();e.stopPropagation();if(e.target.dataset.bk.indexOf("|")<0)return addBet(e.target.dataset.bet);return showTip(e.target,1)}
-  if((e.key==="Enter"||e.key===" ")&&e.target.dataset&&e.target.dataset.add){e.preventDefault();var ax2=e.target.dataset.add,ai2=ax2.lastIndexOf("|");addBet(TIP.bet,ax2.slice(0,ai2),+ax2.slice(ai2+1));return hideTip()}
+  if((e.key==="Enter"||e.key===" ")&&e.target.classList&&e.target.classList.contains("pxb")){e.preventDefault();e.stopPropagation();if(e.target.dataset.bk.indexOf("|")<0)return addBet(e.target.dataset.bet,null,null,+e.target.dataset.u||0);return showTip(e.target,1)}
+  if((e.key==="Enter"||e.key===" ")&&e.target.dataset&&e.target.dataset.add){e.preventDefault();var ax2=e.target.dataset.add,ai2=ax2.lastIndexOf("|");addBet(TIP.bet,ax2.slice(0,ai2),+ax2.slice(ai2+1),TIP.u);return hideTip()}
   if(e.key==="Escape"&&TIP.pin)return hideTip();
   if(e.key==="Enter"&&e.target.closest&&e.target.closest("#betAdd")){e.preventDefault();return betManual()}
   if(e.target.closest&&e.target.closest(".bets input,#betAdd input")){if(e.key==="Enter")e.target.blur();return}
@@ -2401,7 +2402,7 @@ function showTip(h,pin){var el=TIP.el||(TIP.el=document.body.appendChild(Object.
     (q!=null?'<div class="bkc">Chance <b>'+(q*100).toFixed(1)+'%</b>'+(need!=null&&isFinite(need)?' · +3% needs <b>'+fmtP(need)+'</b> or better':'')+'</div>':'')+
     l.map(function(x){var ev=q!=null?q*payOf(x[1])-1:null;return '<div class="bkr'+(x[1]===best?" top":"")+(x[0]===h.dataset.at?" at":"")+(ev!=null&&ev<.03?" dim":"")+'"'+(pin?' data-add="'+esc(x[0]+"|"+x[1])+'" role="button" tabindex="0"':'')+'><span>'+esc(x[0])+'</span>'+(ev!=null?'<em class="'+(ev>0?"bup":"bdn")+'">'+(ev>0?"+":"")+Math.round(ev*100)+'%</em>':'')+'<b>'+fmtP(x[1])+'</b>'+(pin?'<i>+ add</i>':'')+'</div>'}).join("")+
     '<div class="bkf">'+(pin&&parOk(String(h.dataset.bet||"").split("|")[5]||"")?'<button type="button" class="bkpar" data-addpar="1">+ Add to parlay</button>':'')+(q!=null?"Edge at each book; under +3% is dimmed. ":"")+(pin?"Pick the book you bet it at. You can change the odds afterwards in My bets.":"Click the price to add it to My bets or a parlay")+'</div>';
-  el.className="bktip"+(pin?" pin":"");TIP.pin=pin;TIP.bet=h.dataset.bet;
+  el.className="bktip"+(pin?" pin":"");TIP.pin=pin;TIP.bet=h.dataset.bet;TIP.u=+h.dataset.u||0;
   el.style.display="block";var r=h.getBoundingClientRect(),w=el.offsetWidth,ht=el.offsetHeight,x=Math.min(window.innerWidth-w-8,Math.max(8,r.left+r.width/2-w/2)),y=r.bottom+6+ht>window.innerHeight?r.top-ht-6:r.bottom+6;
   el.style.left=x+"px";el.style.top=Math.max(8,y)+"px";TIP.at=h}
 function hideTip(){if(TIP.el)TIP.el.style.display="none";TIP.at=null;TIP.pin=0}
