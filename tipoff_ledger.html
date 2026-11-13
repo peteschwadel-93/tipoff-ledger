@@ -1742,8 +1742,12 @@ function vBets(){S.bsel=S.bsel||{};
     (runs.length?'<div class="netdays"><small>Night by night</small>'+runs.slice().reverse().slice(0,14).map(function(x){return '<span class="netday '+(x.u>0?"up":x.u<0?"dn":"")+'" title="Running total '+sg(x.run)+'u">'+fmtD(x.d)+' <b>'+sg(x.u)+'u</b></span>'}).join("")+'</div>':'')+
     (function(){var n=0,w=0,t=0,ev=0;S.bets.forEach(function(b){var c=clvOf(b);if(!c||!c.fin)return;n++;t+=c.pct;if(c.pct>0.0005)w++;else if(c.pct>-0.0005)ev++});
       return '<div class="netdays"><small>Closing line value</small>'+(n?'<span class="netday '+(t>0?"up":t<0?"dn":"")+'" title="Bets whose odds paid more than the last price before tip">Beat the close on <b>'+w+' of '+n+'</b>'+(ev?' <span class="o">('+ev+' unchanged)</span>':'')+'</span><span class="netday '+(t>0?"up":t<0?"dn":"")+'" title="Average of your odds against the closing price, in payout">Average <b>'+(t>0?"+":"")+(100*t/n).toFixed(1)+'%</b></span>':'<span class="o" style="font-size:13px">fills in as games tip off · the quickest sign of a real edge, weeks before results can show it</span>')+'</div>'})()+
-    '<p class="note" style="grid-column:1/-1">To add a bet, click any underlined price on Picks or Threes (pick cards, value tables, threes cards, the ladder and the slate) and choose the book you bet it at. It lands here at one unit and that book\'s price; change the odds for a boost, or the units, in the table. Results fill in by themselves as games are played, and a player who does not play is voided. No price listed for what you bet? Use “Add a bet by hand” below. These bets are saved in this browser only, so use Export to back them up or move them to another device.</p></section>';
+    '<p class="note" style="grid-column:1/-1">To add a bet, click any underlined price on Picks or Threes (pick cards, value tables, threes cards, the ladder and the slate) and choose the book you bet it at. It lands here at that book\'s price, at the suggested stake where one is shown and one unit otherwise; change the odds for a boost, or the units, in the table. Results fill in by themselves as games are played, and a player who does not play is voided. No price listed for what you bet? Use “Add a bet by hand” below. These bets are saved in this browser only, so use Export to back them up or move them to another device.</p></section>';
   var f=S.betF,rows=all.filter(function(x){return f==="all"||(f==="open"?x.g.pl==null&&x.g.st!=="void":x.g.pl!=null||x.g.st==="void")});
+  /* the table shows open bets and the last seven nights unless "Show all" is on: a few hundred rows made every redraw slow.
+     The totals above always count every bet. */
+  var cut=new Date(new Date(todayET()+"T12:00:00Z").getTime()-7*864e5).toISOString().slice(0,10),nAll=rows.length;
+  if(!S.betAllN)rows=rows.filter(function(x){return (x.g.pl==null&&x.g.st!=="void")||x.b.d>=cut});var nHid=nAll-rows.length;
   var ST={won:["m","WON"],lost:["x","LOST"],void:["","VOID"],open:["","OPEN"],live:["live","LIVE"]};
   var nSel=S.bets.filter(function(b){return S.bsel[b.id]&&b.m!=="par"}).length;
   var cols=[
@@ -1782,7 +1786,7 @@ function vBets(){S.bsel=S.bsel||{};
     '<label class="f">Book <input type="text" id="bfBook" class="pxin" style="width:120px;text-align:left" placeholder="optional" value="'+esc(F.book||"")+'"></label><label class="f lvck"><input type="checkbox" id="bfLive"'+(F.lv?" checked":"")+'> Live bet</label>'+
     '<button class="btn2" id="bfAdd">Add bet</button></div><p class="note" style="margin-top:10px">Line is for threes, rebounds and assists: the over/under number (2.5), or for a ladder rung the count (3 for 3+). Leave it empty for a first basket. Tick <b>Live bet</b> for one placed during the game (anything added after tip is marked live anyway): it is graded as usual, but kept out of chance, edge and CLV, and gets its own tile above. First basket, first team basket and method bets, and parlays with one of them as a leg, are left out of CLV too: they are not value hunts.</p></section>';
   betPaint(head+'<section class="panel bets" style="margin-top:20px"><div class="phead"><h2>My bets · '+S.bets.length+'</h2><div class="pickers"><span class="seg" role="group" aria-label="Which bets">'+[["all","All"],["open","Open"],["done","Settled"]].map(function(o){return '<button data-bf="'+o[0]+'" aria-pressed="'+(f===o[0])+'">'+o[1]+'</button>'}).join("")+'</span>'+
-    '<label class="f">One unit = $ <input type="text" inputmode="decimal" class="pxin" id="unitSize" value="'+S.unit+'" aria-label="Dollars per unit"></label><button class="btn2" id="betParlay"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. The ticked bets move into the parlay.">Make parlay'+(nSel?" · "+nSel:"")+'</button><button class="btn2" id="betParlayK"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. Makes the parlay and leaves the ticked bets as singles too.">Parlay + keep singles</button><button class="btn2" id="betExport"'+(S.bets.length?"":" disabled")+'>Export</button><button class="btn2" id="betImport">Import</button><input type="file" id="betFile" accept="application/json,.json" hidden></div></div>'+
+    '<button class="btn2" id="betAllN" title="'+(S.betAllN?'Show only open bets and the last seven nights':'Older settled bets are hidden to keep this page quick; the totals above count them all')+'">'+(S.betAllN?'Show recent only':nHid?'Show all · '+nHid+' older':'Showing all')+'</button><label class="f">One unit = $ <input type="text" inputmode="decimal" class="pxin" id="unitSize" value="'+S.unit+'" aria-label="Dollars per unit"></label><button class="btn2" id="betParlay"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. The ticked bets move into the parlay.">Make parlay'+(nSel?" · "+nSel:"")+'</button><button class="btn2" id="betParlayK"'+(nSel>1?"":" disabled")+' title="Tick two or more bets first. Makes the parlay and leaves the ticked bets as singles too.">Parlay + keep singles</button><button class="btn2" id="betExport"'+(S.bets.length?"":" disabled")+'>Export</button><button class="btn2" id="betImport">Import</button><input type="file" id="betFile" accept="application/json,.json" hidden></div></div>'+
     (S.bets.length?table("bets",cols,rows,{k:"d",dir:-1},{row:function(x){var c=(x.g.st==="won"?"bwon":"")+(byN&&x.first?" bday":"");return c?' class="'+c+'"':""}}):'<p class="empty">No bets yet. Click any underlined price on the Picks or Threes tabs, or add one by hand below.</p>')+'</section><div style="margin-top:20px">'+form+'</div>');
   betCount()}
 
@@ -1837,6 +1841,8 @@ function mfMix(p,day,LG){var l=(mfIndex().P[p]||[]).filter(function(x){return x[
 var MFADJ={"3PT":.91,Layup:.92,Dunk:1,Other:1.13},MFSH=.8; // MFSH: the night's top player-and-method picks hit about four fifths as often as the model said, so value is judged on a chance a fifth lower
 function mfFirst(g){var f=null;[g.h,g.a].forEach(function(t){(g.fs&&g.fs[t]||[]).forEach(function(s){if(s[2]&&(!f||s[6]<f[6]))f=s})});return f} // the game's first points, free throws included
 function mfDay(day){D._mfd=D._mfd||{};var ck=day+"|"+S.book+"|"+(S.bookOff?1:0);if(D._mfd[ck])return D._mfd[ck];
+  if(dayDone(day)){FIN.mf=FIN.mf||{};var fk=ck+"|"+S.ft;if(FIN.mf[fk])return D._mfd[ck]=FIN.mf[fk];var fo=mfDay0(day);FIN.mf[fk]=fo;return D._mfd[ck]=fo}return D._mfd[ck]=mfDay0(day)}
+function mfDay0(day){var ck=day+"|"+S.book+"|"+(S.bookOff?1:0);
   var LG=mfLeague(day),conf=S._conf&&S._conf.day===day?S._conf.list:(fbInfo(day,0),(S._fbi&&S._fbi.list)||[]),out=[]; // inside the Picks page its own list; elsewhere read through fbInfo
   ftMs(day).forEach(function(m){var o=(D.odds||{})[day+"|"+m.a+"|"+m.h],mf=o&&o.mf||[],g=m.g;
     var cs=conf.filter(function(s){return s.r.m.a===m.a&&s.r.m.h===m.h}),P={},tot=0;MFC.forEach(function(k){P[k]=0});
@@ -2356,6 +2362,7 @@ document.addEventListener("click",function(e){
   if(e.target.id==="bfAdd")return betManual();
   var lvb=e.target.closest("[data-blv]");if(lvb){var lb=S.bets.filter(function(x){return x.id===lvb.dataset.blv})[0];if(lb){lb.lv=betIsLive(lb)?0:1;saveBets();BCH={};return render()}}
   var bf=e.target.closest("[data-bf]");if(bf){S.betF=bf.dataset.bf;return render()}
+  if(e.target.closest("#betAllN")){S.betAllN=!S.betAllN;return render()}
   if(S.tab==="bets"&&e.target.closest(".bets input,.bets select,#betAdd"))return;
   var pl=e.target.closest("[data-pl]");if(pl&&!e.target.closest("select")){e.preventDefault();return showPlayer(+pl.dataset.pl)}
   if(e.target.id==="pm"||e.target.closest("#pmX"))return closePlayer();
@@ -2467,8 +2474,24 @@ function start(d){
   var top=jumperTable().sort(function(a,b){return b.tips-a.tips})[0];S.jumper=top?top.p:null;
   $("subline").textContent=d.season+" season · opening tips, jumper head-to-heads and first attempts, from NBA play-by-play.";
   $("fresh").innerHTML=d.games.length+" games through "+fmtD(d.through)+", "+d.through.slice(0,4)+"<br>data built "+esc(d.built.replace("T"," ").replace("Z"," UTC"));
-  render();
+  render();warmSoon();
 }
+/* After the page loads (and after each data refresh), the numbers behind the Tracker, My bets and past nights are worked out
+   in small slices while the browser is idle, newest night first, so those tabs open from memory instead of computing for a
+   second or more on the first click. Finished nights are kept for the whole visit (see FIN), so this runs once. */
+var WARM=null;
+function warmSoon(){if(typeof window==="undefined"||!window.setTimeout||S.lockOff||!D)return;var ver=WARM={},today=todayET(),sy=seasonOf(today),days={},q=[];
+  Object.keys(D.odds||{}).forEach(function(k){var d=k.slice(0,10);if(d<today&&seasonOf(d)===sy)days[d]=1});
+  D.games.forEach(function(g){if(g.s===sy&&g.d<today)days[g.d]=days[g.d]||2});
+  Object.keys(days).sort().reverse().forEach(function(d){if(!dayDone(d))return;
+    q.push(function(){fbInfo(d)});if(days[d]===2)return;
+    q.push(function(){var kb=S.bookOff;try{S.bookOff=1;mfDay(d);S.bookOff=0;mfDay(d)}finally{S.bookOff=kb}});
+    ["t3","rb","as"].forEach(function(sk){q.push(function(){inSK(sk,function(){var kb=S.bookOff;try{S.bookOff=1;t3Day(d);S.bookOff=0;t3Day(d)}finally{S.bookOff=kb}})})})});
+  q.push(function(){var kb=S.bookOff;try{S.bookOff=1;trackGames(sy)}finally{S.bookOff=kb}});
+  q.push(function(){var kb=S.bookOff;try{S.bookOff=1;trackGames(sy-1,true)}finally{S.bookOff=kb}});
+  function run(){if(WARM!==ver)return;var t0=Date.now();while(q.length&&Date.now()-t0<12){try{q.shift()()}catch(_){}}if(q.length)next()}
+  function next(){(window.requestIdleCallback||function(f){return setTimeout(f,40)})(run,{timeout:3000})}
+  setTimeout(next,1200)}
 function fail(){
   $("fresh").textContent="No data loaded";
   view.innerHTML='<p class="empty">The play-by-play data did not load. Reload the page; if it stays empty, rebuild the data with build_data.py.</p>';
