@@ -333,6 +333,7 @@ h2.sep{margin-top:12px;color:var(--muted)}
 #view{contain-intrinsic-size:auto 3000px}body.pmOpen #view{content-visibility:hidden}
 #pm .pc{contain:layout paint}
 
+.rup .rref{opacity:.62}.rup .rcard.rref{border-style:dashed}
 </style>
 
 <div class="wrap">
@@ -924,7 +925,7 @@ var RB={c:.6587,st:.1217,m:.7725,r:1.128,r2:.0543,o:.9981,ms:.405,z0:-3.821,z1:.
 var AS={c:.0959,st:.0999,m:.8998,r:.9046,r2:-.0182,o:1.0715,ms:.4965,z0:-3.4216,z1:-.8659,z2:1.3251,z3:2.9879}; // assists: the same form, fitted the same way (29,000 player-games projected for 1.5+)
 function CNT(){return SK!=="t3"}
 function SP(){return SC().P||RB}
-var SK="t3",STAT={t3:{k:"t3",mw:.5,nm:"Threes",noun:"made threes",u:"threes",rg:" made",col:2,f:"m",of:"a",li:"t3",al:"t3a",lk:"t3",seen:"seen",lw:"lw",fz:"fz",volMin:4,volShow:2.5,mp:""},
+var SK="t3",STAT={t3:{k:"t3",mw:.4,nm:"Threes",noun:"made threes",u:"threes",rg:" made",col:2,f:"m",of:"a",li:"t3",al:"t3a",lk:"t3",seen:"seen",lw:"lw",fz:"fz",volMin:4,volShow:2.5,mp:""},
   rb:{k:"rb",mw:.4,nm:"Rebounds",noun:"rebounds",u:"rebounds",u1:"rebound",one:"rebound",tag:"REB",rg:" reb",col:4,f:"r",of:"r",li:"rb",al:"rba",lk:"rb",seen:"rseen",lw:"rlw",fz:"rfz",volMin:4,volShow:3,mp:"R",P:RB,calK:[4,6,8,10,12],bek:[6,8,10],profMu:8,profK:10,ladVol:6,range:"3+ to 15+"},
   as:{k:"as",mw:.4,nm:"Assists",noun:"assists",u:"assists",u1:"assist",one:"assist",tag:"AST",rg:" ast",col:5,f:"s2",of:"s2",li:"as",al:"asa",lk:"as",seen:"aseen",lw:"alw",fz:"afz",volMin:4,volShow:2,mp:"A",P:AS,calK:[2,4,6,8,10],bek:[4,6,8],profMu:7,profK:9,ladVol:5,range:"2+ to 12+"}};
 STAT.t3.one="made-threes";
@@ -1125,9 +1126,10 @@ function t3Day0(day,raw){var all=D.games,sched=D.sched||[],C=SC(),LK=lkOf(day),P
             if(ln[4]!=null)cand.push({lab:"Under "+ln[1],k:kk,over:0,sk:SK,pm:1-po,mk:two?1-mo:iu/1.07,two:two,price:ln[4],book:ln[5],all:allU})}
           Object.keys(row.o.k).map(Number).forEach(function(k){var v=row.o.k[k],v0=v[0];if(one&&v[2]){if(v[2][one]==null)return;v=[v[2][one],one,v[2]]}if(ln&&k===kk&&ln[2]!=null&&ln[2]>=v[0])return;
             cand.push({lab:k+"+"+C.rg,k:k,over:1,rg:1,sk:SK,pm:t3AtLeast(d,k),mk:two&&k===kk?mo:1/payOf(v0)/1.07,two:two&&k===kk,price:v[0],book:v[1],all:v[2]})});
-          /* the pick chance blends the model and the market: half and half for threes, 40% model and 60% market for rebounds and
-             assists. Nov 16: on this season's ~9,000 rebound and assist lines the model was right about direction but stretched its
-             disagreements with the market by about five times, so those picks hit well under their stated chance; 40% fit far better.
+          /* the pick chance blends the model and the market: 40% model and 60% market for all three stats. Nov 16: on this season's
+             ~9,000 rebound and assist lines the model was right about direction but stretched its disagreements with the market by about
+             five times, so those picks hit well under their stated chance; 40% fit far better. Nov 22: threes showed the same pattern on
+             ladder rungs (rungs where the model sat 4+ points above the market hit 46% against 51% claimed), so threes moved to 40% too.
              A gap over 12 points still usually means news the model has not seen. */
           cand.forEach(function(x){var w=C.mw!=null?C.mw:.5;x.pay=payOf(x.price);x.gap=Math.abs(x.pm-x.mk);x.p=w*x.pm+(1-w)*x.mk;x.ev=x.p*x.pay-1;x.vs=valScore(x.p,x.pay);x.row=row;
             x.hit=t3Hit(x,row)});
@@ -1460,22 +1462,23 @@ function trkRoundup(sy){
   part("mf","Method picks",MFP.u+"u each",MFP.u,mf);
   part("pz","Parlay ideas","1u each",1,pzRecord().days.map(function(x){return{d:x.d,n:x.n,w:x.w,u:x.u}}));
   function sum(keys){var a={n:0,w:0,u:0,st:0};parts.forEach(function(p){if(keys.indexOf(p.key)>=0){a.n+=p.n;a.w+=p.w;a.u+=p.u;a.st+=p.st}});return a}
-  var T=sum(["t3","rb","as","lw","fb","ft","mf","pz"]),PR=sum(["t3","rb","as","lw"]),FB=sum(["fb"]);
+  var REF={mf:1,pz:1}; /* method picks and parlay ideas are research reference points: tracked here, kept out of every total */
+  var T=sum(["t3","rb","as","lw","fb","ft"]),PR=sum(["t3","rb","as","lw"]),FB=sum(["fb"]);
   var lab=sy+"-"+String(sy+1).slice(2),U=S.unit||10;
   function cl(u){return Math.abs(u)<.005?"rzero":u>0?"rup1":"rdn"}
   function uu(u){return (u>0.004?"+":u<-0.004?"−":"")+Math.abs(u).toFixed(2)+"u"}
   function usd(u){var v=Math.round(u*U);return (v>0?"+":v<0?"−":"")+"$"+Math.abs(v).toLocaleString()}
   function roi(a){return a.st?(a.u>=0?"+":"−")+Math.abs(Math.round(a.u/a.st*100))+"%":"–"}
   function line(a,noun,won){return a.n?a.n+" "+noun+" · "+a.w+" "+won+" · ROI "+roi(a)+" · "+usd(a.u):"nothing settled yet"}
-  var wks=Object.keys(W).sort(),up=0,run=0;wks.forEach(function(k){var t=0;Object.keys(W[k]).forEach(function(p){t+=W[k][p]});W[k].tot=t;if(t>0)up++});
-  var h='<section class="panel rup"><div class="rtop"><div><div class="rlab">All tracked bets · net units · '+lab+'</div><div class="rbig '+cl(T.u)+'">'+(T.n?uu(T.u):"–")+'</div>'+
+  var wks=Object.keys(W).sort(),up=0,run=0;wks=wks.filter(function(k){return Object.keys(W[k]).some(function(p){return !REF[p]})});wks.forEach(function(k){var t=0;Object.keys(W[k]).forEach(function(p){if(!REF[p])t+=W[k][p]});W[k].tot=t;if(t>0)up++});
+  var h='<section class="panel rup"><div class="rtop"><div><div class="rlab">Model-backed bets · net units · '+lab+'</div><div class="rbig '+cl(T.u)+'">'+(T.n?uu(T.u):"–")+'</div>'+
     '<div class="rsub">'+(T.n?'<b>'+usd(T.u)+'</b> at $'+U+' a unit · '+T.st.toFixed(1)+' units staked · ROI '+roi(T)+' · '+up+' of '+wks.length+' week'+(wks.length===1?'':'s')+' up':'Nothing settled yet'+(S.win?' in the betting window':'')+'.')+'</div></div>'+
     '<div class="rcard"><div class="rlab">Props total<i>best plays and ladders</i></div><div class="rmid '+cl(PR.u)+'">'+(PR.n?uu(PR.u):"–")+'</div><div class="rsub">'+(PR.n?PR.st.toFixed(1)+'u staked · ROI '+roi(PR)+' · '+usd(PR.u):'nothing settled yet')+'</div></div>'+
     '<div class="rcard"><div class="rlab">First basket<i>4-chevron picks only</i></div><div class="rmid '+cl(FB.u)+'">'+(FB.n?uu(FB.u):"–")+'</div><div class="rsub">'+(FB.n?FB.st.toFixed(1)+'u staked · ROI '+roi(FB)+' · '+usd(FB.u):'nothing settled yet')+'</div></div></div>'+
-    '<div class="rlab" style="margin-top:6px">By part</div><div class="rparts">'+parts.map(function(p){return '<div class="rcard"><div class="rlab">'+esc(p.lab)+'<i>'+esc(p.sub)+'</i></div><div class="rmid '+cl(p.u)+'">'+(p.n?uu(p.u):"–")+'</div><div class="rsub">'+line(p,p.key==="pz"?"parlays":p.key==="lw"?"ladders":"picks",p.key==="pz"?"won":p.key==="lw"?"in profit":"hit")+'</div></div>'}).join("")+'</div>';
-  if(wks.length)h+='<div class="rlab" style="margin-top:6px">Week by week</div><div class="tw"><table class="rwk"><thead><tr><th>Week of</th>'+parts.map(function(p){return '<th class="n">'+esc(p.key==="ft"?"Team basket":p.key==="mf"?"Method":p.key==="pz"?"Parlays":p.key==="lw"?"Ladders":p.key==="fb"?"1st basket":p.lab)+'</th>'}).join("")+'<th class="n">Total</th><th class="n rate">Running</th></tr></thead><tbody>'+
-    wks.map(function(k){var r=W[k];run+=r.tot;return '<tr><td>'+fmtD(k)+'</td>'+parts.map(function(p){var v=r[p.key];return '<td class="n">'+(v==null?'<span class="o">–</span>':'<span class="'+cl(v)+'">'+uu(v)+'</span>')+'</td>'}).join("")+'<td class="n"><b class="'+cl(r.tot)+'">'+uu(r.tot)+'</b></td><td class="n rate"><b class="'+cl(run)+'">'+uu(run)+'</b></td></tr>'}).join("")+'</tbody></table></div>';
-  h+='<p class="note">Every bet this page tracks, settled at the stored price before tip, best price across books: one unit on each Best play for threes, rebounds and assists, one unit split across each Ladder watch ladder as suggested, one unit on each first basket shooter picked in a 4-chevron game (games at fewer chevrons are left out), '+FTP.u+'u on each first team basket pick, '+MFP.u+'u on each method pick, one unit on each parlay idea. '+(S.win?'Counts the betting window only (switch to All dates below to count everything). ':'Counts every date of the season. ')+'Weeks run Monday to Sunday. Each part has its full record further down this page.</p></section>';
+    '<div class="rlab" style="margin-top:6px">By part</div><div class="rparts">'+parts.map(function(p){return '<div class="rcard'+(REF[p.key]?' rref':'')+'"><div class="rlab">'+esc(p.lab)+'<i>'+esc(p.sub)+(REF[p.key]?' · reference, not in total':'')+'</i></div><div class="rmid '+cl(p.u)+'">'+(p.n?uu(p.u):"–")+'</div><div class="rsub">'+line(p,p.key==="pz"?"parlays":p.key==="lw"?"ladders":"picks",p.key==="pz"?"won":p.key==="lw"?"in profit":"hit")+'</div></div>'}).join("")+'</div>';
+  if(wks.length)h+='<div class="rlab" style="margin-top:6px">Week by week</div><div class="tw"><table class="rwk"><thead><tr><th>Week of</th>'+parts.filter(function(p){return !REF[p.key]}).map(function(p){return '<th class="n">'+esc(p.key==="ft"?"Team basket":p.key==="mf"?"Method":p.key==="pz"?"Parlays":p.key==="lw"?"Ladders":p.key==="fb"?"1st basket":p.lab)+'</th>'}).join("")+'<th class="n">Total</th><th class="n rate">Running</th>'+parts.filter(function(p){return REF[p.key]}).map(function(p){return '<th class="n rref" title="Reference only, not in the total">'+(p.key==="mf"?"Method":"Parlays")+' · ref</th>'}).join("")+'</tr></thead><tbody>'+
+    wks.map(function(k){var r=W[k];run+=r.tot;return '<tr><td>'+fmtD(k)+'</td>'+parts.filter(function(p){return !REF[p.key]}).map(function(p){var v=r[p.key];return '<td class="n">'+(v==null?'<span class="o">–</span>':'<span class="'+cl(v)+'">'+uu(v)+'</span>')+'</td>'}).join("")+'<td class="n"><b class="'+cl(r.tot)+'">'+uu(r.tot)+'</b></td><td class="n rate"><b class="'+cl(run)+'">'+uu(run)+'</b></td>'+parts.filter(function(p){return REF[p.key]}).map(function(p){var v=r[p.key];return '<td class="n rref">'+(v==null?'<span class="o">–</span>':'<span class="'+cl(v)+'">'+uu(v)+'</span>')+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table></div>';
+  h+='<p class="note">The total counts the model-backed bets, settled at the stored price before tip, best price across books: one unit on each Best play for threes, rebounds and assists, one unit split across each Ladder watch ladder as suggested, one unit on each first basket shooter picked in a 4-chevron game (games at fewer chevrons are left out), and '+FTP.u+'u on each first team basket pick. Method picks ('+MFP.u+'u each) and parlay ideas (one unit each) are research reference points: their records are shown, dimmed, but they are not in the total, the week totals or the running line. '+(S.win?'Counts the betting window only (switch to All dates below to count everything). ':'Counts every date of the season. ')+'Weeks run Monday to Sunday. Each part has its full record further down this page.</p></section>';
   return h}
 function vTracker(){S.bookOff=1;try{vTracker2()}finally{S.bookOff=0}}
 function vTracker2(){
@@ -2637,7 +2640,7 @@ function vMovers(){var M=D.movers||{},today=todayET(),days=Object.keys(M).sort()
   var rowsSw='<div class="gp" id="mvRows"><button data-mvr="one" aria-pressed="'+one+'">One a player</button><button data-mvr="every" aria-pressed="'+!one+'">Every change</button></div>';
   view.innerHTML='<section class="panel"><div class="phead"><h2>Movers · '+fmtD(day)+'</h2><div class="pickers"><label class="f">Day <select id="mvDay">'+days.map(function(d){return '<option value="'+d+'"'+(d===day?" selected":"")+'>'+fmtD(d)+', '+d.slice(0,4)+(d===today?" · today":"")+'</option>'}).join("")+'</select></label></div></div>'+
     '<div class="mvbar">'+pills+rowsSw+'<span class="tag">'+Object.keys(pl).length+' players</span> <span class="tag nu up">'+up+' up</span> <span class="tag nu dn">'+dn+' down</span></div>'+
-    '<p class="note">Every refresh compares each player with the refresh before, for games still to start, and records what changed. <b>Chance</b> is the pick chance the cards use: for first basket and first team basket the model\'s chance; for threes, rebounds and assists the chance of the over at the main line, the model and the market blended (half and half for threes, 40% model for rebounds and assists). <b>Proj</b> is the model\'s projected made threes, rebounds or assists. <b>Moved</b> is the change in chance in points, or the change in projection while there is no price yet. <b>Value</b> is the value score of his best bet in that market, before and after. '+
+    '<p class="note">Every refresh compares each player with the refresh before, for games still to start, and records what changed. <b>Chance</b> is the pick chance the cards use: for first basket and first team basket the model\'s chance; for threes, rebounds and assists the chance of the over at the main line, the model and the market blended (40% model, 60% market, for all three stats). <b>Proj</b> is the model\'s projected made threes, rebounds or assists. <b>Moved</b> is the change in chance in points, or the change in projection while there is no price yet. <b>Value</b> is the value score of his best bet in that market, before and after. '+
     '<b>One a player</b> nets the whole day into one row, from the first refresh to now; <b>Every change</b> lists each refresh on its own row. A cause with little or no move is real: one input can cancel another. Prices are fetched three times before each game (about twelve hours, two hours and 25 minutes out, the last after lineups are posted), so most moves between those come from news. The log covers today and the two days before; nothing is recorded once a game has started. Select a column to sort.</p>'+
     (R.length?'<div class="tw"><table class="t3 mv" id="mvTbl"><thead><tr>'+cols.map(th).join("")+'</tr></thead><tbody>'+body+'</tbody></table></div>'+(R.length>150?'<button class="more" id="mvMore">'+(S.mvAll?"Show the top 150":"Show all "+R.length)+'</button>':''):'<p class="empty">No moves in this market on this day.</p>')+'</section>'}
 /* a player's changes on the night, for his pop-up */
