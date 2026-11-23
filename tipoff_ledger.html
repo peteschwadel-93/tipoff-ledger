@@ -810,7 +810,7 @@ function vPicks(){
     if(any)nt.ghit++});
   var allPriced=nt.n>0&&nt.priced===nt.n;
   // the first-basket export: each picked game's favoured side and its three picks, at the best price across books
-  S._fbx={day:day,rows:picks.slice().sort(function(a,b){var x=a.m.ts||(a.m.g&&a.m.g.ts)||"",y=b.m.ts||(b.m.g&&b.m.g.ts)||"";return x<y?-1:x>y?1:0}).map(function(r){var od=oddsOf(r.m);
+  if(view&&view.id==="view")S._fbx={day:day,rows:picks.slice().sort(function(a,b){var x=a.m.ts||(a.m.g&&a.m.g.ts)||"",y=b.m.ts||(b.m.g&&b.m.g.ts)||"";return x<y?-1:x>y?1:0}).map(function(r){var od=oddsOf(r.m);
     return {t:r.fav,pl:(r.top||[]).slice(0,3).map(function(x){var l=od&&od._k[normName(D.players[x.p])],o=l&&l.length===1?l[0]:null;var c=ctxOf(r.m),ij=c&&injOf(c,r.fav,x.p);return {n:o?o[0]:(D.players[x.p]||""),v:o?o[1]:null,q:!!(ij&&luOf(c,r.fav,x.p)!=="start")}})}}).filter(function(x){return x.t&&x.pl.length})};
   var night=nt.n?'<span class="tag '+(nt.hit?"w":"")+'" title="Picked players who scored their game\'s first points, free throws included, the same rule the cards use. Only games that have had a score are counted.">'+nt.hit+' OF '+nt.n+' FIRST BASKET</span> '+
       '<span class="tag" title="Picked players who took a shot before their game\'s first basket.">'+nt.att+' OF '+nt.n+' SHOT EARLY</span> '+
