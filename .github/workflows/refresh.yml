@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy3.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -88,8 +88,26 @@ jobs:
         if: steps.build.outcome == 'success'
         with:
           path: _site
+      # Publishing sometimes fails on GitHub's side ("No artifacts named github-pages were found",
+      # "Fetching artifact metadata failed") even though the upload worked. Wait and try again,
+      # up to three times, before calling the run a failure. The data, locks and movers are
+      # already saved by this point either way.
       - id: deploy
         if: steps.build.outcome == 'success'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Wait before publishing again
+        if: steps.build.outcome == 'success' && steps.deploy.outcome == 'failure'
+        run: sleep 20
+      - id: deploy2
+        if: steps.build.outcome == 'success' && steps.deploy.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Wait before the last try
+        if: steps.build.outcome == 'success' && steps.deploy.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 45
+      - id: deploy3
+        if: steps.build.outcome == 'success' && steps.deploy.outcome == 'failure' && steps.deploy2.outcome == 'failure'
         uses: actions/deploy-pages@v4
 
       - name: Report a failed save
